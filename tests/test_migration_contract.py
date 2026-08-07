@@ -3,6 +3,7 @@ from pathlib import Path
 
 MIGRATION = Path("infra/migrations/0001_source_catalog_and_staging.sql")
 INVALID_POLYGON_MIGRATION = Path("infra/migrations/0002_allow_invalid_staging_polygons.sql")
+SEGMENT_MIGRATION = Path("infra/migrations/0003_road_axis_candidates_and_segments.sql")
 
 
 class MigrationContractTests(unittest.TestCase):
@@ -41,6 +42,14 @@ class MigrationContractTests(unittest.TestCase):
             "DROP CONSTRAINT staging_mowing_polygon_original_geometry_check",
             sql,
         )
+
+    def test_segment_schema_uses_metric_crs_and_blocks_unvalidated_axis(self) -> None:
+        sql = SEGMENT_MIGRATION.read_text(encoding="utf-8")
+
+        self.assertIn("geometry(LineString, 31983)", sql)
+        self.assertIn("validation_status = 'validated' OR NOT eligible_for_operations", sql)
+        self.assertIn("UNIQUE (road_axis_candidate_id, segment_index)", sql)
+
 
 if __name__ == "__main__":
     unittest.main()

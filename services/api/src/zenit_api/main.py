@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 
 from zenit_api.config import get_settings
+from zenit_api.segments import router as segments_router
 
 
 class HealthResponse(BaseModel):
@@ -26,6 +27,7 @@ app = FastAPI(
     version=settings.app_version,
     lifespan=lifespan,
 )
+app.include_router(segments_router)
 
 
 @app.get("/health", response_model=HealthResponse, tags=["system"])

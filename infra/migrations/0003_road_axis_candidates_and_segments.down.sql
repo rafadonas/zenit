@@ -1,0 +1,7 @@
+BEGIN;
+
+DROP TABLE IF EXISTS road_segment;
+DROP TABLE IF EXISTS road_axis_candidate;
+DROP TABLE IF EXISTS road;
+
+COMMIT;
