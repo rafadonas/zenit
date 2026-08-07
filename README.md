@@ -6,10 +6,22 @@ execution, and auditable operational reporting.
 
 ## Current status
 
-Sprints 0–2 are implemented: the local stack and health API, auditable source
-ingestion into PostGIS, a marker-derived candidate axis split into 100 m
-segments, a bbox GeoJSON endpoint, and a read-only dashboard map. The candidate
-axis remains `estimated`, `needs_validation`, and blocked from operational use.
+Sprints 0–2 are complete. The repository currently provides:
+
+- a Docker Compose development stack with FastAPI, PostGIS, and MinIO;
+- immutable source cataloguing, checksums, lineage, and idempotent imports;
+- typed KMZ/KML and workbook parsers with structured anomaly reporting;
+- a marker-derived candidate axis split into 309 geometric segments;
+- a bbox GeoJSON endpoint and a read-only Next.js corridor dashboard; and
+- Python and TypeScript lint, tests, builds, and CI gates.
+
+The candidate axis is development-only. It is explicitly labelled `estimated`,
+`needs_validation`, and `eligible_for_operations=false` because no official road
+axis was supplied and the marker dataset contains known inversions and gaps.
+
+Sprint 3, the cached satellite pipeline and explainable rule baseline, is the
+current implementation focus. No satellite scene has been supplied or approved
+for operational use yet.
 
 ## Planned architecture
 
@@ -28,6 +40,18 @@ axis remains `estimated`, `needs_validation`, and blocked from operational use.
 Place the supplied project inputs in `data/raw/`. Raw inputs are local,
 immutable evidence and must not be committed. See `data/README.md` for the
 expected files and handling rules.
+
+Historical spreadsheet observations use reference date **2025-03-28**. They are
+not current vegetation conditions and must not be treated as a growth series.
+Simulated or prepared demonstration inputs are never eligible for training or
+official reports.
+
+## Prerequisites
+
+- Python 3.12–3.14
+- Node.js 22 or newer
+- Docker Engine with Docker Compose
+- PostgreSQL/PostGIS and object storage through the provided Compose stack
 
 ## Development sequence
 
@@ -73,8 +97,7 @@ export DOCKER_HOST="unix:///run/user/$(id -u)/docker.sock"
 ```
 
 PostGIS, MinIO, and the API have been built and validated as healthy. Flutter is
-not installed yet because the mobile application is outside the current Sprint 1
-ingestion scope.
+not installed yet because the mobile application starts in Sprint 5.
 
 ## Database migrations and ingestion
 
@@ -82,11 +105,11 @@ Apply migrations in numeric order before importing sources. The current local
 database already has migrations `0001`, `0002`, and `0003` applied.
 
 ```bash
-docker-compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0001_source_catalog_and_staging.sql
-docker-compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0002_allow_invalid_staging_polygons.sql
-docker-compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0003_road_axis_candidates_and_segments.sql
 ```
 
