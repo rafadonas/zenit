@@ -19,9 +19,11 @@ The candidate axis is development-only. It is explicitly labelled `estimated`,
 `needs_validation`, and `eligible_for_operations=false` because no official road
 axis was supplied and the marker dataset contains known inversions and gaps.
 
-Sprint 3, the cached satellite pipeline and explainable rule baseline, is the
-current implementation focus. No satellite scene has been supplied or approved
-for operational use yet.
+Sprint 3 is in progress. Its database foundation now catalogs cached satellite
+scenes and checksummed assets, versioned/idempotent runs, segment zones, quality
+metrics, and explainable recommendations. A non-persisting analysis preview is
+available for validating the baseline rules. No satellite scene has been
+supplied or approved for operational use, so no real raster result is claimed.
 
 ## Planned architecture
 
@@ -102,7 +104,8 @@ not installed yet because the mobile application starts in Sprint 5.
 ## Database migrations and ingestion
 
 Apply migrations in numeric order before importing sources. The current local
-database already has migrations `0001`, `0002`, and `0003` applied.
+database has migrations `0001` through `0003` applied. Migration `0004` adds the
+Sprint 3 foundation and must be applied explicitly.
 
 ```bash
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
@@ -111,6 +114,8 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0002_allow_invalid_staging_polygons.sql
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0003_road_axis_candidates_and_segments.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
+  < infra/migrations/0004_satellite_analysis_foundation.sql
 ```
 
 Use `zenit-import` for one immutable raw file at a time. Full examples are in
@@ -127,6 +132,21 @@ GET /v1/roads/SP021/segments?min_lon=-46.84&min_lat=-23.64&max_lon=-46.72&max_la
 The response is GeoJSON in EPSG:4326. Segment properties explicitly report
 `estimated`, `needs_validation`, and `eligible_for_operations=false`; see
 `docs/data-quality/km-axis-quality.md` before using this dataset.
+
+## Analysis preview API
+
+The Sprint 3 baseline can be evaluated without persisting a result:
+
+```text
+POST /v1/analysis/preview
+```
+
+The request labels scene quality and status, reflectance inputs, valid-pixel
+coverage, zone type, and—when available—an independently observed height with
+its provenance status. NDVI alone never becomes a height estimate. Low-quality
+or non-real data returns `inconclusive` and `inspect`; a real height over the
+applicable 30 cm or 10 cm threshold returns `mowing_review`, which still requires
+human approval. See `docs/decisions/ADR-0005-quality-gated-satellite-baseline.md`.
 
 ## Dashboard development
 
