@@ -1,0 +1,45 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "zenit-api"
+version = "0.1.0"
+description = "ZENIT road-vegetation monitoring API"
+readme = "README.md"
+requires-python = ">=3.12,<3.15"
+dependencies = [
+  "fastapi>=0.116,<1",
+  "pydantic-settings>=2.10,<3",
+  "psycopg[binary]>=3.2,<4",
+  "uvicorn[standard]>=0.35,<1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "httpx>=0.28,<1",
+  "pytest>=8.4,<10",
+  "pytest-cov>=6.2,<8",
+  "ruff>=0.12,<1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = [
+  "services/api/src/zenit_api",
+]
+
+[tool.pytest.ini_options]
+addopts = "--strict-config --strict-markers --cov=zenit_api --cov-report=term-missing"
+pythonpath = [".", "services/api/src", "services/geospatial-worker/src"]
+testpaths = ["services/api/tests", "tests"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["services/api/src", "services/api/tests", "services/geospatial-worker/src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/test_source_parsers.py" = ["E501"]

@@ -1,0 +1,38 @@
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Supplied and generated data
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+.coverage
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+.tools/
+
+# JavaScript / TypeScript
+node_modules/
+.next/
+*.tsbuildinfo
+coverage/
+
+# Local source documents
+ZENIT_Manual_Mestre_para_Codex.pdf
+
+# Flutter / Dart
+.dart_tool/
+build/
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
