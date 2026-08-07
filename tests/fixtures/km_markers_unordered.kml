@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <Placemark>
+      <description>SP021 km 1</description>
+      <Point><coordinates>-46.71,-23.41,0</coordinates></Point>
+    </Placemark>
+    <Placemark>
+      <description>SP021&#9;&#10;km 0</description>
+      <Point><coordinates>-46.70,-23.40,0</coordinates></Point>
+    </Placemark>
+  </Document>
+</kml>

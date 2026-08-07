@@ -1,0 +1,248 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-08-06T22:00:43.796865+00:00",
+  "raw_directory": "data/raw",
+  "file_count": 8,
+  "files": [
+    {
+      "path": "01. Rodovia Motiva - Rodoanel/Marco km_rodoanel 2.kmz",
+      "size_bytes": 3104,
+      "sha256": "f457d3a9aca27ea5e2ee7527f2efb80c38cd87a1b280d675a3d1881b186b11e4",
+      "detected_format": "kmz",
+      "details": {
+        "archive_members": [
+          "doc.kml"
+        ],
+        "kml_documents": {
+          "doc.kml": {
+            "placemark_count": 30,
+            "geometry_counts": {
+              "Point": 30
+            },
+            "coordinate_bounds": {
+              "min_longitude": -46.83184134075487,
+              "min_latitude": -23.63253885917052,
+              "max_longitude": -46.73676819732765,
+              "max_latitude": -23.41620665170857
+            },
+            "placemark_names": {},
+            "placemark_descriptions": {
+              "SP021\nkm 0": 1,
+              "SP021\nkm 1": 1,
+              "SP021\nkm 3": 1,
+              "SP021\nkm 2": 1,
+              "SP021\nkm 4": 1,
+              "SP021\nkm 5": 1,
+              "SP021\nkm 6": 1,
+              "SP021\nkm 7": 1,
+              "SP021\nkm 9": 1,
+              "SP021\nkm 10": 1,
+              "SP021\nkm 12": 1,
+              "SP021\nkm 13": 1,
+              "SP021\nkm 14": 1,
+              "SP021\nkm 15": 1,
+              "SP021\nkm 16": 1,
+              "SP021\nkm 17": 1,
+              "SP021\nkm 18": 1,
+              "SP021\nkm 19": 1,
+              "SP021\nkm20": 1,
+              "SP021\nkm 21": 1,
+              "SP021\nkm 22": 1,
+              "SP021\nkm 23": 1,
+              "SP021\nkm 24": 1,
+              "SP021\nkm 25": 1,
+              "SP021\nkm 26": 1,
+              "SP021\nkm 27": 1,
+              "SP021\nkm 28": 1,
+              "SP021\nkm 29": 1,
+              "SP021\nkm 11": 1,
+              "SP021\t\nkm 8": 1
+            },
+            "field_presence": {},
+            "field_sample_values": {},
+            "numeric_field_stats": {}
+          }
+        }
+      }
+    },
+    {
+      "path": "01. Rodovia Motiva - Rodoanel/classificacao_rocada.kmz",
+      "size_bytes": 1893845,
+      "sha256": "7cfb094262d3c6e8485eb5f466a222dd9cb96e7157a0f4c4004c30685ba24dac",
+      "detected_format": "kml",
+      "details": {
+        "placemark_count": 642,
+        "geometry_counts": {
+          "Polygon": 642
+        },
+        "coordinate_bounds": {
+          "min_longitude": -46.8303484225394,
+          "min_latitude": -23.6292698139127,
+          "max_longitude": -46.728624868219,
+          "max_latitude": -23.4078190380033
+        },
+        "placemark_names": {
+          "Apenas manual": 342,
+          "Spider, Giro-Zero ou Trator com trincheira": 180,
+          "Trator com braço articulado": 106,
+          "Spider, com ancoragem": 14
+        },
+        "placemark_descriptions": {
+          "23": 63,
+          "9": 56,
+          "15": 45,
+          "0": 44,
+          "19": 42,
+          "5": 41,
+          "4": 35,
+          "6": 28,
+          "13": 27,
+          "24": 27,
+          "20": 25,
+          "25": 25,
+          "18": 23,
+          "26": 22,
+          "22": 21,
+          "21": 19,
+          "14": 17,
+          "12": 16,
+          "1": 14,
+          "10": 12,
+          "28": 11,
+          "2": 9,
+          "16": 9,
+          "17": 8,
+          "27": 3
+        },
+        "field_presence": {
+          "KM": 642,
+          "Latitude": 642,
+          "classe": 642
+        },
+        "field_sample_values": {
+          "KM": [
+            "-46.8193661037333",
+            "-46.817604511103",
+            "-46.819708441487",
+            "-46.8153220703508",
+            "-46.8153343555477"
+          ],
+          "Latitude": [
+            "22.0458641253733",
+            "22.7975787292205",
+            "18.4865336553321",
+            "28.7639277996494",
+            "34.3564619935801"
+          ],
+          "classe": [
+            "-23.49917402563867",
+            "-23.52976663953104",
+            "-23.55419082912625",
+            "-23.56842146866329",
+            "-23.57442610301609"
+          ]
+        },
+        "numeric_field_stats": {
+          "KM": {
+            "count": 642,
+            "minimum": -46.830222744552,
+            "maximum": -46.7294114614872,
+            "sum": -30045.99660731948
+          },
+          "Latitude": {
+            "count": 642,
+            "minimum": 16.2327676721859,
+            "maximum": 26406.7785618048,
+            "sum": 981817.270074577
+          },
+          "classe": {
+            "count": 642,
+            "minimum": -23.62838220239957,
+            "maximum": -23.40800526011189,
+            "sum": -15098.733751529642
+          }
+        }
+      }
+    },
+    {
+      "path": "02. Dados Gestão verde - Atual/Retigrafico/RA-RET-ROÇ-LIMP-2026-03-13.xlsx",
+      "size_bytes": 120808,
+      "sha256": "b88a8e394a291ac1cf885f4bb4a27e4e81bd7d467272608a519eaa5deaceb4aa",
+      "detected_format": "xlsx",
+      "details": {
+        "sheets": [
+          {
+            "name": "ROÇADA",
+            "row_count": 27,
+            "max_column": 67,
+            "cell_count": 1676,
+            "merged_range_count": 40,
+            "contains_serial_45744": true
+          }
+        ],
+        "archive_member_count": 28
+      }
+    },
+    {
+      "path": "02. Dados Gestão verde - Atual/Retigrafico/RA-RET-ROÇ-LIMP-2026-03-20.xlsx",
+      "size_bytes": 120783,
+      "sha256": "516e64c1fc3574e33f956a6f24d7725626f01b6e9d1d83be05d469ea86a20466",
+      "detected_format": "xlsx",
+      "details": {
+        "sheets": [
+          {
+            "name": "ROÇADA",
+            "row_count": 27,
+            "max_column": 67,
+            "cell_count": 1676,
+            "merged_range_count": 40,
+            "contains_serial_45744": true
+          }
+        ],
+        "archive_member_count": 28
+      }
+    },
+    {
+      "path": "03. Obrigações Contratuais/ANTT/Programa de Exploração da Rodovia - PER - Volume I - Pós Esclarecimentos.pdf",
+      "size_bytes": 1905342,
+      "sha256": "6b41d221b92c6d685c1a67e5292d25770ec8a2073782ad19efb224bb8a445896",
+      "detected_format": "pdf",
+      "details": null
+    },
+    {
+      "path": "03. Obrigações Contratuais/Artesp/LOTE 2 - Anexo 06 - Serviços de Conservação do Sistema Rodoviário.pdf",
+      "size_bytes": 1166452,
+      "sha256": "94f186f5608cfe68e122d729830d6f9f2da8db2f39f9d8ba4481bf65344d62c1",
+      "detected_format": "pdf",
+      "details": null
+    },
+    {
+      "path": "Challenge CCR Motiva – Guia do Projeto.docx",
+      "size_bytes": 18199,
+      "sha256": "5bad7edfd72ab8f86461c07ab0508d82214cf607a96bc52e888a33c7e9d2f090",
+      "detected_format": "docx",
+      "details": {
+        "paragraph_count": 58,
+        "heading_sample": [
+          "Challenge CCR Motiva – 2ºAno - Ciência da Computação",
+          "1) Sobre a empresa Motiva",
+          "A Motiva é uma das maiores empresas de infraestrutura de mobilidade do Brasil, atuando na gestão de rodovias, além de também operar em setores como trens, metrôs e aeroportos. Seu principal objetivo é conectar pessoas e melhorar a mobilidade no país, sempre com foco em eficiência, segurança e sustentabilidade.",
+          "A empresa está presente em diversos estados brasileiros, administrando milhares de quilômetros de rodovias e impactando diariamente milhões de pessoas e veículos. Seu trabalho está diretamente ligado à economia do país, já que o transporte rodoviário é responsável por uma grande parte da movimentação de cargas no Brasil.",
+          "2) Qual o desafio",
+          "O desafio proposto pela Motiva consiste em pensar em uma forma mais inteligente de monitorar e gerenciar a vegetação presente ao longo das rodovias.",
+          "Hoje, esse processo exige acompanhamento constante e tomada de decisão baseada em informações muitas vezes limitadas ou desatualizadas.",
+          "A proposta é desenvolver uma solução que utilize tecnologia para melhorar esse processo, tornando-o mais eficiente, estratégico e baseado em dados.",
+          "Exemplo: Hoje, uma equipe pode realizar a roçada de um trecho da rodovia com base em um cronograma fixo, por exemplo, a cada 30 dias, sem considerar se a vegetação realmente precisa dessa intervenção naquele momento.",
+          "Com o uso de tecnologia, seria possível analisar dados como tempo desde a última manutenção, condições climáticas e crescimento estimado da vegetação, permitindo que a intervenção aconteça no momento ideal — nem antes (gerando custo desnecessário), nem depois (gerando risco)."
+        ]
+      }
+    },
+    {
+      "path": "Inovação Aberta_FIAP_04.26.pdf",
+      "size_bytes": 4913119,
+      "sha256": "7bbd8a74c63f89b1e42bec838f2d32fd206c9e39458ddfc35af916631c198958",
+      "detected_format": "pdf",
+      "details": null
+    }
+  ]
+}

@@ -15,6 +15,9 @@ dependencies = [
   "uvicorn[standard]>=0.35,<1",
 ]
 
+[project.scripts]
+zenit-import = "zenit_geospatial.cli:main"
+
 [project.optional-dependencies]
 dev = [
   "httpx>=0.28,<1",
@@ -26,6 +29,7 @@ dev = [
 [tool.hatch.build.targets.wheel]
 packages = [
   "services/api/src/zenit_api",
+  "services/geospatial-worker/src/zenit_geospatial",
 ]
 
 [tool.pytest.ini_options]

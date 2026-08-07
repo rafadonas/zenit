@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <Placemark>
+      <name>Apenas manual</name>
+      <description>19</description>
+      <ExtendedData>
+        <Data name="classe"><value>-23.45</value></Data>
+        <Data name="KM"><value>-46.75</value></Data>
+        <Data name="Latitude"><value>125.5</value></Data>
+      </ExtendedData>
+      <Polygon>
+        <outerBoundaryIs><LinearRing><coordinates>
+          -46.75,-23.45,0 -46.74,-23.45,0 -46.74,-23.44,0 -46.75,-23.45,0
+        </coordinates></LinearRing></outerBoundaryIs>
+      </Polygon>
+    </Placemark>
+  </Document>
+</kml>
