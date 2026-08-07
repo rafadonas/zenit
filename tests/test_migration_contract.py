@@ -4,6 +4,7 @@ from pathlib import Path
 MIGRATION = Path("infra/migrations/0001_source_catalog_and_staging.sql")
 INVALID_POLYGON_MIGRATION = Path("infra/migrations/0002_allow_invalid_staging_polygons.sql")
 SEGMENT_MIGRATION = Path("infra/migrations/0003_road_axis_candidates_and_segments.sql")
+SATELLITE_MIGRATION = Path("infra/migrations/0004_satellite_analysis_foundation.sql")
 
 
 class MigrationContractTests(unittest.TestCase):
@@ -49,6 +50,23 @@ class MigrationContractTests(unittest.TestCase):
         self.assertIn("geometry(LineString, 31983)", sql)
         self.assertIn("validation_status = 'validated' OR NOT eligible_for_operations", sql)
         self.assertIn("UNIQUE (road_axis_candidate_id, segment_index)", sql)
+
+    def test_satellite_analysis_preserves_quality_provenance_and_human_approval(self) -> None:
+        sql = SATELLITE_MIGRATION.read_text(encoding="utf-8")
+
+        for table in (
+            "segment_zone",
+            "satellite_scene",
+            "satellite_asset",
+            "analysis_run",
+            "vegetation_analysis",
+        ):
+            self.assertIn(f"CREATE TABLE {table}", sql)
+        self.assertIn("idempotency_key char(64) NOT NULL UNIQUE", sql)
+        self.assertIn("checksum_sha256 char(64) NOT NULL", sql)
+        self.assertIn("recommendation <> 'mowing_review' OR requires_human_approval", sql)
+        self.assertIn("zone_type = 'special' OR threshold_cm = 30.00", sql)
+        self.assertIn("zone_type <> 'special' OR threshold_cm = 10.00", sql)
 
 
 if __name__ == "__main__":
