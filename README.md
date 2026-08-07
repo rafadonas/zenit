@@ -6,9 +6,10 @@ execution, and auditable operational reporting.
 
 ## Current status
 
-The repository is in its foundation stage. The master specification is available
-at `ZENIT_Manual_Mestre_para_Codex.pdf`. Source datasets have not yet been added,
-so data ingestion and validation have not started.
+Sprints 0–2 are implemented: the local stack and health API, auditable source
+ingestion into PostGIS, a marker-derived candidate axis split into 100 m
+segments, a bbox GeoJSON endpoint, and a read-only dashboard map. The candidate
+axis remains `estimated`, `needs_validation`, and blocked from operational use.
 
 ## Planned architecture
 
@@ -127,4 +128,3 @@ npm run dashboard:typecheck
 npm run dashboard:test
 npm run dashboard:build
 ```
-# zenit

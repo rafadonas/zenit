@@ -1,0 +1,17 @@
+{
+  "name": "zenit",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/dashboard"
+  ],
+  "scripts": {
+    "dashboard:build": "npm run build --workspace @zenit/dashboard",
+    "dashboard:lint": "npm run lint --workspace @zenit/dashboard",
+    "dashboard:test": "npm run test --workspace @zenit/dashboard",
+    "dashboard:typecheck": "npm run typecheck --workspace @zenit/dashboard"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

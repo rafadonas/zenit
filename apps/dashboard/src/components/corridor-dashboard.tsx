@@ -1,0 +1,178 @@
+"use client";
+
+import { useMemo, useState } from "react";
+
+import {
+  formatDistance,
+  projectSegments,
+  type SegmentCollection,
+  type SegmentProperties,
+} from "../lib/segments";
+
+interface CorridorDashboardProps {
+  collection: SegmentCollection;
+}
+
+function SegmentDetails({ segment }: { segment: SegmentProperties | null }) {
+  if (!segment) {
+    return (
+      <div className="empty-selection">
+        <span aria-hidden="true">↗</span>
+        <p>Selecione um trecho no mapa para consultar seus metadados.</p>
+      </div>
+    );
+  }
+  return (
+    <dl className="detail-list">
+      <div>
+        <dt>Trecho</dt>
+        <dd>#{segment.segment_index.toString().padStart(3, "0")}</dd>
+      </div>
+      <div>
+        <dt>Extensão geométrica</dt>
+        <dd>{formatDistance(segment.end_distance_m - segment.start_distance_m)}</dd>
+      </div>
+      <div>
+        <dt>Posição no eixo estimado</dt>
+        <dd>
+          {formatDistance(segment.start_distance_m)} – {formatDistance(segment.end_distance_m)}
+        </dd>
+      </div>
+      <div>
+        <dt>Origem</dt>
+        <dd><span className="status-pill estimated">Estimado</span></dd>
+      </div>
+      <div>
+        <dt>Validação</dt>
+        <dd><span className="status-pill review">Pendente de validação</span></dd>
+      </div>
+      <div>
+        <dt>Uso operacional</dt>
+        <dd>{segment.eligible_for_operations ? "Liberado" : "Bloqueado"}</dd>
+      </div>
+    </dl>
+  );
+}
+
+export function CorridorDashboard({ collection }: CorridorDashboardProps) {
+  const projected = useMemo(() => projectSegments(collection.features), [collection.features]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const selected = projected.find((segment) => segment.id === selectedId)?.properties ?? null;
+  const totalDistance = Math.max(
+    0,
+    ...collection.features.map((feature) => feature.properties.end_distance_m),
+  );
+
+  return (
+    <main className="dashboard-shell">
+      <header className="topbar">
+        <div className="brand-block">
+          <span className="brand-mark" aria-hidden="true"><i /></span>
+          <div><strong>ZENIT</strong><small>Vegetação rodoviária</small></div>
+        </div>
+        <div className="route-context">
+          <span className="live-dot" aria-hidden="true" />
+          Ambiente de desenvolvimento · SP-021
+        </div>
+        <div className="update-context">
+          <span>Geometria</span>
+          <strong>candidata v1</strong>
+        </div>
+      </header>
+
+      <section className="hero-row">
+        <div>
+          <p className="eyebrow">Visão do corredor</p>
+          <h1>Rodoanel Oeste</h1>
+          <p className="subtitle">Segmentação geométrica para validação técnica</p>
+        </div>
+        <div className="warning-banner" role="status">
+          <span className="warning-icon" aria-hidden="true">!</span>
+          <div>
+            <strong>Eixo estimado — uso operacional bloqueado</strong>
+            <span>Marcos KM apresentam inversões e lacunas. Não usar para ordens ou geofence.</span>
+          </div>
+        </div>
+      </section>
+
+      <section className="kpi-grid" aria-label="Indicadores do corredor">
+        <article><span>Segmentos</span><strong>{collection.features.length}</strong><small>unidades geométricas</small></article>
+        <article><span>Extensão candidata</span><strong>{formatDistance(totalDistance)}</strong><small>não é KM oficial</small></article>
+        <article><span>Trechos operacionais</span><strong>0</strong><small>validação necessária</small></article>
+        <article><span>CRS métrico</span><strong>31983</strong><small>SIRGAS 2000 / UTM 23S</small></article>
+      </section>
+
+      <section className="workspace-grid">
+        <article className="map-card">
+          <div className="card-heading">
+            <div><p className="eyebrow">Mapa de segmentos</p><h2>Corredor completo</h2></div>
+            <div className="map-meta"><span>Saída EPSG:4326</span><span>100 m por trecho</span></div>
+          </div>
+
+          {projected.length === 0 ? (
+            <div className="map-empty"><p>Nenhum segmento encontrado nesta área.</p></div>
+          ) : (
+            <div className="map-frame">
+              <svg viewBox="0 0 1000 680" role="img" aria-labelledby="map-title map-description">
+                <title id="map-title">Mapa esquemático dos segmentos da SP-021</title>
+                <desc id="map-description">Eixo estimado dividido em segmentos selecionáveis de aproximadamente cem metros.</desc>
+                <defs>
+                  <pattern id="grid" width="38" height="38" patternUnits="userSpaceOnUse">
+                    <path d="M 38 0 L 0 0 0 38" className="grid-line" />
+                  </pattern>
+                  <filter id="route-glow" x="-30%" y="-30%" width="160%" height="160%">
+                    <feGaussianBlur stdDeviation="3" result="blur" />
+                    <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+                  </filter>
+                </defs>
+                <rect width="1000" height="680" fill="url(#grid)" />
+                <g className="route-shadow" aria-hidden="true">
+                  {projected.map((segment) => <path d={segment.path} key={`shadow-${segment.id}`} />)}
+                </g>
+                <g className="segments-layer">
+                  {projected.map((segment) => {
+                    const isSelected = segment.id === selectedId;
+                    return (
+                      <path
+                        aria-label={`Trecho ${segment.properties.segment_index}, ${formatDistance(segment.properties.end_distance_m - segment.properties.start_distance_m)}, estimado e não operacional`}
+                        className={isSelected ? "segment selected" : "segment"}
+                        d={segment.path}
+                        key={segment.id}
+                        onClick={() => setSelectedId(segment.id)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") setSelectedId(segment.id);
+                        }}
+                        role="button"
+                        tabIndex={0}
+                      />
+                    );
+                  })}
+                </g>
+              </svg>
+              <div className="north-indicator" aria-hidden="true"><span>N</span><i /></div>
+              <div className="map-legend" aria-label="Legenda">
+                <strong>Legenda</strong>
+                <span><i className="legend-line estimated-line" /> Eixo estimado</span>
+                <span><i className="legend-line selected-line" /> Segmento selecionado</span>
+                <span><i className="legend-lock">×</i> Uso operacional bloqueado</span>
+              </div>
+            </div>
+          )}
+          <footer className="map-footer">
+            <span>Fonte: marcos SP-021 importados · referência geométrica candidata</span>
+            <span>Atualização do conjunto: 06/08/2026</span>
+          </footer>
+        </article>
+
+        <aside className="side-panel">
+          <div className="side-heading"><p className="eyebrow">Inspeção</p><h2>Detalhes do trecho</h2></div>
+          <SegmentDetails segment={selected} />
+          <div className="quality-note">
+            <span aria-hidden="true">i</span>
+            <div><strong>Sobre esta camada</strong><p>Distâncias seguem a linha candidata de 30,85 km. A fonte não contém eixo rodoviário oficial.</p></div>
+          </div>
+        </aside>
+      </section>
+    </main>
+  );
+}
