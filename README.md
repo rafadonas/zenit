@@ -114,6 +114,11 @@ PostGIS, MinIO, the API, and the dashboard have been built and validated as
 healthy. Flutter is not installed yet because the mobile application starts in
 Sprint 5.
 
+CI repeats this validation from an empty Compose volume after the Python and
+dashboard jobs pass. The smoke job checks the final PostGIS schema, API health,
+an empty provenance-safe satellite response, and dashboard availability without
+requiring raw source files or provider credentials.
+
 ## Database migrations and ingestion
 
 Apply migrations in numeric order before importing sources. The current local

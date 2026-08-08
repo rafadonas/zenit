@@ -41,3 +41,41 @@ jobs:
         run: npm run dashboard:test
       - name: Build
         run: npm run dashboard:build
+
+  compose-smoke:
+    runs-on: ubuntu-latest
+    needs: [api, dashboard]
+    timeout-minutes: 15
+    env:
+      COMPOSE_PROJECT_NAME: zenit-ci
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and start a fresh stack
+        run: docker compose up --build --wait --wait-timeout 240
+      - name: Verify migrated schema
+        run: |
+          docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit -Atc \
+            "SELECT to_regclass('public.source_file') IS NOT NULL
+                AND to_regclass('public.road_segment') IS NOT NULL
+                AND to_regclass('public.vegetation_analysis') IS NOT NULL;" \
+            | grep -qx t
+          docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit -Atc \
+            "SELECT postgis_typmod_type(a.atttypmod)
+               FROM pg_attribute a
+               JOIN pg_class c ON c.oid = a.attrelid
+              WHERE c.relname = 'satellite_scene' AND a.attname = 'footprint';" \
+            | grep -qx MultiPolygon
+      - name: Verify service contracts
+        run: |
+          curl --fail --silent --show-error http://localhost:8000/health \
+            | python -c "import json,sys; payload=json.load(sys.stdin); assert payload['status'] == 'ok'"
+          curl --fail --silent --show-error \
+            http://localhost:8000/v1/segments/00000000-0000-4000-8000-000000000001/satellite-observations \
+            | python -c "import json,sys; payload=json.load(sys.stdin); assert payload['items'] == []; assert payload['metadata']['result_count'] == 0"
+          curl --fail --silent --show-error --output /dev/null http://localhost:3000
+      - name: Show service logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+      - name: Remove isolated stack
+        if: always()
+        run: docker compose down --volumes --remove-orphans
