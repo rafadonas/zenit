@@ -18,6 +18,7 @@ import {
 
 interface CorridorDashboardProps {
   collection: SegmentCollection;
+  initialSegmentIndex?: number | null;
 }
 
 function SegmentDetails({ segment }: { segment: SegmentProperties | null }) {
@@ -174,10 +175,19 @@ function SatelliteEvidence({ segmentId }: { segmentId: string | null }) {
   );
 }
 
-export function CorridorDashboard({ collection }: CorridorDashboardProps) {
+export function CorridorDashboard({
+  collection,
+  initialSegmentIndex = null,
+}: CorridorDashboardProps) {
   const projected = useMemo(() => projectSegments(collection.features), [collection.features]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [segmentSearch, setSegmentSearch] = useState("");
+  const initialSelectedId =
+    initialSegmentIndex === null
+      ? null
+      : findSegmentIdByIndex(collection.features, initialSegmentIndex);
+  const [selectedId, setSelectedId] = useState<string | null>(initialSelectedId);
+  const [segmentSearch, setSegmentSearch] = useState(
+    initialSelectedId && initialSegmentIndex !== null ? String(initialSegmentIndex) : "",
+  );
   const [searchError, setSearchError] = useState<string | null>(null);
   const selected = projected.find((segment) => segment.id === selectedId)?.properties ?? null;
   const totalDistance = Math.max(
@@ -189,6 +199,16 @@ export function CorridorDashboard({ collection }: CorridorDashboardProps) {
     ...collection.features.map((feature) => feature.properties.segment_index),
   );
 
+  function selectSegment(segmentId: string, segmentIndex: number, focus: boolean) {
+    setSelectedId(segmentId);
+    setSegmentSearch(String(segmentIndex));
+    setSearchError(null);
+    window.history.replaceState(null, "", `/?segment=${segmentIndex}`);
+    if (focus) {
+      requestAnimationFrame(() => document.getElementById(`segment-${segmentId}`)?.focus());
+    }
+  }
+
   function selectFromSearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const segmentIndex = Number(segmentSearch);
@@ -197,9 +217,7 @@ export function CorridorDashboard({ collection }: CorridorDashboardProps) {
       setSearchError(`Trecho inexistente. Informe um número entre 0 e ${maxSegmentIndex}.`);
       return;
     }
-    setSearchError(null);
-    setSelectedId(segmentId);
-    requestAnimationFrame(() => document.getElementById(`segment-${segmentId}`)?.focus());
+    selectSegment(segmentId, segmentIndex, true);
   }
 
   return (
@@ -297,9 +315,12 @@ export function CorridorDashboard({ collection }: CorridorDashboardProps) {
                         d={segment.path}
                         id={`segment-${segment.id}`}
                         key={segment.id}
-                        onClick={() => setSelectedId(segment.id)}
+                        onClick={() => selectSegment(segment.id, segment.properties.segment_index, false)}
                         onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ") setSelectedId(segment.id);
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            selectSegment(segment.id, segment.properties.segment_index, true);
+                          }
                         }}
                         role="button"
                         tabIndex={0}

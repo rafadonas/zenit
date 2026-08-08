@@ -28,7 +28,23 @@ async function loadSegments(): Promise<SegmentCollection> {
   return payload;
 }
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ segment?: string | string[] }>;
+}) {
+  const params = await searchParams;
+  const rawSegment = Array.isArray(params.segment) ? params.segment[0] : params.segment;
+  const parsedSegment = rawSegment === undefined ? null : Number(rawSegment);
+  const initialSegmentIndex =
+    parsedSegment !== null && Number.isInteger(parsedSegment) && parsedSegment >= 0
+      ? parsedSegment
+      : null;
   const segments = await loadSegments();
-  return <CorridorDashboard collection={segments} />;
+  return (
+    <CorridorDashboard
+      collection={segments}
+      initialSegmentIndex={initialSegmentIndex}
+    />
+  );
 }

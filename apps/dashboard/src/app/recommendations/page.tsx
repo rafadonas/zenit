@@ -85,7 +85,7 @@ export default async function RecommendationsPage() {
               </div>
               <footer>
                 <span>Regra {item.rule_version} · processador {item.processor_version}</span>
-                <strong>Uso em campo: bloqueado</strong>
+                <div><strong>Uso em campo: bloqueado</strong><Link href={`/?segment=${item.segment_index}`}>Ver trecho e evidências</Link></div>
               </footer>
             </article>
           );

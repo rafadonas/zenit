@@ -169,6 +169,9 @@ policy-pending review state without reviewer identity. Every item explicitly
 reports `authorizes_field_work=false`; no review-write endpoint is enabled.
 The dashboard exposes the same read-only queue at `/recommendations` and omits
 all decision controls until authenticated reviewer identity and RBAC exist.
+Each queue item links to a shareable corridor URL such as `/?segment=195`,
+opening the geometric segment and its satellite evidence directly without
+presenting the index as official stationing.
 
 Use `zenit-import` for one immutable raw file at a time. Full examples are in
 `docs/architecture/source-ingestion.md`.
