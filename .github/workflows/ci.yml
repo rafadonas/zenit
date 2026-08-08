@@ -57,7 +57,8 @@ jobs:
           docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit -Atc \
             "SELECT to_regclass('public.source_file') IS NOT NULL
                 AND to_regclass('public.road_segment') IS NOT NULL
-                AND to_regclass('public.vegetation_analysis') IS NOT NULL;" \
+                AND to_regclass('public.vegetation_analysis') IS NOT NULL
+                AND to_regclass('public.recommendation_review') IS NOT NULL;" \
             | grep -qx t
           docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit -Atc \
             "SELECT postgis_typmod_type(a.atttypmod)

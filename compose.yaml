@@ -18,6 +18,7 @@ services:
       - ./infra/migrations/0005_satellite_scene_discovery.sql:/docker-entrypoint-initdb.d/0005.sql:ro
       - ./infra/migrations/0006_satellite_scene_multipolygon.sql:/docker-entrypoint-initdb.d/0006.sql:ro
       - ./infra/migrations/0007_partial_satellite_cache.sql:/docker-entrypoint-initdb.d/0007.sql:ro
+      - ./infra/migrations/0008_recommendation_review_audit.sql:/docker-entrypoint-initdb.d/0008.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s

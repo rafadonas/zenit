@@ -12,6 +12,9 @@ SATELLITE_MULTIPOLYGON_MIGRATION = Path(
 SATELLITE_VALIDATION_AOI = Path("scripts/prepare_satellite_validation_aoi.sql")
 PARTIAL_CACHE_MIGRATION = Path("infra/migrations/0007_partial_satellite_cache.sql")
 COMPOSE_FILE = Path("compose.yaml")
+RECOMMENDATION_REVIEW_MIGRATION = Path(
+    "infra/migrations/0008_recommendation_review_audit.sql"
+)
 
 
 class MigrationContractTests(unittest.TestCase):
@@ -116,12 +119,25 @@ class MigrationContractTests(unittest.TestCase):
             for line in compose.splitlines()
             if "/docker-entrypoint-initdb.d/" in line
         ]
-        self.assertEqual(len(mounts), 7)
+        self.assertEqual(len(mounts), 8)
         for version, mount in enumerate(mounts, start=1):
             prefix = f"{version:04d}"
             self.assertIn(f"infra/migrations/{prefix}_", mount)
             self.assertIn(f"/docker-entrypoint-initdb.d/{prefix}.sql:ro", mount)
             self.assertNotIn(".down.sql", mount)
+
+    def test_recommendation_reviews_are_audited_and_append_only(self) -> None:
+        sql = RECOMMENDATION_REVIEW_MIGRATION.read_text(encoding="utf-8")
+
+        self.assertIn("CREATE TABLE recommendation_review", sql)
+        self.assertIn("vegetation_analysis_id uuid NOT NULL", sql)
+        self.assertIn("idempotency_key char(64) NOT NULL UNIQUE", sql)
+        self.assertIn("decision IN ('accepted', 'rejected', 'adjusted')", sql)
+        self.assertIn("decision = 'accepted' OR btrim", sql)
+        self.assertIn("reviewer_subject text NOT NULL", sql)
+        self.assertIn("recommendation_review_chain_guard", sql)
+        self.assertIn("recommendation_review_immutable", sql)
+        self.assertIn("append-only", sql)
 
 
 if __name__ == "__main__":

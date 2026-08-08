@@ -35,6 +35,11 @@ vegetation or mowing result is claimed. A 5 × 11 pixel Process API NDVI crop an
 its contributor metadata are checksummed in ignored processed storage and
 labelled `partially_cached`, not as a complete source scene.
 
+Sprint 4 has started with an append-only recommendation-review schema. It can
+preserve accept, reject, and adjust events with actor, rationale, idempotency,
+and supersession, but no review-write endpoint or work-order authorization is
+enabled until identity, RBAC, and approval policy are defined.
+
 ## Planned architecture
 
 - `apps/dashboard`: Next.js management dashboard
@@ -122,8 +127,8 @@ requiring raw source files or provider credentials.
 ## Database migrations and ingestion
 
 Apply migrations in numeric order before importing sources. The current local
-development database has migrations `0001` through `0007` applied. On the first
-startup of a new Compose volume, Postgres applies these seven up migrations in
+development database has migrations `0001` through `0008` applied. On the first
+startup of a new Compose volume, Postgres applies these eight up migrations in
 order through `/docker-entrypoint-initdb.d`; existing volumes are never modified
 by that initialization mechanism. The explicit commands below remain useful
 for non-Compose environments and controlled upgrades of existing databases.
@@ -143,7 +148,15 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0006_satellite_scene_multipolygon.sql
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0007_partial_satellite_cache.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
+  < infra/migrations/0008_recommendation_review_audit.sql
 ```
+
+Migration `0008` starts the Sprint 4 management foundation with immutable,
+idempotent recommendation-review events. It records accept/reject/adjust
+decisions, actor subject, rationale, source channel, and supersession without
+creating or authorizing field work. See
+`docs/decisions/ADR-0007-append-only-recommendation-reviews.md`.
 
 Use `zenit-import` for one immutable raw file at a time. Full examples are in
 `docs/architecture/source-ingestion.md`.
