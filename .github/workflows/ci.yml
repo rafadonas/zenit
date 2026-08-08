@@ -73,6 +73,8 @@ jobs:
           curl --fail --silent --show-error \
             http://localhost:8000/v1/segments/00000000-0000-4000-8000-000000000001/satellite-observations \
             | python -c "import json,sys; payload=json.load(sys.stdin); assert payload['items'] == []; assert payload['metadata']['result_count'] == 0"
+          curl --fail --silent --show-error http://localhost:8000/v1/recommendations \
+            | python -c "import json,sys; payload=json.load(sys.stdin); assert payload['items'] == []; assert payload['metadata']['result_count'] == 0"
           curl --fail --silent --show-error --output /dev/null http://localhost:3000
       - name: Show service logs on failure
         if: failure()

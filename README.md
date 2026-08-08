@@ -158,6 +158,16 @@ decisions, actor subject, rationale, source channel, and supersession without
 creating or authorizing field work. See
 `docs/decisions/ADR-0007-append-only-recommendation-reviews.md`.
 
+The read-only management queue is available at:
+
+```text
+GET /v1/recommendations?limit=50
+```
+
+It returns analysis, segment/zone, explanation, versions, review count, and a
+policy-pending review state without reviewer identity. Every item explicitly
+reports `authorizes_field_work=false`; no review-write endpoint is enabled.
+
 Use `zenit-import` for one immutable raw file at a time. Full examples are in
 `docs/architecture/source-ingestion.md`.
 
