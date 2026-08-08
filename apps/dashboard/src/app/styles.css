@@ -129,6 +129,7 @@ h1 { margin-bottom: 8px; font: 600 clamp(2.1rem, 4vw, 3.2rem)/1 Georgia, serif; 
 .observation-history button:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
 .observation-history strong { font-size: .64rem; }
 .observation-history span { color: var(--muted); font-size: .58rem; }
+.history-warning { margin: 0 0 11px; padding: 8px; border-radius: 6px; color: #72501f; background: var(--amber-soft); font-size: .62rem; line-height: 1.4; }
 .evidence-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; margin: 0; border: 1px solid #e0e6e0; border-radius: 8px; overflow: hidden; background: #e0e6e0; }
 .evidence-grid div { padding: 9px; background: white; }
 .evidence-grid dt { margin-bottom: 3px; color: var(--muted); font-size: .6rem; text-transform: uppercase; letter-spacing: .05em; }

@@ -40,9 +40,18 @@ class SatelliteObservation(BaseModel):
     assets: list[SatelliteAssetEvidence]
 
 
+class SatelliteObservationMetadata(BaseModel):
+    segment_id: UUID
+    result_count: int = Field(ge=0)
+    total_count: int = Field(ge=0)
+    limit: int = Field(ge=1, le=100)
+    truncated: bool
+    warning: str
+
+
 class SatelliteObservationCollection(BaseModel):
     items: list[SatelliteObservation]
-    metadata: dict[str, Any]
+    metadata: SatelliteObservationMetadata
 
 
 class SatelliteObservationReader(Protocol):
@@ -80,7 +89,8 @@ class PostgresSatelliteObservationRepository:
                 analysis.rule_version,
                 analysis.processor_version,
                 result.explanation,
-                COALESCE(assets.items, '[]'::jsonb)
+                COALESCE(assets.items, '[]'::jsonb),
+                COUNT(*) OVER ()
             FROM vegetation_analysis result
             JOIN analysis_run analysis ON analysis.id = result.analysis_run_id
             JOIN satellite_scene scene ON scene.id = analysis.satellite_scene_id
@@ -130,15 +140,19 @@ class PostgresSatelliteObservationRepository:
             )
             for row in rows
         ]
+        total_count = int(rows[0][21]) if rows else 0
         return SatelliteObservationCollection(
             items=items,
-            metadata={
-                "segment_id": str(segment_id),
-                "result_count": len(items),
-                "warning": (
+            metadata=SatelliteObservationMetadata(
+                segment_id=segment_id,
+                result_count=len(items),
+                total_count=total_count,
+                limit=limit,
+                truncated=total_count > len(items),
+                warning=(
                     "Satellite quality is not vegetation height or authorization for mowing."
                 ),
-            },
+            ),
         )
 
 

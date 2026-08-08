@@ -33,6 +33,9 @@ export interface SatelliteObservationCollection {
   metadata: {
     segment_id: string;
     result_count: number;
+    total_count: number;
+    limit: number;
+    truncated: boolean;
     warning?: string;
   };
 }
@@ -91,7 +94,10 @@ export function isSatelliteObservationCollection(
   return (
     value.items.every(isObservation) &&
     typeof value.metadata.segment_id === "string" &&
-    isNumber(value.metadata.result_count)
+    isNumber(value.metadata.result_count) &&
+    isNumber(value.metadata.total_count) &&
+    isNumber(value.metadata.limit) &&
+    typeof value.metadata.truncated === "boolean"
   );
 }
 

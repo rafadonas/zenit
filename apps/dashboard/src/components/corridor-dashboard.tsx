@@ -110,7 +110,10 @@ function SatelliteEvidence({ segmentId }: { segmentId: string | null }) {
         <div>
           <p className="eyebrow">Evidência satelital</p>
           <h3>{selectedRunId ? "Observação selecionada" : "Última observação"}</h3>
-          <small>{state.collection.metadata.result_count} registro(s) persistido(s)</small>
+          <small>
+            {state.collection.metadata.result_count} de {state.collection.metadata.total_count}
+            {" registro(s) persistido(s)"}
+          </small>
         </div>
         <span className={`status-pill ${observation.conclusion === "inconclusive" ? "review" : "estimated"}`}>
           {observation.conclusion === "inconclusive" ? "Inconclusiva" : "Conclusiva"}
@@ -130,6 +133,11 @@ function SatelliteEvidence({ segmentId }: { segmentId: string | null }) {
             </button>
           ))}
         </div>
+      ) : null}
+      {state.collection.metadata.truncated ? (
+        <p className="history-warning" role="status">
+          Histórico parcial: exibindo os {state.collection.metadata.limit} registros mais recentes.
+        </p>
       ) : null}
       <dl className="evidence-grid">
         <div><dt>Aquisição</dt><dd>{formatAcquisitionDate(observation.acquired_at)}</dd></div>

@@ -34,7 +34,13 @@ describe("satellite observation utilities", () => {
     expect(
       isSatelliteObservationCollection({
         items: [observation],
-        metadata: { segment_id: "segment-1", result_count: 1 },
+        metadata: {
+          segment_id: "segment-1",
+          result_count: 1,
+          total_count: 12,
+          limit: 10,
+          truncated: true,
+        },
       }),
     ).toBe(true);
   });
@@ -43,7 +49,13 @@ describe("satellite observation utilities", () => {
     expect(
       isSatelliteObservationCollection({
         items: [{ ...observation, assets: [{ ...observation.assets[0], checksum_sha256: "bad" }] }],
-        metadata: { segment_id: "segment-1", result_count: 1 },
+        metadata: {
+          segment_id: "segment-1",
+          result_count: 1,
+          total_count: 1,
+          limit: 10,
+          truncated: false,
+        },
       }),
     ).toBe(false);
   });

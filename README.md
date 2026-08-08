@@ -217,6 +217,11 @@ checksums instead of overwriting earlier evidence. The segment-index locator pro
 navigation—for example, index `195` selects the prepared validation AOI without
 presenting that geometric index as an official kilometer marker.
 
+History responses report the returned count, total count, applied limit, and an
+explicit `truncated` flag. The dashboard warns when it is showing only the most
+recent subset, so a bounded response cannot be mistaken for the complete audit
+history.
+
 Install the declared workspace dependencies and start the API before running the
 dashboard:
 

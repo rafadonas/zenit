@@ -8,6 +8,7 @@ from zenit_api.satellite_observations import (
     SatelliteAssetEvidence,
     SatelliteObservation,
     SatelliteObservationCollection,
+    SatelliteObservationMetadata,
     get_satellite_observation_reader,
 )
 
@@ -52,7 +53,14 @@ class FakeReader:
                     ],
                 )
             ],
-            metadata={"segment_id": str(segment_id), "result_count": 1},
+            metadata=SatelliteObservationMetadata(
+                segment_id=segment_id,
+                result_count=1,
+                total_count=12,
+                limit=10,
+                truncated=True,
+                warning="Satellite quality is not vegetation height or authorization for mowing.",
+            ),
         )
 
 
@@ -80,6 +88,10 @@ def test_endpoint_exposes_safety_labels_and_checksums_without_storage_uri() -> N
     assert payload["items"][0]["eligible_for_official_reporting"] is False
     assert payload["items"][0]["assets"][0]["checksum_sha256"] == "a" * 64
     assert "storage_uri" not in payload["items"][0]["assets"][0]
+    assert payload["metadata"]["result_count"] == 1
+    assert payload["metadata"]["total_count"] == 12
+    assert payload["metadata"]["limit"] == 10
+    assert payload["metadata"]["truncated"] is True
 
 
 def test_endpoint_rejects_invalid_uuid_and_limit() -> None:
