@@ -17,6 +17,9 @@ class Settings(BaseSettings):
     app_name: str = "zenit"
     app_version: str = "0.1.0"
     database_url: str = "postgresql://zenit:change_me@postgres:5432/zenit"
+    copernicus_client_id: str | None = None
+    copernicus_client_secret: str | None = None
+    bdc_access_token: str | None = None
 
 
 @lru_cache

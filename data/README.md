@@ -20,6 +20,7 @@
 - `RA-RET-ROC-LIMP-2026-03-20.xlsx`
 - `Marco km_rodoanel 2.kmz`
 - `classificacao_rocada.kmz`
+- `ZENIT_Guia_Tecnico_APIs_Sentinel_CBers.pdf`
 
 Filenames are descriptive expectations, not normalization instructions. Keep the
 original supplied names unchanged.
@@ -33,3 +34,6 @@ original supplied names unchanged.
   `needs_validation`.
 - KML coordinates must be preserved in WGS 84 (EPSG:4326); the metric SIRGAS
   2000 / UTM CRS for derived processing must be explicitly validated.
+- The satellite API guide is a dated technical reference, not a credential file,
+  satellite scene, or current observation. Provider details require production
+  revalidation, and its ~1 km AOI suggestion does not override 100 m analysis.

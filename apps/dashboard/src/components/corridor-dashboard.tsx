@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   formatDistance,
@@ -8,6 +8,11 @@ import {
   type SegmentCollection,
   type SegmentProperties,
 } from "../lib/segments";
+import {
+  formatAcquisitionDate,
+  isSatelliteObservationCollection,
+  type SatelliteObservationCollection,
+} from "../lib/satellite-observations";
 
 interface CorridorDashboardProps {
   collection: SegmentCollection;
@@ -51,6 +56,85 @@ function SegmentDetails({ segment }: { segment: SegmentProperties | null }) {
         <dd>{segment.eligible_for_operations ? "Liberado" : "Bloqueado"}</dd>
       </div>
     </dl>
+  );
+}
+
+type ObservationState =
+  | { segmentId: string; status: "ready"; collection: SatelliteObservationCollection }
+  | { segmentId: string; status: "error" }
+  | null;
+
+function SatelliteEvidence({ segmentId }: { segmentId: string | null }) {
+  const [state, setState] = useState<ObservationState>(null);
+
+  useEffect(() => {
+    if (!segmentId) return;
+    const controller = new AbortController();
+    void fetch(`/api/segments/${encodeURIComponent(segmentId)}/satellite-observations`, {
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Observation request failed");
+        const payload: unknown = await response.json();
+        if (!isSatelliteObservationCollection(payload)) throw new Error("Invalid observation contract");
+        setState({ segmentId, status: "ready", collection: payload });
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setState({ segmentId, status: "error" });
+      });
+    return () => controller.abort();
+  }, [segmentId]);
+
+  if (!segmentId) return null;
+  if (!state || state.segmentId !== segmentId) {
+    return <div className="evidence-state" role="status">Consultando evidências satelitais…</div>;
+  }
+  if (state.status === "error") {
+    return <div className="evidence-state error" role="alert">Não foi possível consultar as evidências. Nenhum resultado foi presumido.</div>;
+  }
+  if (state.collection.items.length === 0) {
+    return <div className="evidence-state">Nenhuma observação satelital registrada para este trecho.</div>;
+  }
+
+  const observation = state.collection.items[0];
+  return (
+    <section className="satellite-evidence" aria-label="Última evidência satelital">
+      <div className="evidence-heading">
+        <div><p className="eyebrow">Evidência satelital</p><h3>Última observação</h3></div>
+        <span className={`status-pill ${observation.conclusion === "inconclusive" ? "review" : "estimated"}`}>
+          {observation.conclusion === "inconclusive" ? "Inconclusiva" : "Conclusiva"}
+        </span>
+      </div>
+      <dl className="evidence-grid">
+        <div><dt>Aquisição</dt><dd>{formatAcquisitionDate(observation.acquired_at)}</dd></div>
+        <div><dt>Zona</dt><dd>{observation.zone_type}</dd></div>
+        <div><dt>NDVI médio</dt><dd>{observation.mean_ndvi?.toFixed(3) ?? "Sem dado"}</dd></div>
+        <div><dt>Pixels válidos</dt><dd>{observation.valid_pixel_percent.toLocaleString("pt-BR")}%</dd></div>
+        <div><dt>Confiança</dt><dd>{observation.confidence_band === "low" ? "Baixa" : observation.confidence_band}</dd></div>
+        <div><dt>Recomendação</dt><dd>{observation.recommendation === "inspect" ? "Inspecionar" : observation.recommendation}</dd></div>
+      </dl>
+      <div className="evidence-gates">
+        <strong>{observation.requires_human_approval ? "Aprovação humana obrigatória" : "Revisão humana preservada"}</strong>
+        <span>Relatório oficial: {observation.eligible_for_official_reporting ? "elegível" : "bloqueado"}</span>
+      </div>
+      <details>
+        <summary>Proveniência e artefatos</summary>
+        <p>{observation.provider} · {observation.collection} · regra {observation.rule_version}</p>
+        <ul>
+          {observation.assets.map((asset) => (
+            <li key={`${asset.role}-${asset.checksum_sha256}`}>
+              <span>{asset.role}</span>
+              <code title={asset.checksum_sha256}>{asset.checksum_sha256.slice(0, 12)}…</code>
+            </li>
+          ))}
+        </ul>
+      </details>
+      <p className="evidence-warning">
+        NDVI e qualidade de pixels não medem altura da vegetação nem autorizam roçada.
+      </p>
+    </section>
   );
 }
 
@@ -167,6 +251,7 @@ export function CorridorDashboard({ collection }: CorridorDashboardProps) {
         <aside className="side-panel">
           <div className="side-heading"><p className="eyebrow">Inspeção</p><h2>Detalhes do trecho</h2></div>
           <SegmentDetails segment={selected} />
+          <SatelliteEvidence segmentId={selectedId} />
           <div className="quality-note">
             <span aria-hidden="true">i</span>
             <div><strong>Sobre esta camada</strong><p>Distâncias seguem a linha candidata de 30,85 km. A fonte não contém eixo rodoviário oficial.</p></div>

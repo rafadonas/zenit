@@ -17,6 +17,7 @@ dependencies = [
 
 [project.scripts]
 zenit-import = "zenit_geospatial.cli:main"
+zenit-satellite = "zenit_geospatial.satellite_cli:main"
 
 [project.optional-dependencies]
 dev = [

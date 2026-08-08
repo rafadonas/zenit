@@ -7,7 +7,7 @@ Machine-readable manifest: `data/manifests/initial-source-audit.json`
 
 ## Scope and method
 
-This audit inventories the eight supplied ZENIT source files now stored under
+This audit inventories the nine supplied ZENIT source files now stored under
 `data/raw/`. Files were moved into the protected raw directory without renaming or
 content modification. SHA-256 checksums were calculated from their current bytes.
 
@@ -28,9 +28,23 @@ were checked with `pdfinfo` and `pdftotext`.
 | `03. Obrigações Contratuais/Artesp/LOTE 2 - Anexo 06 - Serviços de Conservação do Sistema Rodoviário.pdf` | 1,166,452 | `94f186f5608cfe68e122d729830d6f9f2da8db2f39f9d8ba4481bf65344d62c1` | PDF, 116 pages |
 | `Challenge CCR Motiva – Guia do Projeto.docx` | 18,199 | `5bad7edfd72ab8f86461c07ab0508d82214cf607a96bc52e888a33c7e9d2f090` | DOCX |
 | `Inovação Aberta_FIAP_04.26.pdf` | 4,913,119 | `7bbd8a74c63f89b1e42bec838f2d32fd206c9e39458ddfc35af916631c198958` | PDF, 15 pages |
+| `ZENIT_Guia_Tecnico_APIs_Sentinel_CBers.pdf` | 718,920 | `61913c6163d67e9a0e70701440b22ac0b118a2c2cd2d2ed5b1ed75aa18cf7af9` | PDF, 38 pages |
 
-All three PDFs are unencrypted and text-extractable. The DOCX contains 58
+All four PDFs are unencrypted and text-extractable. The DOCX contains 58
 non-empty paragraphs and opens as a valid Office Open XML container.
+
+## Satellite API integration guide
+
+The guide received on 2026-08-07 is a technical reference rather than imagery
+or an operational observation. It contains provider endpoints, collection and
+band identifiers, placeholder environment-variable names, quality guidance, and
+examples; no real credential value was observed. Its provider facts are dated
+2026-08-07 and must be revalidated before production use.
+
+The guide's suggested ~1 km operational AOI conflicts with ZENIT's controlling
+100 m segment rule. Discovery and analysis therefore remain based on versioned
+100 m `segment_zone` AOIs. Sentinel-2 L2A and CBERS-4A products must retain
+separate sensor/product provenance, and NDVI must not be interpreted as height.
 
 ## Kilometer markers (F7)
 

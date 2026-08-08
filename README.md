@@ -22,8 +22,18 @@ axis was supplied and the marker dataset contains known inversions and gaps.
 Sprint 3 is in progress. Its database foundation now catalogs cached satellite
 scenes and checksummed assets, versioned/idempotent runs, segment zones, quality
 metrics, and explainable recommendations. A non-persisting analysis preview is
-available for validating the baseline rules. No satellite scene has been
-supplied or approved for operational use, so no real raster result is claimed.
+available for validating the baseline rules. Discovery adapters normalize
+Sentinel Hub Catalog and INPE BDC STAC acquisitions without exposing provider
+details to the analysis domain. A public CBERS catalog query has been validated,
+and Copernicus OAuth plus Sentinel-2 catalog discovery have also been validated
+with a limited live query. Five Sentinel acquisitions are persisted idempotently
+as catalog-only `discovered` metadata. No scene asset has been downloaded or
+approved for operational use. A Statistical API validation over one prepared
+100 m AOI passed pixel-quality checks but is persisted as inconclusive/inspection
+because the axis and buffer are not official and NDVI is not height. No current
+vegetation or mowing result is claimed. A 5 × 11 pixel Process API NDVI crop and
+its contributor metadata are checksummed in ignored processed storage and
+labelled `partially_cached`, not as a complete source scene.
 
 ## Planned architecture
 
@@ -104,8 +114,9 @@ not installed yet because the mobile application starts in Sprint 5.
 ## Database migrations and ingestion
 
 Apply migrations in numeric order before importing sources. The current local
-database has migrations `0001` through `0003` applied. Migration `0004` adds the
-Sprint 3 foundation and must be applied explicitly.
+development database has migrations `0001` through `0007` applied. Migrations
+remain explicit SQL files and must be applied in numeric order in a new
+environment.
 
 ```bash
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
@@ -116,10 +127,29 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0003_road_axis_candidates_and_segments.sql
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0004_satellite_analysis_foundation.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
+  < infra/migrations/0005_satellite_scene_discovery.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
+  < infra/migrations/0006_satellite_scene_multipolygon.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
+  < infra/migrations/0007_partial_satellite_cache.sql
 ```
 
 Use `zenit-import` for one immutable raw file at a time. Full examples are in
 `docs/architecture/source-ingestion.md`.
+
+For the prepared Sprint 3 validation AOI, the idempotent Sentinel flow is:
+
+```bash
+zenit-satellite \
+  --segment-index 195 \
+  --zone left \
+  --from-date 2026-07-01 \
+  --to-date 2026-08-07
+```
+
+It is deliberately restricted to prepared, non-operational geometry. See
+`docs/architecture/satellite-discovery.md` before changing the AOI or period.
 
 ## Segment GeoJSON API
 
@@ -148,11 +178,30 @@ or non-real data returns `inconclusive` and `inspect`; a real height over the
 applicable 30 cm or 10 cm threshold returns `mowing_review`, which still requires
 human approval. See `docs/decisions/ADR-0005-quality-gated-satellite-baseline.md`.
 
+## Satellite observation API
+
+Persisted satellite evidence for a 100 m segment is available read-only:
+
+```text
+GET /v1/segments/{segment_id}/satellite-observations?limit=50
+```
+
+The response preserves scene and zone data-status labels, quality metrics,
+explanations, rule/processor versions, approval requirements, and artifact
+checksums. It intentionally omits internal storage locations and provider
+credentials. Satellite quality and NDVI are not presented as vegetation height
+or authorization for mowing; prepared or low-confidence evidence remains
+inconclusive, requires inspection, and is ineligible for official reporting.
+
 ## Dashboard development
 
-The Sprint 2 dashboard renders the candidate SP-021 axis as selectable 100 m
-segments and keeps the data-quality and operational-use warnings visible. It
-does not substitute simulated data when the API is unavailable.
+The dashboard renders the candidate SP-021 axis as selectable 100 m segments
+and keeps the data-quality and operational-use warnings visible. Selecting a
+segment loads its latest persisted satellite observation through a server-side
+proxy, including acquisition date, NDVI, valid-pixel coverage, confidence,
+recommendation, reporting gate, rule version, and artifact checksum. It does
+not substitute simulated data or presume a result when either API is
+unavailable.
 
 Install the declared workspace dependencies and start the API before running the
 dashboard:
