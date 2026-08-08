@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { formatDistance, isSegmentCollection, projectSegments, type SegmentFeature } from "./segments";
+import {
+  findSegmentIdByIndex,
+  formatDistance,
+  isSegmentCollection,
+  projectSegments,
+  type SegmentFeature,
+} from "./segments";
 
 const feature: SegmentFeature = {
   type: "Feature",
@@ -39,5 +45,11 @@ describe("segment utilities", () => {
   it("formats operational distance in Portuguese", () => {
     expect(formatDistance(54.03)).toBe("54 m");
     expect(formatDistance(30854.03)).toBe("30,85 km");
+  });
+
+  it("finds a segment by its geometric index", () => {
+    expect(findSegmentIdByIndex([feature], 1)).toBe("segment-1");
+    expect(findSegmentIdByIndex([feature], 195)).toBeNull();
+    expect(findSegmentIdByIndex([feature], 1.5)).toBeNull();
   });
 });

@@ -77,6 +77,14 @@ h1 { margin-bottom: 8px; font: 600 clamp(2.1rem, 4vw, 3.2rem)/1 Georgia, serif; 
 .card-heading, .side-heading { padding: 21px 24px 16px; }
 .card-heading { display: flex; align-items: end; justify-content: space-between; gap: 20px; }
 .card-heading h2, .side-heading h2 { margin: 0; font: 600 1.25rem/1.1 Georgia, serif; }
+.map-tools { display: flex; align-items: end; gap: 14px; }
+.segment-search { display: grid; gap: 4px; }
+.segment-search label { color: var(--muted); font-size: .61rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
+.segment-search > div { display: flex; }
+.segment-search input { width: 74px; padding: 7px 8px; border: 1px solid #cbd5cd; border-radius: 7px 0 0 7px; color: var(--ink); background: white; }
+.segment-search button { padding: 7px 10px; border: 0; border-radius: 0 7px 7px 0; color: white; background: var(--green); cursor: pointer; font-size: .68rem; font-weight: 750; }
+.segment-search button:hover, .segment-search button:focus-visible { background: var(--green-dark); }
+.segment-search > span { max-width: 230px; color: #8a3f32; font-size: .61rem; }
 .map-meta { display: flex; gap: 8px; }
 .map-meta span { padding: 6px 9px; border-radius: 6px; background: #eef2eb; color: var(--muted); font-size: .65rem; }
 .map-frame { position: relative; height: min(61vh, 680px); min-height: 480px; margin: 0 14px; border: 1px solid #cfd8d0; border-radius: 10px; overflow: hidden; background: #e9eee8; }
@@ -165,6 +173,8 @@ h1 { margin-bottom: 8px; font: 600 clamp(2.1rem, 4vw, 3.2rem)/1 Georgia, serif; 
   .kpi-grid article:nth-child(2) { border-right: 0; }
   .kpi-grid article:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
   .map-frame { min-height: 520px; height: 62vh; }
+  .card-heading { align-items: stretch; flex-direction: column; }
+  .map-tools { justify-content: space-between; }
   .map-meta, .map-footer span:last-child { display: none; }
   .side-panel { display: block; }
   .side-heading { border-right: 0; border-bottom: 1px solid var(--line); }

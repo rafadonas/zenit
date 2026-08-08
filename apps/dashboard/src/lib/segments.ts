@@ -109,3 +109,14 @@ export function formatDistance(meters: number): string {
   }
   return `${meters.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} m`;
 }
+
+export function findSegmentIdByIndex(
+  features: SegmentFeature[],
+  segmentIndex: number,
+): string | null {
+  if (!Number.isInteger(segmentIndex) || segmentIndex < 0) return null;
+  return (
+    features.find((feature) => feature.properties.segment_index === segmentIndex)?.properties
+      .segment_id ?? null
+  );
+}

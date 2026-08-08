@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import {
+  findSegmentIdByIndex,
   formatDistance,
   projectSegments,
   type SegmentCollection,
@@ -141,11 +142,30 @@ function SatelliteEvidence({ segmentId }: { segmentId: string | null }) {
 export function CorridorDashboard({ collection }: CorridorDashboardProps) {
   const projected = useMemo(() => projectSegments(collection.features), [collection.features]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [segmentSearch, setSegmentSearch] = useState("");
+  const [searchError, setSearchError] = useState<string | null>(null);
   const selected = projected.find((segment) => segment.id === selectedId)?.properties ?? null;
   const totalDistance = Math.max(
     0,
     ...collection.features.map((feature) => feature.properties.end_distance_m),
   );
+  const maxSegmentIndex = Math.max(
+    0,
+    ...collection.features.map((feature) => feature.properties.segment_index),
+  );
+
+  function selectFromSearch(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const segmentIndex = Number(segmentSearch);
+    const segmentId = findSegmentIdByIndex(collection.features, segmentIndex);
+    if (!segmentId) {
+      setSearchError(`Trecho inexistente. Informe um número entre 0 e ${maxSegmentIndex}.`);
+      return;
+    }
+    setSearchError(null);
+    setSelectedId(segmentId);
+    requestAnimationFrame(() => document.getElementById(`segment-${segmentId}`)?.focus());
+  }
 
   return (
     <main className="dashboard-shell">
@@ -190,7 +210,26 @@ export function CorridorDashboard({ collection }: CorridorDashboardProps) {
         <article className="map-card">
           <div className="card-heading">
             <div><p className="eyebrow">Mapa de segmentos</p><h2>Corredor completo</h2></div>
-            <div className="map-meta"><span>Saída EPSG:4326</span><span>100 m por trecho</span></div>
+            <div className="map-tools">
+              <form className="segment-search" onSubmit={selectFromSearch}>
+                <label htmlFor="segment-search">Ir para trecho</label>
+                <div>
+                  <input
+                    id="segment-search"
+                    inputMode="numeric"
+                    max={maxSegmentIndex}
+                    min={0}
+                    onChange={(event) => setSegmentSearch(event.target.value)}
+                    placeholder="195"
+                    type="number"
+                    value={segmentSearch}
+                  />
+                  <button type="submit">Localizar</button>
+                </div>
+                {searchError ? <span role="alert">{searchError}</span> : null}
+              </form>
+              <div className="map-meta"><span>EPSG:4326</span><span>100 m por trecho</span></div>
+            </div>
           </div>
 
           {projected.length === 0 ? (
@@ -221,6 +260,7 @@ export function CorridorDashboard({ collection }: CorridorDashboardProps) {
                         aria-label={`Trecho ${segment.properties.segment_index}, ${formatDistance(segment.properties.end_distance_m - segment.properties.start_distance_m)}, estimado e não operacional`}
                         className={isSelected ? "segment selected" : "segment"}
                         d={segment.path}
+                        id={`segment-${segment.id}`}
                         key={segment.id}
                         onClick={() => setSelectedId(segment.id)}
                         onKeyDown={(event) => {
