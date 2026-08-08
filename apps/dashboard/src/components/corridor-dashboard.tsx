@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 
 import {
   findSegmentIdByIndex,
@@ -208,10 +209,10 @@ export function CorridorDashboard({ collection }: CorridorDashboardProps) {
           <span className="brand-mark" aria-hidden="true"><i /></span>
           <div><strong>ZENIT</strong><small>Vegetação rodoviária</small></div>
         </div>
-        <div className="route-context">
-          <span className="live-dot" aria-hidden="true" />
-          Ambiente de desenvolvimento · SP-021
-        </div>
+        <nav className="topnav" aria-label="Navegação principal">
+          <Link aria-current="page" href="/">Corredor</Link>
+          <Link href="/recommendations">Recomendações</Link>
+        </nav>
         <div className="update-context">
           <span>Geometria</span>
           <strong>candidata v1</strong>

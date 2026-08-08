@@ -48,6 +48,9 @@ button, input { font: inherit; }
 .brand-mark { width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid rgb(255 255 255 / 34%); border-radius: 50% 50% 44% 56%; transform: rotate(-18deg); }
 .brand-mark i { width: 15px; height: 23px; border: 2px solid #d7efc8; border-width: 0 2px 2px 0; border-radius: 0 70% 0 70%; transform: rotate(-25deg); }
 .route-context { font-size: .78rem; letter-spacing: .05em; color: #d2e5dc; }
+.topnav { display: flex; align-items: center; gap: 8px; }
+.topnav a { padding: 8px 10px; border-radius: 7px; color: #cfe2d9; font-size: .72rem; text-decoration: none; }
+.topnav a:hover, .topnav a:focus-visible, .topnav a[aria-current="page"] { color: white; background: rgb(255 255 255 / 12%); }
 .live-dot { display: inline-block; width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: #a8d786; box-shadow: 0 0 0 4px rgb(168 215 134 / 14%); }
 .update-context { justify-self: end; text-align: right; font-size: .72rem; color: #a9cbbd; }
 .update-context strong { display: block; margin-top: 2px; color: white; font-size: .8rem; }
@@ -160,6 +163,29 @@ h1 { margin-bottom: 8px; font: 600 clamp(2.1rem, 4vw, 3.2rem)/1 Georgia, serif; 
 .state-card h1 { font-size: 2rem; }
 .state-card > p:not(.eyebrow) { color: var(--muted); line-height: 1.6; }
 .primary-button { padding: 11px 17px; border: 0; border-radius: 8px; color: white; background: var(--green); cursor: pointer; }
+.recommendations-shell { min-height: 100vh; padding-bottom: 48px; }
+.queue-heading, .queue-summary, .recommendation-list { width: min(1120px, 92vw); margin-inline: auto; }
+.queue-heading { display: flex; justify-content: space-between; align-items: end; gap: 30px; padding: 38px 0 25px; }
+.queue-heading h1 { max-width: 620px; }
+.queue-summary { display: flex; align-items: baseline; gap: 8px; padding: 17px 20px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
+.queue-summary strong { font: 600 1.6rem Georgia, serif; }
+.queue-summary span, .queue-summary small { color: var(--muted); font-size: .72rem; }
+.queue-summary small { margin-left: auto; color: #7b561f; }
+.recommendation-list { display: grid; gap: 14px; margin-top: 16px; }
+.recommendation-card, .queue-empty { padding: 22px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); box-shadow: var(--shadow); }
+.recommendation-title { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.recommendation-title h2 { margin: 0; font: 600 1.2rem Georgia, serif; }
+.queue-detail-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; margin: 18px 0; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: var(--line); }
+.queue-detail-grid div { padding: 11px; background: white; }
+.queue-detail-grid dt { color: var(--muted); font-size: .62rem; text-transform: uppercase; }
+.queue-detail-grid dd { margin: 4px 0 0; font-size: .75rem; font-weight: 750; }
+.recommendation-reasons { color: #52655c; font-size: .72rem; line-height: 1.5; }
+.recommendation-reasons ul { margin: 7px 0 0; padding-left: 19px; }
+.recommendation-reasons p { margin: 7px 0 0; }
+.recommendation-card footer { display: flex; justify-content: space-between; gap: 16px; margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: .65rem; }
+.recommendation-card footer strong { color: #765022; }
+.queue-empty { text-align: center; color: var(--muted); }
+.queue-empty h2 { color: var(--ink); }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -176,6 +202,9 @@ h1 { margin-bottom: 8px; font: 600 clamp(2.1rem, 4vw, 3.2rem)/1 Georgia, serif; 
   .topbar { min-height: 68px; padding-inline: 20px; }
   .update-context { display: none; }
   .hero-row { align-items: stretch; flex-direction: column; padding-top: 28px; }
+  .queue-heading { align-items: stretch; flex-direction: column; padding-top: 28px; }
+  .queue-detail-grid { grid-template-columns: 1fr 1fr; }
+  .recommendation-card footer { flex-direction: column; }
   .warning-banner { max-width: none; }
   .kpi-grid { grid-template-columns: 1fr 1fr; }
   .kpi-grid article:nth-child(2) { border-right: 0; }
