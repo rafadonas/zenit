@@ -8,7 +8,7 @@ execution, and auditable operational reporting.
 
 Sprints 0–2 are complete. The repository currently provides:
 
-- a Docker Compose development stack with FastAPI, PostGIS, and MinIO;
+- a Docker Compose development stack with Next.js, FastAPI, PostGIS, and MinIO;
 - immutable source cataloguing, checksums, lineage, and idempotent imports;
 - typed KMZ/KML and workbook parsers with structured anomaly reporting;
 - a marker-derived candidate axis split into 309 geometric segments;
@@ -97,8 +97,10 @@ With Docker and Docker Compose installed:
 docker compose up --build
 ```
 
-The API health endpoint is available at `http://localhost:8000/health`, PostGIS
-at port `5432`, and the MinIO console at `http://localhost:9001`.
+The dashboard is available at `http://localhost:3000`, the API health endpoint
+at `http://localhost:8000/health`, PostGIS at port `5432`, and the MinIO console
+at `http://localhost:9001`. The dashboard container waits for a healthy API and
+uses the internal Compose network for server-side requests.
 
 This workstation uses Docker Engine rootless. The project-local binaries are
 ignored by Git. In a new shell, select them with:
@@ -108,8 +110,9 @@ export PATH="$PWD/.tools/docker/bin:$PATH"
 export DOCKER_HOST="unix:///run/user/$(id -u)/docker.sock"
 ```
 
-PostGIS, MinIO, and the API have been built and validated as healthy. Flutter is
-not installed yet because the mobile application starts in Sprint 5.
+PostGIS, MinIO, the API, and the dashboard have been built and validated as
+healthy. Flutter is not installed yet because the mobile application starts in
+Sprint 5.
 
 ## Database migrations and ingestion
 

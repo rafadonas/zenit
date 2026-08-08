@@ -2,6 +2,14 @@
 
 !pyproject.toml
 !README.md
+!package.json
+!package-lock.json
+!apps/
+!apps/dashboard/
+!apps/dashboard/**
+apps/dashboard/.next/
+apps/dashboard/node_modules/
+apps/dashboard/coverage/
 !services/
 !services/api/
 !services/api/src/
