@@ -122,6 +122,13 @@ h1 { margin-bottom: 8px; font: 600 clamp(2.1rem, 4vw, 3.2rem)/1 Georgia, serif; 
 .evidence-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 13px; }
 .evidence-heading h3 { margin: 0; font: 600 1rem/1.1 Georgia, serif; }
 .evidence-heading .eyebrow { margin-bottom: 5px; }
+.evidence-heading small { display: block; margin-top: 4px; color: var(--muted); font-size: .59rem; }
+.observation-history { display: flex; gap: 6px; margin: 0 0 11px; padding-bottom: 4px; overflow-x: auto; }
+.observation-history button { flex: 0 0 auto; display: grid; gap: 2px; min-width: 112px; padding: 8px; border: 1px solid #d6dfd8; border-radius: 7px; text-align: left; color: var(--ink); background: white; cursor: pointer; }
+.observation-history button[aria-pressed="true"] { border-color: var(--green); background: var(--mint); box-shadow: inset 0 0 0 1px var(--green); }
+.observation-history button:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+.observation-history strong { font-size: .64rem; }
+.observation-history span { color: var(--muted); font-size: .58rem; }
 .evidence-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; margin: 0; border: 1px solid #e0e6e0; border-radius: 8px; overflow: hidden; background: #e0e6e0; }
 .evidence-grid div { padding: 9px; background: white; }
 .evidence-grid dt { margin-bottom: 3px; color: var(--muted); font-size: .6rem; text-transform: uppercase; letter-spacing: .05em; }

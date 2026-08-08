@@ -67,6 +67,7 @@ type ObservationState =
 
 function SatelliteEvidence({ segmentId }: { segmentId: string | null }) {
   const [state, setState] = useState<ObservationState>(null);
+  const [selectedRun, setSelectedRun] = useState<{ segmentId: string; runId: string } | null>(null);
 
   useEffect(() => {
     if (!segmentId) return;
@@ -99,15 +100,37 @@ function SatelliteEvidence({ segmentId }: { segmentId: string | null }) {
     return <div className="evidence-state">Nenhuma observação satelital registrada para este trecho.</div>;
   }
 
-  const observation = state.collection.items[0];
+  const selectedRunId = selectedRun?.segmentId === segmentId ? selectedRun.runId : null;
+  const observation =
+    state.collection.items.find((item) => item.analysis_run_id === selectedRunId) ??
+    state.collection.items[0];
   return (
-    <section className="satellite-evidence" aria-label="Última evidência satelital">
+    <section className="satellite-evidence" aria-label="Evidências satelitais persistidas">
       <div className="evidence-heading">
-        <div><p className="eyebrow">Evidência satelital</p><h3>Última observação</h3></div>
+        <div>
+          <p className="eyebrow">Evidência satelital</p>
+          <h3>{selectedRunId ? "Observação selecionada" : "Última observação"}</h3>
+          <small>{state.collection.metadata.result_count} registro(s) persistido(s)</small>
+        </div>
         <span className={`status-pill ${observation.conclusion === "inconclusive" ? "review" : "estimated"}`}>
           {observation.conclusion === "inconclusive" ? "Inconclusiva" : "Conclusiva"}
         </span>
       </div>
+      {state.collection.items.length > 1 ? (
+        <div className="observation-history" aria-label="Histórico de observações">
+          {state.collection.items.map((item, index) => (
+            <button
+              aria-pressed={item.analysis_run_id === observation.analysis_run_id}
+              key={item.analysis_run_id}
+              onClick={() => setSelectedRun({ segmentId, runId: item.analysis_run_id })}
+              type="button"
+            >
+              <strong>{index === 0 ? "Mais recente" : formatAcquisitionDate(item.acquired_at)}</strong>
+              <span>{item.zone_type} · {item.conclusion === "inconclusive" ? "inconclusiva" : "conclusiva"}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
       <dl className="evidence-grid">
         <div><dt>Aquisição</dt><dd>{formatAcquisitionDate(observation.acquired_at)}</dd></div>
         <div><dt>Zona</dt><dd>{observation.zone_type}</dd></div>
@@ -122,7 +145,10 @@ function SatelliteEvidence({ segmentId }: { segmentId: string | null }) {
       </div>
       <details>
         <summary>Proveniência e artefatos</summary>
-        <p>{observation.provider} · {observation.collection} · regra {observation.rule_version}</p>
+        <p>
+          {observation.provider} · {observation.collection} · regra {observation.rule_version}
+          {" · "}processador {observation.processor_version}
+        </p>
         <ul>
           {observation.assets.map((asset) => (
             <li key={`${asset.role}-${asset.checksum_sha256}`}>

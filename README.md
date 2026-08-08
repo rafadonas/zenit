@@ -211,7 +211,9 @@ segment loads its latest persisted satellite observation through a server-side
 proxy, including acquisition date, NDVI, valid-pixel coverage, confidence,
 recommendation, reporting gate, rule version, and artifact checksum. It does
 not substitute simulated data or presume a result when either API is
-unavailable. The segment-index locator provides direct keyboard-accessible
+unavailable. When multiple observations exist, the audit history keeps each
+run selectable with its own acquisition, zone, versions, gates, and artifact
+checksums instead of overwriting earlier evidence. The segment-index locator provides direct keyboard-accessible
 navigation—for example, index `195` selects the prepared validation AOI without
 presenting that geometric index as an official kilometer marker.
 
