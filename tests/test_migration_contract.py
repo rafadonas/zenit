@@ -11,6 +11,7 @@ SATELLITE_MULTIPOLYGON_MIGRATION = Path(
 )
 SATELLITE_VALIDATION_AOI = Path("scripts/prepare_satellite_validation_aoi.sql")
 PARTIAL_CACHE_MIGRATION = Path("infra/migrations/0007_partial_satellite_cache.sql")
+COMPOSE_FILE = Path("compose.yaml")
 
 
 class MigrationContractTests(unittest.TestCase):
@@ -106,6 +107,21 @@ class MigrationContractTests(unittest.TestCase):
 
         self.assertIn("'partially_cached'", sql)
         self.assertIn("(cache_status = 'discovered') = (cached_at IS NULL)", sql)
+
+    def test_fresh_compose_database_applies_only_up_migrations_in_order(self) -> None:
+        compose = COMPOSE_FILE.read_text(encoding="utf-8")
+
+        mounts = [
+            line.strip()
+            for line in compose.splitlines()
+            if "/docker-entrypoint-initdb.d/" in line
+        ]
+        self.assertEqual(len(mounts), 7)
+        for version, mount in enumerate(mounts, start=1):
+            prefix = f"{version:04d}"
+            self.assertIn(f"infra/migrations/{prefix}_", mount)
+            self.assertIn(f"/docker-entrypoint-initdb.d/{prefix}.sql:ro", mount)
+            self.assertNotIn(".down.sql", mount)
 
 
 if __name__ == "__main__":

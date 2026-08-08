@@ -117,9 +117,11 @@ Sprint 5.
 ## Database migrations and ingestion
 
 Apply migrations in numeric order before importing sources. The current local
-development database has migrations `0001` through `0007` applied. Migrations
-remain explicit SQL files and must be applied in numeric order in a new
-environment.
+development database has migrations `0001` through `0007` applied. On the first
+startup of a new Compose volume, Postgres applies these seven up migrations in
+order through `/docker-entrypoint-initdb.d`; existing volumes are never modified
+by that initialization mechanism. The explicit commands below remain useful
+for non-Compose environments and controlled upgrades of existing databases.
 
 ```bash
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \

@@ -11,6 +11,13 @@ services:
       - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      - ./infra/migrations/0001_source_catalog_and_staging.sql:/docker-entrypoint-initdb.d/0001.sql:ro
+      - ./infra/migrations/0002_allow_invalid_staging_polygons.sql:/docker-entrypoint-initdb.d/0002.sql:ro
+      - ./infra/migrations/0003_road_axis_candidates_and_segments.sql:/docker-entrypoint-initdb.d/0003.sql:ro
+      - ./infra/migrations/0004_satellite_analysis_foundation.sql:/docker-entrypoint-initdb.d/0004.sql:ro
+      - ./infra/migrations/0005_satellite_scene_discovery.sql:/docker-entrypoint-initdb.d/0005.sql:ro
+      - ./infra/migrations/0006_satellite_scene_multipolygon.sql:/docker-entrypoint-initdb.d/0006.sql:ro
+      - ./infra/migrations/0007_partial_satellite_cache.sql:/docker-entrypoint-initdb.d/0007.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
