@@ -1,10 +1,13 @@
 import 'dart:math';
+import 'dart:typed_data';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zenit_mobile/data/device_identity_store.dart';
 import 'package:zenit_mobile/domain/demo_order_lifecycle.dart';
 import 'package:zenit_mobile/domain/measurement_draft.dart';
 import 'package:zenit_mobile/domain/mobile_sync.dart';
+import 'package:zenit_mobile/domain/prepared_photo_draft.dart';
 
 void main() {
   test('generated UUID has version 4 and RFC 4122 variant bits', () {
@@ -141,5 +144,27 @@ void main() {
 
     final unsafe = event.toJson()..['authorizes_field_work'] = true;
     expect(() => DemoLifecycleEvent.fromJson(unsafe), throwsFormatException);
+  });
+
+  test('photo bytes remain local and checksum corruption is rejected', () {
+    final bytes = Uint8List.fromList([0xff, 0xd8, 0xff, 0xd9]);
+    final photo = PreparedPhotoDraft(
+      eventId: '77777777-7777-4777-8777-777777777777',
+      photoId: '88888888-8888-4888-8888-888888888888',
+      orderId: '11111111-1111-4111-8111-111111111111',
+      plannedPointId: '22222222-2222-4222-8222-222222222221',
+      sequence: 1,
+      capturedAt: DateTime.utc(2026, 8, 9, 17),
+      checksumSha256: sha256.convert(bytes).toString(),
+      mediaType: 'image/jpeg',
+      bytes: bytes,
+    );
+
+    final eventPayload = photo.toSyncEventJson();
+    expect(eventPayload.toString(), isNot(contains('content_base64')));
+    expect(PreparedPhotoDraft.fromJson(photo.toJson()).bytes, bytes);
+
+    final corrupted = photo.toJson()..['checksum_sha256'] = 'a' * 64;
+    expect(() => PreparedPhotoDraft.fromJson(corrupted), throwsFormatException);
   });
 }

@@ -20,6 +20,7 @@ void main() {
         vault: vault,
         deviceIdentityStore: MemoryDeviceIdentityStore(),
         appVersion: 'test',
+        photoCapture: FakePhotoCapture(),
         uuidFactory: _uuidFactory(),
         clock: () => DateTime.utc(2026, 8, 9, 14),
       );
@@ -52,6 +53,7 @@ void main() {
       vault: vault,
       deviceIdentityStore: MemoryDeviceIdentityStore(),
       appVersion: 'test',
+      photoCapture: FakePhotoCapture(),
     );
     await controller.initialize();
     await controller.logout();
@@ -73,6 +75,7 @@ void main() {
         vault: vault,
         deviceIdentityStore: MemoryDeviceIdentityStore(),
         appVersion: 'test',
+        photoCapture: FakePhotoCapture(),
       );
       await controller.initialize();
 
@@ -93,6 +96,7 @@ void main() {
         vault: vault,
         deviceIdentityStore: MemoryDeviceIdentityStore(),
         appVersion: 'test',
+        photoCapture: FakePhotoCapture(),
       );
       await controller.initialize();
 
@@ -110,6 +114,7 @@ void main() {
       vault: vault,
       deviceIdentityStore: MemoryDeviceIdentityStore(),
       appVersion: 'test',
+      photoCapture: FakePhotoCapture(),
       uuidFactory: _uuidFactory(),
     );
     await controller.initialize();
@@ -133,17 +138,19 @@ void main() {
       vault: vault,
       deviceIdentityStore: MemoryDeviceIdentityStore(),
       appVersion: 'test',
+      photoCapture: FakePhotoCapture(),
       uuidFactory: _uuidFactory(),
     );
     await controller.initialize();
     await controller.login('field@example.test', 'secret');
     await _startDemo(controller, order);
     await controller.saveThreeDrafts(order, [8, 22, 35]);
+    await _capturePhotos(controller, order);
     await controller.finishDemoOrder(order);
 
     expect(await controller.syncPreparedDrafts(order), isFalse);
     final firstBatch = vault.pendingBatch!;
-    expect(firstBatch.eventIds, hasLength(6));
+    expect(firstBatch.eventIds, hasLength(9));
     expect(
       (await vault.readDrafts(
         order.id,
@@ -160,10 +167,26 @@ void main() {
       'confirm',
       'start',
       'create',
+      'prepare',
       'create',
+      'prepare',
       'create',
+      'prepare',
       'finish',
     ]);
+    final photoPayloads = gateway.lastEvents!
+        .where((event) => event['operation'] == 'prepare')
+        .map((event) => (event['payload']! as Map).cast<String, Object?>());
+    expect(photoPayloads, hasLength(3));
+    expect(
+      photoPayloads.every(
+        (payload) =>
+            payload['content_status'] == 'not_uploaded' &&
+            payload['ruler_status'] == 'not_validated' &&
+            !payload.containsKey('content_base64'),
+      ),
+      isTrue,
+    );
     expect(vault.pendingBatch, isNull);
     expect(vault.syncCursor, 1);
     expect(
@@ -178,6 +201,12 @@ void main() {
       )).every((event) => event.syncState == DraftSyncState.acknowledged),
       isTrue,
     );
+    expect(
+      (await vault.readPhotoDrafts(
+        order.id,
+      )).every((photo) => photo.syncState == DraftSyncState.acknowledged),
+      isTrue,
+    );
   });
 
   test('persistent acknowledgement prevents overwriting an event', () async {
@@ -189,17 +218,39 @@ void main() {
       vault: vault,
       deviceIdentityStore: MemoryDeviceIdentityStore(),
       appVersion: 'test',
+      photoCapture: FakePhotoCapture(),
       uuidFactory: _uuidFactory(),
     );
     await controller.initialize();
     await controller.login('field@example.test', 'secret');
     await _startDemo(controller, order);
     await controller.saveThreeDrafts(order, [8, 22, 35]);
+    await _capturePhotos(controller, order);
     await controller.finishDemoOrder(order);
     await controller.syncPreparedDrafts(order);
 
     expect(await controller.saveThreeDrafts(order, [9, 23, 36]), isFalse);
     expect(controller.errorMessage, contains('não pode ser sobrescrita'));
+  });
+
+  test('demo cannot finish without one photo per planned point', () async {
+    final order = preparedOrder();
+    final controller = ZenitAppController(
+      gateway: FakeGateway(orders: [order]),
+      sessionStore: MemorySessionStore(),
+      vault: MemoryVault(),
+      deviceIdentityStore: MemoryDeviceIdentityStore(),
+      appVersion: 'test',
+      photoCapture: FakePhotoCapture(),
+      uuidFactory: _uuidFactory(),
+    );
+    await controller.initialize();
+    await controller.login('field@example.test', 'secret');
+    await _startDemo(controller, order);
+    await controller.saveThreeDrafts(order, [8, 22, 35]);
+
+    expect(await controller.finishDemoOrder(order), isFalse);
+    expect(controller.errorMessage, contains('foto preparada'));
   });
 
   test(
@@ -215,16 +266,19 @@ void main() {
             batch.eventIds[0],
             batch.eventIds[1],
             batch.eventIds[2],
+            batch.eventIds[3],
             batch.eventIds[5],
+            batch.eventIds[7],
+            batch.eventIds[8],
           },
           rejectedEvents: {
-            batch.eventIds[3]: const SyncEventResult(
+            batch.eventIds[4]: const SyncEventResult(
               code: 'road_access_denied',
               message: 'access denied',
             ),
           },
           conflictingEvents: {
-            batch.eventIds[4]: const SyncEventResult(
+            batch.eventIds[6]: const SyncEventResult(
               code: 'event_id_reused',
               message: 'conflict preserved',
             ),
@@ -238,12 +292,14 @@ void main() {
         vault: vault,
         deviceIdentityStore: MemoryDeviceIdentityStore(),
         appVersion: 'test',
+        photoCapture: FakePhotoCapture(),
         uuidFactory: _uuidFactory(),
       );
       await controller.initialize();
       await controller.login('field@example.test', 'secret');
       await _startDemo(controller, order);
       await controller.saveThreeDrafts(order, [8, 22, 35]);
+      await _capturePhotos(controller, order);
       await controller.finishDemoOrder(order);
 
       expect(await controller.syncPreparedDrafts(order), isTrue);
@@ -281,6 +337,7 @@ void main() {
       vault: vault,
       deviceIdentityStore: MemoryDeviceIdentityStore(),
       appVersion: 'test',
+      photoCapture: FakePhotoCapture(),
     );
     await controller.initialize();
 
@@ -301,6 +358,7 @@ void main() {
       vault: vault,
       deviceIdentityStore: MemoryDeviceIdentityStore(),
       appVersion: 'test',
+      photoCapture: FakePhotoCapture(),
     );
 
     await controller.initialize();
@@ -318,6 +376,15 @@ Future<void> _startDemo(
 ) async {
   expect(await controller.confirmDemoOrder(order), isTrue);
   expect(await controller.startDemoOrder(order), isTrue);
+}
+
+Future<void> _capturePhotos(
+  ZenitAppController controller,
+  PreparedWorkOrder order,
+) async {
+  for (final point in order.points) {
+    expect(await controller.capturePreparedPhoto(order, point), isTrue);
+  }
 }
 
 String Function() _uuidFactory() {

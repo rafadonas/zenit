@@ -1,4 +1,8 @@
+import 'dart:typed_data';
+
+import 'package:crypto/crypto.dart';
 import 'package:zenit_mobile/data/offline_vault.dart';
+import 'package:zenit_mobile/data/photo_capture.dart';
 import 'package:zenit_mobile/data/device_identity_store.dart';
 import 'package:zenit_mobile/data/secure_session_store.dart';
 import 'package:zenit_mobile/data/zenit_gateway.dart';
@@ -6,6 +10,7 @@ import 'package:zenit_mobile/domain/auth_session.dart';
 import 'package:zenit_mobile/domain/demo_order_lifecycle.dart';
 import 'package:zenit_mobile/domain/measurement_draft.dart';
 import 'package:zenit_mobile/domain/mobile_sync.dart';
+import 'package:zenit_mobile/domain/prepared_photo_draft.dart';
 import 'package:zenit_mobile/domain/prepared_work_order.dart';
 
 Map<String, Object?> preparedOrderJson() => {
@@ -114,6 +119,18 @@ class MemoryDeviceIdentityStore implements DeviceIdentityStore {
       value ??= '44444444-4444-4444-8444-444444444444';
 }
 
+class FakePhotoCapture implements PhotoCapture {
+  @override
+  Future<CapturedPhoto?> capture() async {
+    final bytes = Uint8List.fromList([0xff, 0xd8, 0xff, 0xd9]);
+    return CapturedPhoto(
+      bytes: bytes,
+      mediaType: 'image/jpeg',
+      checksumSha256: sha256.convert(bytes).toString(),
+    );
+  }
+}
+
 class MemorySessionStore implements SessionStore {
   AuthSession? value;
 
@@ -132,6 +149,7 @@ class MemoryVault implements OfflineVault {
   List<PreparedWorkOrder> orders = const [];
   final Map<String, List<MeasurementDraft>> drafts = {};
   final Map<String, List<DemoLifecycleEvent>> lifecycleEvents = {};
+  final Map<String, List<PreparedPhotoDraft>> photoDrafts = {};
   String? ownerUserId;
   PendingSyncBatch? pendingBatch;
   int syncCursor = 0;
@@ -144,6 +162,7 @@ class MemoryVault implements OfflineVault {
     orders = const [];
     drafts.clear();
     lifecycleEvents.clear();
+    photoDrafts.clear();
     ownerUserId = null;
     pendingBatch = null;
     syncCursor = 0;
@@ -159,6 +178,10 @@ class MemoryVault implements OfflineVault {
   @override
   Future<List<DemoLifecycleEvent>> readLifecycleEvents(String orderId) async =>
       lifecycleEvents[orderId] ?? const [];
+
+  @override
+  Future<List<PreparedPhotoDraft>> readPhotoDrafts(String orderId) async =>
+      photoDrafts[orderId] ?? const [];
 
   @override
   Future<void> replaceDrafts(
@@ -177,6 +200,12 @@ class MemoryVault implements OfflineVault {
   ) async => lifecycleEvents[orderId] = List.unmodifiable(values);
 
   @override
+  Future<void> replacePhotoDrafts(
+    String orderId,
+    List<PreparedPhotoDraft> values,
+  ) async => photoDrafts[orderId] = List.unmodifiable(values);
+
+  @override
   Future<void> bindOwnerUserId(String userId) async => ownerUserId = userId;
 
   @override
@@ -184,10 +213,12 @@ class MemoryVault implements OfflineVault {
     String orderId,
     List<MeasurementDraft> values,
     List<DemoLifecycleEvent> lifecycleValues,
+    List<PreparedPhotoDraft> photoValues,
     int nextSyncCursor,
   ) async {
     drafts[orderId] = List.unmodifiable(values);
     lifecycleEvents[orderId] = List.unmodifiable(lifecycleValues);
+    photoDrafts[orderId] = List.unmodifiable(photoValues);
     syncCursor = nextSyncCursor;
     pendingBatch = null;
   }
@@ -199,7 +230,10 @@ class MemoryVault implements OfflineVault {
           .any((draft) => !draft.hasPersistentServerResult) ||
       lifecycleEvents.values
           .expand((values) => values)
-          .any((event) => !event.hasPersistentServerResult);
+          .any((event) => !event.hasPersistentServerResult) ||
+      photoDrafts.values
+          .expand((values) => values)
+          .any((photo) => !photo.hasPersistentServerResult);
 
   @override
   Future<String?> readOwnerUserId() async => ownerUserId;
@@ -215,9 +249,11 @@ class MemoryVault implements OfflineVault {
     PendingSyncBatch batch,
     List<MeasurementDraft> values,
     List<DemoLifecycleEvent> lifecycleValues,
+    List<PreparedPhotoDraft> photoValues,
   ) async {
     pendingBatch = batch;
     drafts[batch.orderId] = List.unmodifiable(values);
     lifecycleEvents[batch.orderId] = List.unmodifiable(lifecycleValues);
+    photoDrafts[batch.orderId] = List.unmodifiable(photoValues);
   }
 }

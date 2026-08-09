@@ -16,6 +16,7 @@ PREPARED_INSPECTION_ORDER_MIGRATION = Path("infra/migrations/0010_prepared_inspe
 PREPARED_MOBILE_SYNC_MIGRATION = Path("infra/migrations/0011_prepared_mobile_sync.sql")
 PREPARED_DEMO_ORDER_EVENT_MIGRATION = Path("infra/migrations/0012_prepared_demo_order_events.sql")
 PREPARED_PHOTO_MANIFEST_MIGRATION = Path("infra/migrations/0013_prepared_photo_manifest.sql")
+DEMO_FINISH_PHOTO_MIGRATION = Path("infra/migrations/0014_require_demo_finish_photos.sql")
 
 
 class MigrationContractTests(unittest.TestCase):
@@ -118,7 +119,7 @@ class MigrationContractTests(unittest.TestCase):
         mounts = [
             line.strip() for line in compose.splitlines() if "/docker-entrypoint-initdb.d/" in line
         ]
-        self.assertEqual(len(mounts), 13)
+        self.assertEqual(len(mounts), 14)
         for version, mount in enumerate(mounts, start=1):
             prefix = f"{version:04d}"
             self.assertIn(f"infra/migrations/{prefix}_", mount)
@@ -208,6 +209,13 @@ class MigrationContractTests(unittest.TestCase):
         self.assertIn("CHECK (NOT eligible_for_official_reporting)", sql)
         self.assertIn("prepared photo manifest requires its exact accepted sync event", sql)
         self.assertIn("prepared_field_photo_manifest_immutable", sql)
+
+    def test_demo_finish_requires_three_distinct_photo_manifests(self) -> None:
+        sql = DEMO_FINISH_PHOTO_MIGRATION.read_text(encoding="utf-8")
+
+        self.assertIn("count(DISTINCT photo.planned_point_id)", sql)
+        self.assertIn("finish requires three prepared point photo manifests", sql)
+        self.assertIn("prepared_demo_finish_photo_guard", sql)
 
 
 if __name__ == "__main__":

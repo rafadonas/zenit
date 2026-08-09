@@ -846,17 +846,28 @@ class PostgresMobileSyncRepository:
         if event.operation == "finish":
             await cursor.execute(
                 """
-                SELECT count(DISTINCT planned_point_id)
-                FROM prepared_field_measurement
-                WHERE work_order_id = %s
+                SELECT
+                    (SELECT count(DISTINCT planned_point_id)
+                     FROM prepared_field_measurement
+                     WHERE work_order_id = %s),
+                    (SELECT count(DISTINCT planned_point_id)
+                     FROM prepared_field_photo_manifest
+                     WHERE work_order_id = %s)
                 """,
-                (order_event.work_order_id,),
+                (order_event.work_order_id, order_event.work_order_id),
             )
-            if (await cursor.fetchone())[0] != 3:
+            measurement_count, photo_count = await cursor.fetchone()
+            if measurement_count != 3:
                 return RejectedSyncEventResponse(
                     event_id=event.event_id,
                     code="measurements_incomplete",
                     message="finish requires three persisted prepared point measurements",
+                )
+            if photo_count != 3:
+                return RejectedSyncEventResponse(
+                    event_id=event.event_id,
+                    code="photos_incomplete",
+                    message="finish requires three persisted prepared point photo manifests",
                 )
         return None
 

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import 'data/offline_vault.dart';
+import 'data/photo_capture.dart';
 import 'data/device_identity_store.dart';
 import 'data/secure_session_store.dart';
 import 'data/zenit_gateway.dart';
@@ -8,6 +9,7 @@ import 'domain/auth_session.dart';
 import 'domain/demo_order_lifecycle.dart';
 import 'domain/measurement_draft.dart';
 import 'domain/mobile_sync.dart';
+import 'domain/prepared_photo_draft.dart';
 import 'domain/prepared_work_order.dart';
 
 class ZenitAppController extends ChangeNotifier {
@@ -17,10 +19,12 @@ class ZenitAppController extends ChangeNotifier {
     required this.vault,
     required this.deviceIdentityStore,
     required this.appVersion,
+    PhotoCapture? photoCapture,
     DateTime Function()? clock,
     String Function()? uuidFactory,
   }) : _clock = clock ?? DateTime.now,
-       _uuidFactory = uuidFactory ?? generateUuidV4;
+       _uuidFactory = uuidFactory ?? generateUuidV4,
+       _photoCapture = photoCapture ?? ImagePickerPhotoCapture();
 
   final ZenitGateway gateway;
   final SessionStore sessionStore;
@@ -29,6 +33,7 @@ class ZenitAppController extends ChangeNotifier {
   final String appVersion;
   final DateTime Function() _clock;
   final String Function() _uuidFactory;
+  final PhotoCapture _photoCapture;
 
   AuthSession? session;
   List<PreparedWorkOrder> orders = const [];
@@ -132,6 +137,47 @@ class ZenitAppController extends ChangeNotifier {
   Future<List<DemoLifecycleEvent>> readLifecycleEvents(String orderId) =>
       vault.readLifecycleEvents(orderId);
 
+  Future<List<PreparedPhotoDraft>> readPhotoDrafts(String orderId) =>
+      vault.readPhotoDrafts(orderId);
+
+  Future<bool> capturePreparedPhoto(
+    PreparedWorkOrder order,
+    PlannedInspectionPoint point,
+  ) => _run(() async {
+    final pendingBatch = await vault.readPendingSyncBatch();
+    if (pendingBatch != null) throw const PendingBatchEditError();
+    final lifecycle = await vault.readLifecycleEvents(order.id);
+    if (lifecycle.length != 2 ||
+        lifecycle.last.operation != DemoLifecycleOperation.start) {
+      throw const DemoOrderNotStartedError();
+    }
+    final existing = await vault.readPhotoDrafts(order.id);
+    final previous = existing
+        .where((photo) => photo.plannedPointId == point.id)
+        .firstOrNull;
+    if (previous?.hasPersistentServerResult == true) {
+      throw const PersistedPhotoEditError();
+    }
+    final captured = await _photoCapture.capture();
+    if (captured == null) throw const PhotoCaptureCancelledError();
+    final photo = PreparedPhotoDraft(
+      eventId: _uuidFactory(),
+      photoId: _uuidFactory(),
+      orderId: order.id,
+      plannedPointId: point.id,
+      sequence: point.sequence,
+      capturedAt: _clock().toUtc(),
+      checksumSha256: captured.checksumSha256,
+      mediaType: captured.mediaType,
+      bytes: captured.bytes,
+    );
+    await vault.replacePhotoDrafts(
+      order.id,
+      [...existing.where((item) => item.plannedPointId != point.id), photo]
+        ..sort((left, right) => left.sequence.compareTo(right.sequence)),
+    );
+  });
+
   Future<bool> confirmDemoOrder(PreparedWorkOrder order) => _run(() async {
     final events = await vault.readLifecycleEvents(order.id);
     if (events.isNotEmpty) throw const InvalidDemoLifecycleError();
@@ -169,12 +215,17 @@ class ZenitAppController extends ChangeNotifier {
   Future<bool> finishDemoOrder(PreparedWorkOrder order) => _run(() async {
     final events = await vault.readLifecycleEvents(order.id);
     final drafts = await vault.readDrafts(order.id);
+    final photos = await vault.readPhotoDrafts(order.id);
     if (events.length != 2 ||
         events[0].operation != DemoLifecycleOperation.confirm ||
         events[1].operation != DemoLifecycleOperation.start ||
         drafts.length != 3 ||
         events.any((event) => event.syncState != DraftSyncState.localOnly)) {
       throw const InvalidDemoLifecycleError();
+    }
+    if (photos.length != 3 ||
+        photos.map((photo) => photo.plannedPointId).toSet().length != 3) {
+      throw const IncompletePhotoBatchError();
     }
     await vault.replaceLifecycleEvents(order.id, [
       ...events,
@@ -243,6 +294,7 @@ class ZenitAppController extends ChangeNotifier {
     return _run(() async {
       var drafts = await vault.readDrafts(order.id);
       var lifecycle = await vault.readLifecycleEvents(order.id);
+      var photos = await vault.readPhotoDrafts(order.id);
       final expectedPoints = {for (final point in order.points) point.id};
       if (drafts.length != 3 ||
           drafts.any((draft) => draft.orderId != order.id) ||
@@ -259,6 +311,15 @@ class ZenitAppController extends ChangeNotifier {
           lifecycle[2].operation != DemoLifecycleOperation.finish) {
         throw const IncompleteDemoLifecycleError();
       }
+      if (photos.length != 3 ||
+          photos.any((photo) => photo.orderId != order.id) ||
+          photos.map((photo) => photo.plannedPointId).toSet().length != 3 ||
+          !photos
+              .map((photo) => photo.plannedPointId)
+              .toSet()
+              .containsAll(expectedPoints)) {
+        throw const IncompletePhotoBatchError();
+      }
 
       var pendingBatch = await vault.readPendingSyncBatch();
       if (pendingBatch == null) {
@@ -267,6 +328,9 @@ class ZenitAppController extends ChangeNotifier {
             ) ||
             lifecycle.any(
               (event) => event.syncState != DraftSyncState.localOnly,
+            ) ||
+            photos.any(
+              (photo) => photo.syncState != DraftSyncState.localOnly,
             )) {
           throw const PersistedDraftEditError();
         }
@@ -279,7 +343,10 @@ class ZenitAppController extends ChangeNotifier {
           eventIds: [
             lifecycle[0].eventId,
             lifecycle[1].eventId,
-            ...drafts.map((draft) => draft.eventId),
+            for (var index = 0; index < 3; index++) ...[
+              drafts[index].eventId,
+              photos[index].eventId,
+            ],
             lifecycle[2].eventId,
           ],
         );
@@ -299,13 +366,27 @@ class ZenitAppController extends ChangeNotifier {
               ),
             )
             .toList();
-        await vault.savePendingSyncBatch(pendingBatch, drafts, lifecycle);
+        photos = photos
+            .map(
+              (photo) => photo.copyWith(
+                syncState: DraftSyncState.pending,
+                clearResult: true,
+              ),
+            )
+            .toList();
+        await vault.savePendingSyncBatch(
+          pendingBatch,
+          drafts,
+          lifecycle,
+          photos,
+        );
       } else if (pendingBatch.orderId != order.id) {
         throw const AnotherOrderPendingError();
       }
       final localEventIds = {
         ...drafts.map((draft) => draft.eventId),
         ...lifecycle.map((event) => event.eventId),
+        ...photos.map((photo) => photo.eventId),
       };
       if (pendingBatch.eventIds.length != localEventIds.length ||
           pendingBatch.eventIds.toSet().length != localEventIds.length ||
@@ -318,13 +399,19 @@ class ZenitAppController extends ChangeNotifier {
         pendingBatch.deviceId,
         appVersion,
       );
-      final result = await gateway
-          .syncBatch(current.accessToken, pendingBatch, [
-            lifecycle[0].toSyncEventJson(),
-            lifecycle[1].toSyncEventJson(),
-            ...drafts.map((draft) => draft.toSyncEventJson()),
-            lifecycle[2].toSyncEventJson(),
-          ]);
+      final result = await gateway.syncBatch(
+        current.accessToken,
+        pendingBatch,
+        [
+          lifecycle[0].toSyncEventJson(),
+          lifecycle[1].toSyncEventJson(),
+          for (var index = 0; index < 3; index++) ...[
+            drafts[index].toSyncEventJson(),
+            photos[index].toSyncEventJson(),
+          ],
+          lifecycle[2].toSyncEventJson(),
+        ],
+      );
       final coveredEventIds = {
         ...result.acceptedEventIds,
         ...result.rejectedEvents.keys,
@@ -363,10 +450,14 @@ class ZenitAppController extends ChangeNotifier {
       final completedLifecycle = lifecycle
           .map((event) => _completeLifecycleEvent(event, result))
           .toList();
+      final completedPhotos = photos
+          .map((photo) => _completePhoto(photo, result))
+          .toList();
       await vault.completeSyncBatch(
         order.id,
         completed,
         completedLifecycle,
+        completedPhotos,
         result.nextSyncCursor,
       );
     });
@@ -393,6 +484,33 @@ class ZenitAppController extends ChangeNotifier {
     }
     final conflict = result.conflictingEvents[event.eventId]!;
     return event.copyWith(
+      syncState: DraftSyncState.conflict,
+      syncResultCode: conflict.code,
+      syncResultMessage: conflict.message,
+    );
+  }
+
+  PreparedPhotoDraft _completePhoto(
+    PreparedPhotoDraft photo,
+    MobileSyncResult result,
+  ) {
+    if (result.acceptedEventIds.contains(photo.eventId)) {
+      return photo.copyWith(
+        syncState: DraftSyncState.acknowledged,
+        syncResultCode: 'persisted',
+        syncResultMessage: 'Manifesto persistido; conteúdo não enviado.',
+      );
+    }
+    final rejection = result.rejectedEvents[photo.eventId];
+    if (rejection != null) {
+      return photo.copyWith(
+        syncState: DraftSyncState.rejected,
+        syncResultCode: rejection.code,
+        syncResultMessage: rejection.message,
+      );
+    }
+    final conflict = result.conflictingEvents[photo.eventId]!;
+    return photo.copyWith(
       syncState: DraftSyncState.conflict,
       syncResultCode: conflict.code,
       syncResultMessage: conflict.message,
@@ -475,4 +593,20 @@ class DemoOrderNotStartedError extends MobileWorkflowException {
 class IncompleteDemoLifecycleError extends MobileWorkflowException {
   const IncompleteDemoLifecycleError()
     : super('Finalize a demonstração antes de sincronizar.');
+}
+
+class PersistedPhotoEditError extends MobileWorkflowException {
+  const PersistedPhotoEditError()
+    : super(
+        'O manifesto da foto já foi persistido e não pode ser substituído.',
+      );
+}
+
+class PhotoCaptureCancelledError extends MobileWorkflowException {
+  const PhotoCaptureCancelledError() : super('Captura de foto cancelada.');
+}
+
+class IncompletePhotoBatchError extends MobileWorkflowException {
+  const IncompletePhotoBatchError()
+    : super('Capture uma foto preparada em cada um dos três pontos.');
 }

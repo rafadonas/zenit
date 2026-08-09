@@ -126,7 +126,9 @@ healthy. Sprint 5 now includes an Android-first Flutter scaffold that supports
 online login, encrypted offline download of prepared inspection orders, and
 an offline demo sequence with confirmation, explicitly simulated-location
 start, three prepared measurements, and finish. It deliberately has no real
-GPS, photos, or field execution. The app persists event/batch UUIDs, registers
+GPS, media upload, or field execution. It captures one photo per planned point
+into the encrypted vault and synchronizes checksum-bound manifests only. The
+app persists event/batch UUIDs, registers
 its logical device, sends the exact idempotent batch, and retains local events
 until a persistent accepted/rejected/conflict result arrives. The API has an
 append-only, idempotent prepared-sync foundation with authenticated device
@@ -144,8 +146,8 @@ credentials.
 ## Database migrations and ingestion
 
 Apply migrations in numeric order before importing sources. The current local
-development database has migrations `0001` through `0013` applied. On the first
-startup of a new Compose volume, Postgres applies these thirteen up migrations in
+development database has migrations `0001` through `0014` applied. On the first
+startup of a new Compose volume, Postgres applies these fourteen up migrations in
 order through `/docker-entrypoint-initdb.d`; existing volumes are never modified
 by that initialization mechanism. The explicit commands below remain useful
 for non-Compose environments and controlled upgrades of existing databases.
@@ -177,6 +179,8 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0012_prepared_demo_order_events.sql
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0013_prepared_photo_manifest.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
+  < infra/migrations/0014_require_demo_finish_photos.sql
 ```
 
 Migration `0008` starts the Sprint 4 management foundation with immutable,
@@ -216,6 +220,10 @@ point, actor, device, timestamp, checksum, size, and media type. A manifest is
 always `not_uploaded`, `not_validated`, and non-official; it is not evidence
 that object content exists. See
 `docs/decisions/ADR-0016-prepared-photo-manifest-foundation.md`.
+
+Migration `0014` requires three distinct prepared point-photo manifests before
+a new simulated demo finish can be persisted. It does not claim that their
+content was uploaded or validated.
 
 The public, read-only management queue is available at:
 

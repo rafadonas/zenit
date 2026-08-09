@@ -7,6 +7,7 @@ import 'data/secure_session_store.dart';
 import 'data/zenit_gateway.dart';
 import 'domain/demo_order_lifecycle.dart';
 import 'domain/measurement_draft.dart';
+import 'domain/prepared_photo_draft.dart';
 import 'domain/prepared_work_order.dart';
 
 const apiBaseUrl = String.fromEnvironment(
@@ -256,6 +257,7 @@ class _OrderDraftPageState extends State<OrderDraftPage> {
   String? confirmation;
   List<MeasurementDraft> drafts = const [];
   List<DemoLifecycleEvent> lifecycle = const [];
+  List<PreparedPhotoDraft> photos = const [];
 
   bool get canEdit =>
       drafts.every((draft) => draft.syncState == DraftSyncState.localOnly);
@@ -271,6 +273,9 @@ class _OrderDraftPageState extends State<OrderDraftPage> {
     final loadedLifecycle = await widget.controller.readLifecycleEvents(
       widget.order.id,
     );
+    final loadedPhotos = await widget.controller.readPhotoDrafts(
+      widget.order.id,
+    );
     if (!mounted) return;
     for (
       var index = 0;
@@ -282,6 +287,7 @@ class _OrderDraftPageState extends State<OrderDraftPage> {
     setState(() {
       drafts = loadedDrafts;
       lifecycle = loadedLifecycle;
+      photos = loadedPhotos;
       loading = false;
     });
   }
@@ -326,6 +332,7 @@ class _OrderDraftPageState extends State<OrderDraftPage> {
     final states = [
       ...lifecycle.map((event) => event.syncState),
       ...drafts.map((draft) => draft.syncState),
+      ...photos.map((photo) => photo.syncState),
     ];
     final acknowledged = states
         .where((state) => state == DraftSyncState.acknowledged)
@@ -354,6 +361,21 @@ class _OrderDraftPageState extends State<OrderDraftPage> {
     setState(
       () => confirmation = changed
           ? 'Evento demonstrativo criptografado no aparelho.'
+          : widget.controller.errorMessage,
+    );
+  }
+
+  Future<void> _capturePhoto(PlannedInspectionPoint point) async {
+    final captured = await widget.controller.capturePreparedPhoto(
+      widget.order,
+      point,
+    );
+    if (!mounted) return;
+    if (captured) await _load();
+    if (!mounted) return;
+    setState(
+      () => confirmation = captured
+          ? 'Foto copiada para o vault criptografado; conteúdo não enviado.'
           : widget.controller.errorMessage,
     );
   }
@@ -404,6 +426,7 @@ class _OrderDraftPageState extends State<OrderDraftPage> {
                     onPressed:
                         lifecycle.length == 2 &&
                             drafts.length == 3 &&
+                            photos.length == 3 &&
                             !syncing &&
                             !widget.controller.busy
                         ? () => _transition(widget.controller.finishDemoOrder)
@@ -436,6 +459,33 @@ class _OrderDraftPageState extends State<OrderDraftPage> {
                     helperText:
                         '${(widget.order.points[index].positionFraction * 100).round()}% do segmento · localização estimada',
                   ),
+                ),
+                const SizedBox(height: 6),
+                Builder(
+                  builder: (context) {
+                    final point = widget.order.points[index];
+                    final matches = photos.where(
+                      (photo) => photo.plannedPointId == point.id,
+                    );
+                    final photo = matches.isEmpty ? null : matches.single;
+                    return OutlinedButton.icon(
+                      onPressed:
+                          syncing ||
+                              widget.controller.busy ||
+                              lifecycle.length != 2 ||
+                              photo?.hasPersistentServerResult == true
+                          ? null
+                          : () => _capturePhoto(point),
+                      icon: Icon(
+                        photo == null ? Icons.camera_alt : Icons.verified,
+                      ),
+                      label: Text(
+                        photo == null
+                            ? 'Capturar foto preparada do ponto ${index + 1}'
+                            : 'Foto ${photo.mediaType} · ${photo.bytes.length} bytes',
+                      ),
+                    );
+                  },
                 ),
                 const SizedBox(height: 14),
               ],
@@ -490,6 +540,19 @@ class _OrderDraftPageState extends State<OrderDraftPage> {
                         ? null
                         : Text(draft.syncResultMessage!),
                   ),
+                for (final photo in photos)
+                  ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(_syncIcon(photo.syncState)),
+                    title: Text(
+                      'Foto ${photo.sequence}: ${_syncLabel(photo.syncState)}',
+                    ),
+                    subtitle: Text(
+                      photo.syncResultMessage ??
+                          'SHA-256 ${photo.checksumSha256.substring(0, 12)}… · não enviada · régua não validada',
+                    ),
+                  ),
               ],
               if (confirmation case final message?) ...[
                 const SizedBox(height: 12),
@@ -497,7 +560,7 @@ class _OrderDraftPageState extends State<OrderDraftPage> {
               ],
               const SizedBox(height: 20),
               const Text(
-                'O GPS exibido é simulado e fotos permanecem não coletadas. Estes dados não comprovam inspeção, não entram em relatório oficial e não autorizam roçada.',
+                'O GPS exibido é simulado. As fotos permanecem locais, não enviadas e não validadas. Estes dados não comprovam inspeção, não entram em relatório oficial e não autorizam roçada.',
               ),
             ],
           ),

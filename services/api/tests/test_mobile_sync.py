@@ -327,9 +327,16 @@ def test_sync_contract_accepts_only_unuploaded_unvalidated_photo_manifest() -> N
 
 
 class DemoValidationCursor:
-    def __init__(self, *, operations: set[str], measurement_count: int = 3) -> None:
+    def __init__(
+        self,
+        *,
+        operations: set[str],
+        measurement_count: int = 3,
+        photo_count: int = 3,
+    ) -> None:
         self.operations = operations
         self.measurement_count = measurement_count
+        self.photo_count = photo_count
         self.query = ""
 
     async def execute(self, query: str, parameters: tuple) -> None:
@@ -338,7 +345,7 @@ class DemoValidationCursor:
     async def fetchone(self) -> tuple:
         if "FROM work_order order_record" in self.query:
             return ("prepared", "prepared", False, False, False, True)
-        return (self.measurement_count,)
+        return (self.measurement_count, self.photo_count)
 
     async def fetchall(self) -> list[tuple[str]]:
         return [(operation,) for operation in self.operations]
@@ -381,11 +388,18 @@ def test_photo_manifest_requires_exact_prepared_point_and_road_access() -> None:
     assert validate_photo_manifest(eligible, existing_photo=True).code == "photo_id_reused"
 
 
-def validate_demo_event(operation: str, *, operations: set[str], measurement_count: int = 3):
+def validate_demo_event(
+    operation: str,
+    *,
+    operations: set[str],
+    measurement_count: int = 3,
+    photo_count: int = 3,
+):
     event = MobileSyncEventRequest.model_validate(demo_order_event(operation))
     cursor = DemoValidationCursor(
         operations=operations,
         measurement_count=measurement_count,
+        photo_count=photo_count,
     )
     return asyncio.run(
         PostgresMobileSyncRepository._validate_demo_order_event(
@@ -407,6 +421,15 @@ def test_demo_order_sequence_requires_confirm_then_start_then_finish() -> None:
     )
     assert (
         validate_demo_event("finish", operations={"confirm", "start"}, measurement_count=3) is None
+    )
+    assert (
+        validate_demo_event(
+            "finish",
+            operations={"confirm", "start"},
+            measurement_count=3,
+            photo_count=2,
+        ).code
+        == "photos_incomplete"
     )
 
 

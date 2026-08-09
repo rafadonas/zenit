@@ -11,6 +11,8 @@ Current P0 slice:
   Hive CE vault whose key is protected by Android secure storage;
 - offline demo lifecycle (`confirm`, simulated-location `start`, and `finish`)
   persisted alongside the measurements;
+- one camera photo per planned point copied into the encrypted vault with a
+  verified local SHA-256; only its prepared manifest enters sync;
 - persistent event and batch UUIDs created before network delivery;
 - authenticated device registration and idempotent prepared-batch sync;
 - accepted, rejected, and conflicting outcomes retained locally;
@@ -23,6 +25,8 @@ Safety boundary: every accepted order must explicitly have
 declare GPS/photos as not collected. The demo start uses the first estimated
 planned point only as an explicitly `simulated`, `demo_only` coordinate. These
 events do not mutate the prepared order or make any data operational/official.
+Photo bytes remain encrypted on the device and are explicitly not uploaded;
+their ruler presence and quality remain unvalidated.
 
 Run checks from this directory with the repository-local Flutter SDK:
 
