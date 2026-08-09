@@ -23,6 +23,7 @@ services:
       - ./infra/migrations/0010_prepared_inspection_orders.sql:/docker-entrypoint-initdb.d/0010.sql:ro
       - ./infra/migrations/0011_prepared_mobile_sync.sql:/docker-entrypoint-initdb.d/0011.sql:ro
       - ./infra/migrations/0012_prepared_demo_order_events.sql:/docker-entrypoint-initdb.d/0012.sql:ro
+      - ./infra/migrations/0013_prepared_photo_manifest.sql:/docker-entrypoint-initdb.d/0013.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s

@@ -83,6 +83,29 @@ def demo_order_event(operation: str) -> dict:
     }
 
 
+def photo_manifest_event() -> dict:
+    return {
+        "event_id": str(EVENT_ID),
+        "entity_type": "photo",
+        "operation": "prepare",
+        "payload": {
+            "photo_id": "40000000-0000-4000-8000-000000000007",
+            "work_order_id": str(ORDER_ID),
+            "planned_point_id": str(POINT_ID),
+            "phase": "inspection",
+            "captured_at": "2026-08-09T14:00:00-03:00",
+            "checksum_sha256": "a" * 64,
+            "byte_size": 1024,
+            "media_type": "image/jpeg",
+            "content_status": "not_uploaded",
+            "ruler_status": "not_validated",
+            "location_status": "not_collected",
+            "data_status": "prepared",
+            "eligible_for_official_reporting": False,
+        },
+    }
+
+
 class FakeMobileSyncRepository:
     def __init__(self, failure: type[Exception] | None = None) -> None:
         self.failure = failure
@@ -114,11 +137,11 @@ class FakeMobileSyncRepository:
             raise self.failure
         assert actor == ACTOR
         event = request.events[0]
-        if event.entity_type != "measurement" and event.operation not in {
-            "confirm",
-            "start",
-            "finish",
-        }:
+        if (
+            event.entity_type != "measurement"
+            and event.operation not in {"confirm", "start", "finish"}
+            and not (event.entity_type == "photo" and event.operation == "prepare")
+        ):
             return MobileSyncBatchResponse(
                 batch_id=request.batch_id,
                 accepted=[],
@@ -126,7 +149,7 @@ class FakeMobileSyncRepository:
                     RejectedSyncEventResponse(
                         event_id=event.event_id,
                         code="unsupported_event",
-                        message="only prepared measurement/create events are accepted",
+                        message="event type is not supported",
                     )
                 ],
                 conflicts=[],
@@ -271,6 +294,38 @@ def test_demo_start_rejects_unlabelled_or_real_location_claims() -> None:
     assert response.status_code == 422
 
 
+def test_sync_contract_accepts_only_unuploaded_unvalidated_photo_manifest() -> None:
+    response = request_with_overrides(
+        endpoint="/v1/sync/batch",
+        payload={
+            "device_id": str(DEVICE_ID),
+            "batch_id": str(BATCH_ID),
+            "base_sync_cursor": 0,
+            "events": [photo_manifest_event()],
+        },
+    )
+    assert response.status_code == 200
+    assert response.json()["accepted"] == [{"event_id": str(EVENT_ID), "persisted": True}]
+
+    for field, unsafe_value in (
+        ("content_status", "uploaded"),
+        ("ruler_status", "valid"),
+        ("eligible_for_official_reporting", True),
+    ):
+        unsafe = photo_manifest_event()
+        unsafe["payload"][field] = unsafe_value
+        response = request_with_overrides(
+            endpoint="/v1/sync/batch",
+            payload={
+                "device_id": str(DEVICE_ID),
+                "batch_id": str(BATCH_ID),
+                "base_sync_cursor": 0,
+                "events": [unsafe],
+            },
+        )
+        assert response.status_code == 422
+
+
 class DemoValidationCursor:
     def __init__(self, *, operations: set[str], measurement_count: int = 3) -> None:
         self.operations = operations
@@ -287,6 +342,43 @@ class DemoValidationCursor:
 
     async def fetchall(self) -> list[tuple[str]]:
         return [(operation,) for operation in self.operations]
+
+
+class PhotoValidationCursor:
+    def __init__(self, target: tuple | None, *, existing_photo: bool = False) -> None:
+        self.target = target
+        self.existing_photo = existing_photo
+        self.query = ""
+
+    async def execute(self, query: str, parameters: tuple) -> None:
+        self.query = query
+
+    async def fetchone(self) -> tuple | None:
+        if "WHERE photo_id" in self.query:
+            return (EVENT_ID,) if self.existing_photo else None
+        return self.target
+
+
+def validate_photo_manifest(target: tuple | None, *, existing_photo: bool = False):
+    event = MobileSyncEventRequest.model_validate(photo_manifest_event())
+    return asyncio.run(
+        PostgresMobileSyncRepository._validate_photo_manifest(
+            PhotoValidationCursor(  # type: ignore[arg-type]
+                target, existing_photo=existing_photo
+            ),
+            USER_ID,
+            event,
+        )
+    )
+
+
+def test_photo_manifest_requires_exact_prepared_point_and_road_access() -> None:
+    eligible = (ORDER_ID, "prepared", "prepared", False, False, False, False, True)
+    assert validate_photo_manifest(eligible) is None
+    assert validate_photo_manifest(None).code == "planned_point_not_found"
+    assert validate_photo_manifest((UUID(int=0), *eligible[1:])).code == "point_order_mismatch"
+    assert validate_photo_manifest((*eligible[:7], False)).code == "road_access_denied"
+    assert validate_photo_manifest(eligible, existing_photo=True).code == "photo_id_reused"
 
 
 def validate_demo_event(operation: str, *, operations: set[str], measurement_count: int = 3):

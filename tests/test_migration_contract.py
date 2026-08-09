@@ -15,6 +15,7 @@ IDENTITY_REVIEW_POLICY_MIGRATION = Path("infra/migrations/0009_identity_and_revi
 PREPARED_INSPECTION_ORDER_MIGRATION = Path("infra/migrations/0010_prepared_inspection_orders.sql")
 PREPARED_MOBILE_SYNC_MIGRATION = Path("infra/migrations/0011_prepared_mobile_sync.sql")
 PREPARED_DEMO_ORDER_EVENT_MIGRATION = Path("infra/migrations/0012_prepared_demo_order_events.sql")
+PREPARED_PHOTO_MANIFEST_MIGRATION = Path("infra/migrations/0013_prepared_photo_manifest.sql")
 
 
 class MigrationContractTests(unittest.TestCase):
@@ -117,7 +118,7 @@ class MigrationContractTests(unittest.TestCase):
         mounts = [
             line.strip() for line in compose.splitlines() if "/docker-entrypoint-initdb.d/" in line
         ]
-        self.assertEqual(len(mounts), 12)
+        self.assertEqual(len(mounts), 13)
         for version, mount in enumerate(mounts, start=1):
             prefix = f"{version:04d}"
             self.assertIn(f"infra/migrations/{prefix}_", mount)
@@ -194,6 +195,19 @@ class MigrationContractTests(unittest.TestCase):
         self.assertIn("start requires a persisted confirm event", sql)
         self.assertIn("finish requires start and three prepared point measurements", sql)
         self.assertIn("prepared_work_order_demo_event_immutable", sql)
+
+    def test_photo_manifest_is_unuploaded_unvalidated_and_append_only(self) -> None:
+        sql = PREPARED_PHOTO_MANIFEST_MIGRATION.read_text(encoding="utf-8")
+
+        self.assertIn("CREATE TABLE prepared_field_photo_manifest", sql)
+        self.assertIn("checksum_sha256 ~ '^[0-9a-f]{64}$'", sql)
+        self.assertIn("content_status = 'not_uploaded'", sql)
+        self.assertIn("ruler_status = 'not_validated'", sql)
+        self.assertIn("quality_status = 'prepared_unverified'", sql)
+        self.assertIn("CHECK (NOT authorizes_field_work)", sql)
+        self.assertIn("CHECK (NOT eligible_for_official_reporting)", sql)
+        self.assertIn("prepared photo manifest requires its exact accepted sync event", sql)
+        self.assertIn("prepared_field_photo_manifest_immutable", sql)
 
 
 if __name__ == "__main__":

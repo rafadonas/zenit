@@ -144,8 +144,8 @@ credentials.
 ## Database migrations and ingestion
 
 Apply migrations in numeric order before importing sources. The current local
-development database has migrations `0001` through `0012` applied. On the first
-startup of a new Compose volume, Postgres applies these twelve up migrations in
+development database has migrations `0001` through `0013` applied. On the first
+startup of a new Compose volume, Postgres applies these thirteen up migrations in
 order through `/docker-entrypoint-initdb.d`; existing volumes are never modified
 by that initialization mechanism. The explicit commands below remain useful
 for non-Compose environments and controlled upgrades of existing databases.
@@ -175,6 +175,8 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0011_prepared_mobile_sync.sql
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0012_prepared_demo_order_events.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
+  < infra/migrations/0013_prepared_photo_manifest.sql
 ```
 
 Migration `0008` starts the Sprint 4 management foundation with immutable,
@@ -208,6 +210,12 @@ demo flow. Confirmation, simulated-location start, and finish must occur once
 in order; finish requires measurements at all three planned points. These
 events do not mutate or authorize the prepared order. See
 `docs/decisions/ADR-0014-simulated-prepared-order-lifecycle.md`.
+
+Migration `0013` adds immutable prepared photo manifests linked to a planned
+point, actor, device, timestamp, checksum, size, and media type. A manifest is
+always `not_uploaded`, `not_validated`, and non-official; it is not evidence
+that object content exists. See
+`docs/decisions/ADR-0016-prepared-photo-manifest-foundation.md`.
 
 The public, read-only management queue is available at:
 
@@ -318,6 +326,8 @@ explicitly `simulated`; start requires a simulated coordinate and finish
 requires three persisted point measurements. They never change the immutable
 prepared order or authorize field activity or official reporting. Responses
 contain `accepted`, `rejected`, `conflicts`, and `next_sync_cursor`.
+`photo/prepare` registers checksum-bound metadata only and explicitly reports
+that the content has not been uploaded or validated.
 
 Use `zenit-import` for one immutable raw file at a time. Full examples are in
 `docs/architecture/source-ingestion.md`.

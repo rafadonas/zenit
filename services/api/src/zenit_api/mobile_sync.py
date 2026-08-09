@@ -92,6 +92,31 @@ class DemoWorkOrderEventPayload(BaseModel):
         return value
 
 
+class PreparedPhotoManifestPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    photo_id: UUID
+    work_order_id: UUID
+    planned_point_id: UUID
+    phase: Literal["inspection"]
+    captured_at: datetime
+    checksum_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    byte_size: int = Field(gt=0, le=26_214_400)
+    media_type: Literal["image/jpeg", "image/png"]
+    content_status: Literal["not_uploaded"]
+    ruler_status: Literal["not_validated"]
+    location_status: Literal["not_collected"]
+    data_status: Literal["prepared"]
+    eligible_for_official_reporting: Literal[False]
+
+    @field_validator("captured_at")
+    @classmethod
+    def require_timezone(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("captured_at must include a UTC offset")
+        return value
+
+
 class MobileSyncEventRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -130,6 +155,9 @@ class MobileSyncEventRequest(BaseModel):
             ):
                 raise ValueError("demo event location does not match its operation")
             self.payload = order_event.model_dump(mode="json")
+        if self.entity_type == "photo" and self.operation == "prepare":
+            photo = PreparedPhotoManifestPayload.model_validate(self.payload)
+            self.payload = photo.model_dump(mode="json")
         return self
 
 
@@ -318,6 +346,15 @@ class PostgresMobileSyncRepository:
 
             for event_id in sorted(str(event.event_id) for event in request.events):
                 await self._lock_key(cursor, f"event:{event_id}")
+            photo_ids = sorted(
+                {
+                    str(event.payload["photo_id"])
+                    for event in request.events
+                    if event.entity_type == "photo" and event.operation == "prepare"
+                }
+            )
+            for photo_id in photo_ids:
+                await self._lock_key(cursor, f"photo:{photo_id}")
             order_ids = sorted(
                 {
                     str(event.payload["work_order_id"])
@@ -454,7 +491,7 @@ class PostgresMobileSyncRepository:
                             ),
                         ),
                     )
-                else:
+                elif event.entity_type == "work_order":
                     order_event = DemoWorkOrderEventPayload.model_validate(event.payload)
                     await cursor.execute(
                         """
@@ -481,6 +518,30 @@ class PostgresMobileSyncRepository:
                             order_event.simulated_longitude,
                             order_event.simulated_latitude,
                             order_event.simulation_method,
+                        ),
+                    )
+                else:
+                    photo = PreparedPhotoManifestPayload.model_validate(event.payload)
+                    await cursor.execute(
+                        """
+                        INSERT INTO prepared_field_photo_manifest (
+                            event_id, photo_id, work_order_id, planned_point_id,
+                            actor_user_id, device_id, phase, client_captured_at,
+                            checksum_sha256, byte_size, media_type
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """,
+                        (
+                            event.event_id,
+                            photo.photo_id,
+                            photo.work_order_id,
+                            photo.planned_point_id,
+                            actor.id,
+                            request.device_id,
+                            photo.phase,
+                            photo.captured_at,
+                            photo.checksum_sha256,
+                            photo.byte_size,
+                            photo.media_type,
                         ),
                     )
                 accepted.append(AcceptedSyncEventResponse(event_id=event.event_id))
@@ -583,11 +644,15 @@ class PostgresMobileSyncRepository:
             return await PostgresMobileSyncRepository._validate_demo_order_event(
                 cursor, actor_id, event
             )
+        if event.entity_type == "photo" and event.operation == "prepare":
+            return await PostgresMobileSyncRepository._validate_photo_manifest(
+                cursor, actor_id, event
+            )
         if event.entity_type != "measurement" or event.operation != "create":
             return RejectedSyncEventResponse(
                 event_id=event.event_id,
                 code="unsupported_event",
-                message="only prepared measurement/create events are accepted",
+                message="event type is not supported by the prepared sync boundary",
             )
         measurement = PreparedMeasurementPayload.model_validate(event.payload)
         await cursor.execute(
@@ -635,6 +700,73 @@ class PostgresMobileSyncRepository:
                 event_id=event.event_id,
                 code="unsupported_order_state",
                 message="only non-operational prepared orders accept prepared measurements",
+            )
+        if not target[7]:
+            return RejectedSyncEventResponse(
+                event_id=event.event_id,
+                code="road_access_denied",
+                message="actor no longer has an eligible role for this road",
+            )
+        return None
+
+    @staticmethod
+    async def _validate_photo_manifest(
+        cursor: psycopg.AsyncCursor[tuple],
+        actor_id: UUID,
+        event: MobileSyncEventRequest,
+    ) -> RejectedSyncEventResponse | None:
+        photo = PreparedPhotoManifestPayload.model_validate(event.payload)
+        await cursor.execute(
+            "SELECT event_id FROM prepared_field_photo_manifest WHERE photo_id = %s",
+            (photo.photo_id,),
+        )
+        if await cursor.fetchone() is not None:
+            return RejectedSyncEventResponse(
+                event_id=event.event_id,
+                code="photo_id_reused",
+                message="photo_id was already persisted by another event",
+            )
+        await cursor.execute(
+            """
+            SELECT point.work_order_id, order_record.status, order_record.data_status,
+                   order_record.authorizes_field_work,
+                   order_record.eligible_for_field_execution,
+                   order_record.eligible_for_official_reporting,
+                   point.eligible_for_field_execution,
+                   EXISTS (
+                       SELECT 1 FROM road_user_role assignment
+                       WHERE assignment.user_id = %s
+                         AND assignment.road_id = axis.road_id
+                         AND assignment.role IN ('manager', 'supervisor')
+                         AND assignment.data_status <> 'simulated'
+                   )
+            FROM work_order_planned_point point
+            JOIN work_order order_record ON order_record.id = point.work_order_id
+            JOIN segment_zone zone ON zone.id = order_record.segment_zone_id
+            JOIN road_segment segment ON segment.id = zone.road_segment_id
+            JOIN road_axis_candidate axis ON axis.id = segment.road_axis_candidate_id
+            WHERE point.id = %s
+            """,
+            (actor_id, photo.planned_point_id),
+        )
+        target = await cursor.fetchone()
+        if target is None:
+            return RejectedSyncEventResponse(
+                event_id=event.event_id,
+                code="planned_point_not_found",
+                message="prepared planned point was not found",
+            )
+        if target[0] != photo.work_order_id:
+            return RejectedSyncEventResponse(
+                event_id=event.event_id,
+                code="point_order_mismatch",
+                message="planned point does not belong to the supplied work order",
+            )
+        if target[1:7] != ("prepared", "prepared", False, False, False, False):
+            return RejectedSyncEventResponse(
+                event_id=event.event_id,
+                code="unsupported_order_state",
+                message="photo manifests require a non-operational prepared order",
             )
         if not target[7]:
             return RejectedSyncEventResponse(
