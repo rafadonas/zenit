@@ -17,6 +17,7 @@ PREPARED_MOBILE_SYNC_MIGRATION = Path("infra/migrations/0011_prepared_mobile_syn
 PREPARED_DEMO_ORDER_EVENT_MIGRATION = Path("infra/migrations/0012_prepared_demo_order_events.sql")
 PREPARED_PHOTO_MANIFEST_MIGRATION = Path("infra/migrations/0013_prepared_photo_manifest.sql")
 DEMO_FINISH_PHOTO_MIGRATION = Path("infra/migrations/0014_require_demo_finish_photos.sql")
+PHOTO_UPLOAD_RECEIPT_MIGRATION = Path("infra/migrations/0015_prepared_photo_upload_receipt.sql")
 
 
 class MigrationContractTests(unittest.TestCase):
@@ -119,7 +120,7 @@ class MigrationContractTests(unittest.TestCase):
         mounts = [
             line.strip() for line in compose.splitlines() if "/docker-entrypoint-initdb.d/" in line
         ]
-        self.assertEqual(len(mounts), 14)
+        self.assertEqual(len(mounts), 15)
         for version, mount in enumerate(mounts, start=1):
             prefix = f"{version:04d}"
             self.assertIn(f"infra/migrations/{prefix}_", mount)
@@ -216,6 +217,16 @@ class MigrationContractTests(unittest.TestCase):
         self.assertIn("count(DISTINCT photo.planned_point_id)", sql)
         self.assertIn("finish requires three prepared point photo manifests", sql)
         self.assertIn("prepared_demo_finish_photo_guard", sql)
+
+    def test_photo_upload_receipt_is_encrypted_versioned_and_append_only(self) -> None:
+        sql = PHOTO_UPLOAD_RECEIPT_MIGRATION.read_text(encoding="utf-8")
+
+        self.assertIn("CREATE TABLE prepared_photo_upload_receipt", sql)
+        self.assertIn("object_version_id text NOT NULL", sql)
+        self.assertIn("encryption_method = 'APP-AES256-GCM'", sql)
+        self.assertIn("content_status = 'uploaded_unverified'", sql)
+        self.assertIn("photo upload receipt requires its exact prepared manifest", sql)
+        self.assertIn("prepared_photo_upload_receipt_immutable", sql)
 
 
 if __name__ == "__main__":

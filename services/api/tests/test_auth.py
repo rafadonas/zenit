@@ -1,4 +1,5 @@
 import asyncio
+import base64
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -127,6 +128,24 @@ def test_access_token_rejects_an_unexpected_audience() -> None:
 def test_staging_rejects_the_development_signing_secret() -> None:
     with pytest.raises(ValidationError, match="AUTH_SECRET_KEY"):
         Settings(app_env="staging")
+
+
+def test_media_encryption_key_requires_exactly_32_base64_encoded_bytes() -> None:
+    with pytest.raises(ValidationError, match="must decode to 32 bytes"):
+        Settings(object_storage_media_encryption_key="dG9vLXNob3J0")
+
+    with pytest.raises(ValidationError, match="must be valid base64"):
+        Settings(object_storage_media_encryption_key="not base64!")
+
+
+def test_staging_requires_https_object_storage() -> None:
+    with pytest.raises(ValidationError, match="OBJECT_STORAGE_ENDPOINT must use HTTPS"):
+        Settings(
+            app_env="staging",
+            auth_secret_key="a" * 32,
+            object_storage_secret_key="non-default-secret",
+            object_storage_media_encryption_key=base64.b64encode(b"k" * 32).decode(),
+        )
 
 
 def test_authenticated_context_exposes_only_the_current_users_scoped_roles() -> None:

@@ -126,8 +126,10 @@ healthy. Sprint 5 now includes an Android-first Flutter scaffold that supports
 online login, encrypted offline download of prepared inspection orders, and
 an offline demo sequence with confirmation, explicitly simulated-location
 start, three prepared measurements, and finish. It deliberately has no real
-GPS, media upload, or field execution. It captures one photo per planned point
-into the encrypted vault and synchronizes checksum-bound manifests only. The
+GPS or field execution. It captures one photo per planned point into the
+encrypted vault and synchronizes checksum-bound manifests. The API now accepts
+the exact manifested bytes through a separate prepared-media upload boundary.
+Uploaded objects remain encrypted, unvalidated, and non-official. The
 app persists event/batch UUIDs, registers
 its logical device, sends the exact idempotent batch, and retains local events
 until a persistent accepted/rejected/conflict result arrives. The API has an
@@ -146,8 +148,8 @@ credentials.
 ## Database migrations and ingestion
 
 Apply migrations in numeric order before importing sources. The current local
-development database has migrations `0001` through `0014` applied. On the first
-startup of a new Compose volume, Postgres applies these fourteen up migrations in
+development database has migrations `0001` through `0015` applied. On the first
+startup of a new Compose volume, Postgres applies these fifteen up migrations in
 order through `/docker-entrypoint-initdb.d`; existing volumes are never modified
 by that initialization mechanism. The explicit commands below remain useful
 for non-Compose environments and controlled upgrades of existing databases.
@@ -181,6 +183,8 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0013_prepared_photo_manifest.sql
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0014_require_demo_finish_photos.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
+  < infra/migrations/0015_prepared_photo_upload_receipt.sql
 ```
 
 Migration `0008` starts the Sprint 4 management foundation with immutable,
@@ -224,6 +228,13 @@ that object content exists. See
 Migration `0014` requires three distinct prepared point-photo manifests before
 a new simulated demo finish can be persisted. It does not claim that their
 content was uploaded or validated.
+
+Migration `0015` adds an immutable upload receipt bound to the exact manifest,
+actor, device, checksum, object version, and ETag. The API encrypts photo bytes
+with AES-256-GCM before writing them to the private, versioned media bucket.
+Receipts remain `uploaded_unverified`, ruler-unvalidated, prepared, and
+ineligible for official reporting. See
+`docs/decisions/ADR-0018-verified-encrypted-prepared-media-upload.md`.
 
 The public, read-only management queue is available at:
 
@@ -336,6 +347,21 @@ prepared order or authorize field activity or official reporting. Responses
 contain `accepted`, `rejected`, `conflicts`, and `next_sync_cursor`.
 `photo/prepare` registers checksum-bound metadata only and explicitly reports
 that the content has not been uploaded or validated.
+
+After its manifest is accepted, upload the exact prepared JPEG or PNG bytes:
+
+```text
+POST /v1/media/{photo_id}
+Authorization: Bearer <access-token>
+X-Zenit-Device-ID: <registered-device-uuid>
+Content-Type: multipart/form-data; boundary=...
+```
+
+The endpoint verifies the signature, size, checksum, active actor/device and
+current road role. It stores application-encrypted bytes and an immutable
+version receipt, but deliberately returns only prepared/unverified/non-official
+status. Media retrieval, ruler validation, quality review, retention policy,
+and wiring this upload into the mobile sync worker remain future work.
 
 Use `zenit-import` for one immutable raw file at a time. Full examples are in
 `docs/architecture/source-ingestion.md`.

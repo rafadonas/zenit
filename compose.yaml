@@ -25,6 +25,7 @@ services:
       - ./infra/migrations/0012_prepared_demo_order_events.sql:/docker-entrypoint-initdb.d/0012.sql:ro
       - ./infra/migrations/0013_prepared_photo_manifest.sql:/docker-entrypoint-initdb.d/0013.sql:ro
       - ./infra/migrations/0014_require_demo_finish_photos.sql:/docker-entrypoint-initdb.d/0014.sql:ro
+      - ./infra/migrations/0015_prepared_photo_upload_receipt.sql:/docker-entrypoint-initdb.d/0015.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -65,6 +66,11 @@ services:
       AUTH_TOKEN_AUDIENCE: ${AUTH_TOKEN_AUDIENCE:-zenit-api}
       RECOMMENDATION_REVIEW_POLICY_VERSION: ${RECOMMENDATION_REVIEW_POLICY_VERSION:-recommendation-review-mvp-v1}
       INSPECTION_ORDER_POLICY_VERSION: ${INSPECTION_ORDER_POLICY_VERSION:-prepared-inspection-order-v1}
+      OBJECT_STORAGE_ENDPOINT: ${OBJECT_STORAGE_ENDPOINT:-http://minio:9000}
+      OBJECT_STORAGE_ACCESS_KEY: ${OBJECT_STORAGE_ACCESS_KEY:-zenit}
+      OBJECT_STORAGE_SECRET_KEY: ${OBJECT_STORAGE_SECRET_KEY:-change_me}
+      OBJECT_STORAGE_BUCKET_MEDIA: ${OBJECT_STORAGE_BUCKET_MEDIA:-zenit-media}
+      OBJECT_STORAGE_MEDIA_ENCRYPTION_KEY: ${OBJECT_STORAGE_MEDIA_ENCRYPTION_KEY:-ZGV2ZWxvcG1lbnQtb25seS0zMi1ieXRlLWtleSEhISE=}
     ports:
       - "8000:8000"
     depends_on:
