@@ -18,6 +18,8 @@ from zenit_api.mobile_sync import (
     MobileSyncBatchRequest,
     MobileSyncBatchResponse,
     MobileSyncCursorAheadError,
+    MobileSyncEventRequest,
+    PostgresMobileSyncRepository,
     RejectedSyncEventResponse,
     get_mobile_sync_repository,
 )
@@ -54,6 +56,33 @@ def measurement_event() -> dict:
     }
 
 
+def demo_order_event(operation: str) -> dict:
+    payload = {
+        "work_order_id": str(ORDER_ID),
+        "occurred_at": "2026-08-09T14:00:00-03:00",
+        "data_status": "simulated",
+        "simulation_scope": "demo_only",
+        "authorizes_field_work": False,
+        "eligible_for_official_reporting": False,
+        "location_status": "not_collected",
+    }
+    if operation == "start":
+        payload.update(
+            {
+                "location_status": "simulated",
+                "simulated_latitude": -23.5,
+                "simulated_longitude": -46.7,
+                "simulation_method": "prepared_point_demo_v1",
+            }
+        )
+    return {
+        "event_id": str(EVENT_ID),
+        "entity_type": "work_order",
+        "operation": operation,
+        "payload": payload,
+    }
+
+
 class FakeMobileSyncRepository:
     def __init__(self, failure: type[Exception] | None = None) -> None:
         self.failure = failure
@@ -85,7 +114,11 @@ class FakeMobileSyncRepository:
             raise self.failure
         assert actor == ACTOR
         event = request.events[0]
-        if event.entity_type != "measurement":
+        if event.entity_type != "measurement" and event.operation not in {
+            "confirm",
+            "start",
+            "finish",
+        }:
             return MobileSyncBatchResponse(
                 batch_id=request.batch_id,
                 accepted=[],
@@ -171,7 +204,7 @@ def test_sync_accepts_only_explicitly_prepared_non_official_measurement() -> Non
     assert payload["eligible_for_official_reporting"] is False
 
 
-def test_sync_records_unsupported_work_order_start_as_rejected() -> None:
+def test_sync_records_unknown_work_order_operation_as_rejected() -> None:
     response = request_with_overrides(
         endpoint="/v1/sync/batch",
         payload={
@@ -182,7 +215,7 @@ def test_sync_records_unsupported_work_order_start_as_rejected() -> None:
                 {
                     "event_id": str(EVENT_ID),
                     "entity_type": "work_order",
-                    "operation": "start",
+                    "operation": "pause",
                     "payload": {"work_order_id": str(ORDER_ID)},
                 }
             ],
@@ -191,6 +224,98 @@ def test_sync_records_unsupported_work_order_start_as_rejected() -> None:
 
     assert response.status_code == 200
     assert response.json()["rejected"][0]["code"] == "unsupported_event"
+
+
+@pytest.mark.parametrize("operation", ["confirm", "start", "finish"])
+def test_sync_contract_accepts_explicit_demo_order_events(operation: str) -> None:
+    response = request_with_overrides(
+        endpoint="/v1/sync/batch",
+        payload={
+            "device_id": str(DEVICE_ID),
+            "batch_id": str(BATCH_ID),
+            "base_sync_cursor": 0,
+            "events": [demo_order_event(operation)],
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["accepted"] == [{"event_id": str(EVENT_ID), "persisted": True}]
+    assert response.json()["authorizes_field_work"] is False
+
+
+def test_demo_start_rejects_unlabelled_or_real_location_claims() -> None:
+    event = demo_order_event("start")
+    event["payload"]["data_status"] = "real"
+    response = request_with_overrides(
+        endpoint="/v1/sync/batch",
+        payload={
+            "device_id": str(DEVICE_ID),
+            "batch_id": str(BATCH_ID),
+            "base_sync_cursor": 0,
+            "events": [event],
+        },
+    )
+    assert response.status_code == 422
+
+    event = demo_order_event("start")
+    del event["payload"]["simulation_method"]
+    response = request_with_overrides(
+        endpoint="/v1/sync/batch",
+        payload={
+            "device_id": str(DEVICE_ID),
+            "batch_id": str(BATCH_ID),
+            "base_sync_cursor": 0,
+            "events": [event],
+        },
+    )
+    assert response.status_code == 422
+
+
+class DemoValidationCursor:
+    def __init__(self, *, operations: set[str], measurement_count: int = 3) -> None:
+        self.operations = operations
+        self.measurement_count = measurement_count
+        self.query = ""
+
+    async def execute(self, query: str, parameters: tuple) -> None:
+        self.query = query
+
+    async def fetchone(self) -> tuple:
+        if "FROM work_order order_record" in self.query:
+            return ("prepared", "prepared", False, False, False, True)
+        return (self.measurement_count,)
+
+    async def fetchall(self) -> list[tuple[str]]:
+        return [(operation,) for operation in self.operations]
+
+
+def validate_demo_event(operation: str, *, operations: set[str], measurement_count: int = 3):
+    event = MobileSyncEventRequest.model_validate(demo_order_event(operation))
+    cursor = DemoValidationCursor(
+        operations=operations,
+        measurement_count=measurement_count,
+    )
+    return asyncio.run(
+        PostgresMobileSyncRepository._validate_demo_order_event(
+            cursor,
+            USER_ID,
+            event,  # type: ignore[arg-type]
+        )
+    )
+
+
+def test_demo_order_sequence_requires_confirm_then_start_then_finish() -> None:
+    assert validate_demo_event("confirm", operations=set()) is None
+    assert validate_demo_event("start", operations=set()).code == "invalid_demo_sequence"
+    assert validate_demo_event("start", operations={"confirm"}) is None
+    assert validate_demo_event("finish", operations={"confirm"}).code == "invalid_demo_sequence"
+    assert (
+        validate_demo_event("finish", operations={"confirm", "start"}, measurement_count=2).code
+        == "measurements_incomplete"
+    )
+    assert (
+        validate_demo_event("finish", operations={"confirm", "start"}, measurement_count=3) is None
+    )
 
 
 def test_measurement_requires_prepared_and_non_official_labels() -> None:

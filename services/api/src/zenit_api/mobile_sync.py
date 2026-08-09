@@ -70,6 +70,28 @@ class PreparedMeasurementPayload(BaseModel):
         return value
 
 
+class DemoWorkOrderEventPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    work_order_id: UUID
+    occurred_at: datetime
+    data_status: Literal["simulated"]
+    simulation_scope: Literal["demo_only"]
+    authorizes_field_work: Literal[False]
+    eligible_for_official_reporting: Literal[False]
+    location_status: Literal["not_collected", "simulated"]
+    simulated_latitude: Decimal | None = Field(default=None, ge=-90, le=90)
+    simulated_longitude: Decimal | None = Field(default=None, ge=-180, le=180)
+    simulation_method: Literal["prepared_point_demo_v1"] | None = None
+
+    @field_validator("occurred_at")
+    @classmethod
+    def require_timezone(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("occurred_at must include a UTC offset")
+        return value
+
+
 class MobileSyncEventRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -85,6 +107,29 @@ class MobileSyncEventRequest(BaseModel):
         if self.entity_type == "measurement" and self.operation == "create":
             measurement = PreparedMeasurementPayload.model_validate(self.payload)
             self.payload = measurement.model_dump(mode="json")
+        if self.entity_type == "work_order" and self.operation in {
+            "confirm",
+            "start",
+            "finish",
+        }:
+            order_event = DemoWorkOrderEventPayload.model_validate(self.payload)
+            has_simulated_location = (
+                order_event.location_status == "simulated"
+                and order_event.simulated_latitude is not None
+                and order_event.simulated_longitude is not None
+                and order_event.simulation_method == "prepared_point_demo_v1"
+            )
+            has_no_location = (
+                order_event.location_status == "not_collected"
+                and order_event.simulated_latitude is None
+                and order_event.simulated_longitude is None
+                and order_event.simulation_method is None
+            )
+            if (self.operation == "start" and not has_simulated_location) or (
+                self.operation != "start" and not has_no_location
+            ):
+                raise ValueError("demo event location does not match its operation")
+            self.payload = order_event.model_dump(mode="json")
         return self
 
 
@@ -273,6 +318,16 @@ class PostgresMobileSyncRepository:
 
             for event_id in sorted(str(event.event_id) for event in request.events):
                 await self._lock_key(cursor, f"event:{event_id}")
+            order_ids = sorted(
+                {
+                    str(event.payload["work_order_id"])
+                    for event in request.events
+                    if event.entity_type == "work_order"
+                    and event.operation in {"confirm", "start", "finish"}
+                }
+            )
+            for order_id in order_ids:
+                await self._lock_key(cursor, f"demo-order:{order_id}")
 
             for event in request.events:
                 event_payload = event.model_dump(mode="json")
@@ -335,9 +390,7 @@ class PostgresMobileSyncRepository:
                 rejection = await self._validate_new_event(cursor, actor.id, event)
                 outcome = "rejected" if rejection is not None else "accepted"
                 result_code = rejection.code if rejection else "persisted"
-                result_message = (
-                    rejection.message if rejection else "prepared measurement persisted"
-                )
+                result_message = rejection.message if rejection else "sync event persisted"
                 await cursor.execute(
                     """
                     INSERT INTO mobile_sync_event (
@@ -372,40 +425,64 @@ class PostgresMobileSyncRepository:
                     rejected.append(rejection)
                     continue
 
-                measurement = PreparedMeasurementPayload.model_validate(event.payload)
-                await cursor.execute(
-                    """
-                    INSERT INTO prepared_field_measurement (
-                        event_id,
-                        work_order_id,
-                        planned_point_id,
-                        actor_user_id,
-                        device_id,
-                        phase,
-                        height_cm,
-                        client_captured_at,
-                        measurement_metadata
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)
-                    """,
-                    (
-                        event.event_id,
-                        measurement.work_order_id,
-                        measurement.planned_point_id,
-                        actor.id,
-                        request.device_id,
-                        measurement.phase,
-                        measurement.height_cm,
-                        measurement.captured_at,
-                        _canonical_json(
-                            {
-                                "location_status": measurement.location_status,
-                                "photo_status": measurement.photo_status,
-                                "official_measurement": False,
-                                "source": "mobile_offline_sync",
-                            }
+                if event.entity_type == "measurement":
+                    measurement = PreparedMeasurementPayload.model_validate(event.payload)
+                    await cursor.execute(
+                        """
+                        INSERT INTO prepared_field_measurement (
+                            event_id, work_order_id, planned_point_id, actor_user_id,
+                            device_id, phase, height_cm, client_captured_at,
+                            measurement_metadata
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)
+                        """,
+                        (
+                            event.event_id,
+                            measurement.work_order_id,
+                            measurement.planned_point_id,
+                            actor.id,
+                            request.device_id,
+                            measurement.phase,
+                            measurement.height_cm,
+                            measurement.captured_at,
+                            _canonical_json(
+                                {
+                                    "location_status": measurement.location_status,
+                                    "photo_status": measurement.photo_status,
+                                    "official_measurement": False,
+                                    "source": "mobile_offline_sync",
+                                }
+                            ),
                         ),
-                    ),
-                )
+                    )
+                else:
+                    order_event = DemoWorkOrderEventPayload.model_validate(event.payload)
+                    await cursor.execute(
+                        """
+                        INSERT INTO prepared_work_order_demo_event (
+                            event_id, work_order_id, actor_user_id, device_id,
+                            operation, client_occurred_at, location_status,
+                            simulated_location, simulation_method
+                        ) VALUES (
+                            %s, %s, %s, %s, %s, %s, %s,
+                            CASE WHEN %s IS NULL THEN NULL
+                                 ELSE ST_SetSRID(ST_MakePoint(%s, %s), 4326) END,
+                            %s
+                        )
+                        """,
+                        (
+                            event.event_id,
+                            order_event.work_order_id,
+                            actor.id,
+                            request.device_id,
+                            event.operation,
+                            order_event.occurred_at,
+                            order_event.location_status,
+                            order_event.simulated_longitude,
+                            order_event.simulated_longitude,
+                            order_event.simulated_latitude,
+                            order_event.simulation_method,
+                        ),
+                    )
                 accepted.append(AcceptedSyncEventResponse(event_id=event.event_id))
 
             response = MobileSyncBatchResponse(
@@ -498,6 +575,14 @@ class PostgresMobileSyncRepository:
     async def _validate_new_event(
         cursor: psycopg.AsyncCursor[tuple], actor_id: UUID, event: MobileSyncEventRequest
     ) -> RejectedSyncEventResponse | None:
+        if event.entity_type == "work_order" and event.operation in {
+            "confirm",
+            "start",
+            "finish",
+        }:
+            return await PostgresMobileSyncRepository._validate_demo_order_event(
+                cursor, actor_id, event
+            )
         if event.entity_type != "measurement" or event.operation != "create":
             return RejectedSyncEventResponse(
                 event_id=event.event_id,
@@ -557,6 +642,90 @@ class PostgresMobileSyncRepository:
                 code="road_access_denied",
                 message="actor no longer has an eligible role for this road",
             )
+        return None
+
+    @staticmethod
+    async def _validate_demo_order_event(
+        cursor: psycopg.AsyncCursor[tuple],
+        actor_id: UUID,
+        event: MobileSyncEventRequest,
+    ) -> RejectedSyncEventResponse | None:
+        order_event = DemoWorkOrderEventPayload.model_validate(event.payload)
+        await cursor.execute(
+            """
+            SELECT order_record.status, order_record.data_status,
+                   order_record.authorizes_field_work,
+                   order_record.eligible_for_field_execution,
+                   order_record.eligible_for_official_reporting,
+                   EXISTS (
+                       SELECT 1 FROM road_user_role assignment
+                       WHERE assignment.user_id = %s
+                         AND assignment.road_id = axis.road_id
+                         AND assignment.role IN ('manager', 'supervisor')
+                         AND assignment.data_status <> 'simulated'
+                   )
+            FROM work_order order_record
+            JOIN segment_zone zone ON zone.id = order_record.segment_zone_id
+            JOIN road_segment segment ON segment.id = zone.road_segment_id
+            JOIN road_axis_candidate axis ON axis.id = segment.road_axis_candidate_id
+            WHERE order_record.id = %s
+            """,
+            (actor_id, order_event.work_order_id),
+        )
+        target = await cursor.fetchone()
+        if target is None:
+            return RejectedSyncEventResponse(
+                event_id=event.event_id,
+                code="work_order_not_found",
+                message="prepared work order was not found",
+            )
+        if target[:5] != ("prepared", "prepared", False, False, False):
+            return RejectedSyncEventResponse(
+                event_id=event.event_id,
+                code="unsupported_order_state",
+                message="demo events require a non-operational prepared order",
+            )
+        if not target[5]:
+            return RejectedSyncEventResponse(
+                event_id=event.event_id,
+                code="road_access_denied",
+                message="actor no longer has an eligible role for this road",
+            )
+        await cursor.execute(
+            """
+            SELECT operation
+            FROM prepared_work_order_demo_event
+            WHERE work_order_id = %s
+            """,
+            (order_event.work_order_id,),
+        )
+        operations = {row[0] for row in await cursor.fetchall()}
+        required_previous = {"start": "confirm", "finish": "start"}.get(event.operation)
+        if (
+            event.operation in operations
+            or (required_previous is not None and required_previous not in operations)
+            or (event.operation == "confirm" and operations)
+        ):
+            return RejectedSyncEventResponse(
+                event_id=event.event_id,
+                code="invalid_demo_sequence",
+                message="demo order events must follow confirm, start, finish exactly once",
+            )
+        if event.operation == "finish":
+            await cursor.execute(
+                """
+                SELECT count(DISTINCT planned_point_id)
+                FROM prepared_field_measurement
+                WHERE work_order_id = %s
+                """,
+                (order_event.work_order_id,),
+            )
+            if (await cursor.fetchone())[0] != 3:
+                return RejectedSyncEventResponse(
+                    event_id=event.event_id,
+                    code="measurements_incomplete",
+                    message="finish requires three persisted prepared point measurements",
+                )
         return None
 
 

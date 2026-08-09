@@ -6,22 +6,15 @@ INVALID_POLYGON_MIGRATION = Path("infra/migrations/0002_allow_invalid_staging_po
 SEGMENT_MIGRATION = Path("infra/migrations/0003_road_axis_candidates_and_segments.sql")
 SATELLITE_MIGRATION = Path("infra/migrations/0004_satellite_analysis_foundation.sql")
 SATELLITE_DISCOVERY_MIGRATION = Path("infra/migrations/0005_satellite_scene_discovery.sql")
-SATELLITE_MULTIPOLYGON_MIGRATION = Path(
-    "infra/migrations/0006_satellite_scene_multipolygon.sql"
-)
+SATELLITE_MULTIPOLYGON_MIGRATION = Path("infra/migrations/0006_satellite_scene_multipolygon.sql")
 SATELLITE_VALIDATION_AOI = Path("scripts/prepare_satellite_validation_aoi.sql")
 PARTIAL_CACHE_MIGRATION = Path("infra/migrations/0007_partial_satellite_cache.sql")
 COMPOSE_FILE = Path("compose.yaml")
-RECOMMENDATION_REVIEW_MIGRATION = Path(
-    "infra/migrations/0008_recommendation_review_audit.sql"
-)
-IDENTITY_REVIEW_POLICY_MIGRATION = Path(
-    "infra/migrations/0009_identity_and_review_policy.sql"
-)
-PREPARED_INSPECTION_ORDER_MIGRATION = Path(
-    "infra/migrations/0010_prepared_inspection_orders.sql"
-)
+RECOMMENDATION_REVIEW_MIGRATION = Path("infra/migrations/0008_recommendation_review_audit.sql")
+IDENTITY_REVIEW_POLICY_MIGRATION = Path("infra/migrations/0009_identity_and_review_policy.sql")
+PREPARED_INSPECTION_ORDER_MIGRATION = Path("infra/migrations/0010_prepared_inspection_orders.sql")
 PREPARED_MOBILE_SYNC_MIGRATION = Path("infra/migrations/0011_prepared_mobile_sync.sql")
+PREPARED_DEMO_ORDER_EVENT_MIGRATION = Path("infra/migrations/0012_prepared_demo_order_events.sql")
 
 
 class MigrationContractTests(unittest.TestCase):
@@ -122,11 +115,9 @@ class MigrationContractTests(unittest.TestCase):
         compose = COMPOSE_FILE.read_text(encoding="utf-8")
 
         mounts = [
-            line.strip()
-            for line in compose.splitlines()
-            if "/docker-entrypoint-initdb.d/" in line
+            line.strip() for line in compose.splitlines() if "/docker-entrypoint-initdb.d/" in line
         ]
-        self.assertEqual(len(mounts), 11)
+        self.assertEqual(len(mounts), 12)
         for version, mount in enumerate(mounts, start=1):
             prefix = f"{version:04d}"
             self.assertIn(f"infra/migrations/{prefix}_", mount)
@@ -191,6 +182,18 @@ class MigrationContractTests(unittest.TestCase):
         self.assertIn("CHECK (NOT eligible_for_official_reporting)", sql)
         self.assertIn("prepared mobile sync records are append-only", sql)
         self.assertIn("prepared measurement requires its accepted sync event", sql)
+
+    def test_demo_order_events_are_simulated_sequenced_and_non_operational(self) -> None:
+        sql = PREPARED_DEMO_ORDER_EVENT_MIGRATION.read_text(encoding="utf-8")
+
+        self.assertIn("CREATE TABLE prepared_work_order_demo_event", sql)
+        self.assertIn("operation IN ('confirm', 'start', 'finish')", sql)
+        self.assertIn("simulation_scope = 'demo_only'", sql)
+        self.assertIn("data_status = 'simulated'", sql)
+        self.assertIn("CHECK (NOT authorizes_field_work)", sql)
+        self.assertIn("start requires a persisted confirm event", sql)
+        self.assertIn("finish requires start and three prepared point measurements", sql)
+        self.assertIn("prepared_work_order_demo_event_immutable", sql)
 
 
 if __name__ == "__main__":

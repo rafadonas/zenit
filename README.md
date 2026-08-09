@@ -143,8 +143,8 @@ credentials.
 ## Database migrations and ingestion
 
 Apply migrations in numeric order before importing sources. The current local
-development database has migrations `0001` through `0011` applied. On the first
-startup of a new Compose volume, Postgres applies these eleven up migrations in
+development database has migrations `0001` through `0012` applied. On the first
+startup of a new Compose volume, Postgres applies these twelve up migrations in
 order through `/docker-entrypoint-initdb.d`; existing volumes are never modified
 by that initialization mechanism. The explicit commands below remain useful
 for non-Compose environments and controlled upgrades of existing databases.
@@ -172,6 +172,8 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0010_prepared_inspection_orders.sql
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0011_prepared_mobile_sync.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
+  < infra/migrations/0012_prepared_demo_order_events.sql
 ```
 
 Migration `0008` starts the Sprint 4 management foundation with immutable,
@@ -199,6 +201,12 @@ batches and events are replay-safe; conflicting event payloads preserve both
 versions. Every synchronized measurement remains non-operational and
 ineligible for official reporting. See
 `docs/decisions/ADR-0012-prepared-mobile-sync-foundation.md`.
+
+Migration `0012` adds append-only simulated lifecycle events for the prepared
+demo flow. Confirmation, simulated-location start, and finish must occur once
+in order; finish requires measurements at all three planned points. These
+events do not mutate or authorize the prepared order. See
+`docs/decisions/ADR-0014-simulated-prepared-order-lifecycle.md`.
 
 The public, read-only management queue is available at:
 
@@ -302,12 +310,13 @@ Content-Type: application/json
 {"device_id":"<device-uuid>","platform":"android","app_version":"1.0.0+1"}
 ```
 
-`POST /v1/sync/batch` accepts idempotent prepared event batches. This increment
-only persists `measurement/create`; a `work_order/start` event is recorded as
-rejected because current orders do not authorize field execution. Responses
-contain `accepted`, `rejected`, `conflicts`, and `next_sync_cursor`. The mobile
-app persists the exact pending batch before sending and retains it across
-transport failure for replay with the same identifiers.
+`POST /v1/sync/batch` accepts idempotent prepared event batches. It persists
+prepared `measurement/create` events and the demo-only `work_order/confirm`,
+`work_order/start`, and `work_order/finish` sequence. Demo lifecycle events are
+explicitly `simulated`; start requires a simulated coordinate and finish
+requires three persisted point measurements. They never change the immutable
+prepared order or authorize field activity or official reporting. Responses
+contain `accepted`, `rejected`, `conflicts`, and `next_sync_cursor`.
 
 Use `zenit-import` for one immutable raw file at a time. Full examples are in
 `docs/architecture/source-ingestion.md`.
