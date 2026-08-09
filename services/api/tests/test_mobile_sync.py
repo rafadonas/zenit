@@ -1,0 +1,279 @@
+import asyncio
+from datetime import UTC, datetime
+from uuid import UUID
+
+import pytest
+from httpx import ASGITransport, AsyncClient
+
+from zenit_api.auth import AuthenticatedUser, get_current_user
+from zenit_api.main import app
+from zenit_api.mobile_sync import (
+    AcceptedSyncEventResponse,
+    MobileDeviceNotRegisteredError,
+    MobileDeviceOwnershipError,
+    MobileDeviceRegistrationRequest,
+    MobileDeviceRegistrationResponse,
+    MobileDeviceRevokedError,
+    MobileSyncBatchConflictError,
+    MobileSyncBatchRequest,
+    MobileSyncBatchResponse,
+    MobileSyncCursorAheadError,
+    RejectedSyncEventResponse,
+    get_mobile_sync_repository,
+)
+
+USER_ID = UUID("40000000-0000-4000-8000-000000000001")
+DEVICE_ID = UUID("40000000-0000-4000-8000-000000000002")
+BATCH_ID = UUID("40000000-0000-4000-8000-000000000003")
+EVENT_ID = UUID("40000000-0000-4000-8000-000000000004")
+ORDER_ID = UUID("40000000-0000-4000-8000-000000000005")
+POINT_ID = UUID("40000000-0000-4000-8000-000000000006")
+ACTOR = AuthenticatedUser(
+    id=USER_ID,
+    email="field@example.test",
+    display_name="Prepared Field User",
+)
+
+
+def measurement_event() -> dict:
+    return {
+        "event_id": str(EVENT_ID),
+        "entity_type": "measurement",
+        "operation": "create",
+        "payload": {
+            "work_order_id": str(ORDER_ID),
+            "planned_point_id": str(POINT_ID),
+            "phase": "inspection",
+            "height_cm": 22.5,
+            "captured_at": "2026-08-09T14:00:00-03:00",
+            "data_status": "prepared",
+            "eligible_for_official_reporting": False,
+            "location_status": "not_collected",
+            "photo_status": "not_collected",
+        },
+    }
+
+
+class FakeMobileSyncRepository:
+    def __init__(self, failure: type[Exception] | None = None) -> None:
+        self.failure = failure
+
+    async def register_device(
+        self,
+        *,
+        actor: AuthenticatedUser,
+        request: MobileDeviceRegistrationRequest,
+    ) -> MobileDeviceRegistrationResponse:
+        if self.failure is not None:
+            raise self.failure
+        assert actor == ACTOR
+        assert request.device_id == DEVICE_ID
+        return MobileDeviceRegistrationResponse(
+            device_id=request.device_id,
+            platform="android",
+            registered_app_version=request.app_version,
+            registered_at=datetime(2026, 8, 9, 17, 0, tzinfo=UTC),
+        )
+
+    async def sync_batch(
+        self,
+        *,
+        actor: AuthenticatedUser,
+        request: MobileSyncBatchRequest,
+    ) -> MobileSyncBatchResponse:
+        if self.failure is not None:
+            raise self.failure
+        assert actor == ACTOR
+        event = request.events[0]
+        if event.entity_type != "measurement":
+            return MobileSyncBatchResponse(
+                batch_id=request.batch_id,
+                accepted=[],
+                rejected=[
+                    RejectedSyncEventResponse(
+                        event_id=event.event_id,
+                        code="unsupported_event",
+                        message="only prepared measurement/create events are accepted",
+                    )
+                ],
+                conflicts=[],
+                next_sync_cursor=1,
+            )
+        return MobileSyncBatchResponse(
+            batch_id=request.batch_id,
+            accepted=[AcceptedSyncEventResponse(event_id=event.event_id)],
+            rejected=[],
+            conflicts=[],
+            next_sync_cursor=1,
+        )
+
+
+def request_with_overrides(
+    *,
+    endpoint: str,
+    payload: dict,
+    failure: type[Exception] | None = None,
+):
+    async def fake_actor() -> AuthenticatedUser:
+        return ACTOR
+
+    async def fake_repository() -> FakeMobileSyncRepository:
+        return FakeMobileSyncRepository(failure)
+
+    async def request():
+        app.dependency_overrides[get_current_user] = fake_actor
+        app.dependency_overrides[get_mobile_sync_repository] = fake_repository
+        try:
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                return await client.post(endpoint, json=payload)
+        finally:
+            app.dependency_overrides.clear()
+
+    return asyncio.run(request())
+
+
+def test_register_device_is_authenticated_prepared_and_non_operational() -> None:
+    response = request_with_overrides(
+        endpoint="/v1/mobile/devices",
+        payload={
+            "device_id": str(DEVICE_ID),
+            "platform": "android",
+            "app_version": " 1.0.0+1 ",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["registration_status"] == "active"
+    assert payload["data_status"] == "prepared"
+    assert payload["authorizes_field_work"] is False
+    assert payload["registered_app_version"] == "1.0.0+1"
+
+
+def test_sync_accepts_only_explicitly_prepared_non_official_measurement() -> None:
+    response = request_with_overrides(
+        endpoint="/v1/sync/batch",
+        payload={
+            "device_id": str(DEVICE_ID),
+            "batch_id": str(BATCH_ID),
+            "base_sync_cursor": 0,
+            "events": [measurement_event()],
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["accepted"] == [{"event_id": str(EVENT_ID), "persisted": True}]
+    assert payload["rejected"] == []
+    assert payload["conflicts"] == []
+    assert payload["authorizes_field_work"] is False
+    assert payload["eligible_for_official_reporting"] is False
+
+
+def test_sync_records_unsupported_work_order_start_as_rejected() -> None:
+    response = request_with_overrides(
+        endpoint="/v1/sync/batch",
+        payload={
+            "device_id": str(DEVICE_ID),
+            "batch_id": str(BATCH_ID),
+            "base_sync_cursor": 0,
+            "events": [
+                {
+                    "event_id": str(EVENT_ID),
+                    "entity_type": "work_order",
+                    "operation": "start",
+                    "payload": {"work_order_id": str(ORDER_ID)},
+                }
+            ],
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["rejected"][0]["code"] == "unsupported_event"
+
+
+def test_measurement_requires_prepared_and_non_official_labels() -> None:
+    event = measurement_event()
+    del event["payload"]["eligible_for_official_reporting"]
+    response = request_with_overrides(
+        endpoint="/v1/sync/batch",
+        payload={
+            "device_id": str(DEVICE_ID),
+            "batch_id": str(BATCH_ID),
+            "base_sync_cursor": 0,
+            "events": [event],
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_zero_centimeters_is_a_valid_prepared_n1_measurement() -> None:
+    event = measurement_event()
+    event["payload"]["height_cm"] = 0
+    response = request_with_overrides(
+        endpoint="/v1/sync/batch",
+        payload={
+            "device_id": str(DEVICE_ID),
+            "batch_id": str(BATCH_ID),
+            "base_sync_cursor": 0,
+            "events": [event],
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["accepted"][0]["event_id"] == str(EVENT_ID)
+
+
+def test_batch_rejects_duplicate_event_ids_before_persistence() -> None:
+    response = request_with_overrides(
+        endpoint="/v1/sync/batch",
+        payload={
+            "device_id": str(DEVICE_ID),
+            "batch_id": str(BATCH_ID),
+            "base_sync_cursor": 0,
+            "events": [measurement_event(), measurement_event()],
+        },
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    ("failure", "expected_status"),
+    [
+        (MobileDeviceNotRegisteredError, 403),
+        (MobileDeviceOwnershipError, 403),
+        (MobileDeviceRevokedError, 403),
+        (MobileSyncBatchConflictError, 409),
+        (MobileSyncCursorAheadError, 409),
+    ],
+)
+def test_sync_domain_failures_have_stable_http_statuses(
+    failure: type[Exception], expected_status: int
+) -> None:
+    response = request_with_overrides(
+        endpoint="/v1/sync/batch",
+        payload={
+            "device_id": str(DEVICE_ID),
+            "batch_id": str(BATCH_ID),
+            "base_sync_cursor": 0,
+            "events": [measurement_event()],
+        },
+        failure=failure,
+    )
+
+    assert response.status_code == expected_status
+
+
+@pytest.mark.parametrize("endpoint", ["/v1/mobile/devices", "/v1/sync/batch"])
+def test_mobile_sync_endpoints_require_bearer_authentication(endpoint: str) -> None:
+    async def request():
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            return await client.post(endpoint, json={})
+
+    response = asyncio.run(request())
+
+    assert response.status_code == 401

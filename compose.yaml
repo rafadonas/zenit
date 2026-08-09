@@ -19,6 +19,9 @@ services:
       - ./infra/migrations/0006_satellite_scene_multipolygon.sql:/docker-entrypoint-initdb.d/0006.sql:ro
       - ./infra/migrations/0007_partial_satellite_cache.sql:/docker-entrypoint-initdb.d/0007.sql:ro
       - ./infra/migrations/0008_recommendation_review_audit.sql:/docker-entrypoint-initdb.d/0008.sql:ro
+      - ./infra/migrations/0009_identity_and_review_policy.sql:/docker-entrypoint-initdb.d/0009.sql:ro
+      - ./infra/migrations/0010_prepared_inspection_orders.sql:/docker-entrypoint-initdb.d/0010.sql:ro
+      - ./infra/migrations/0011_prepared_mobile_sync.sql:/docker-entrypoint-initdb.d/0011.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -53,6 +56,12 @@ services:
       APP_NAME: ${APP_NAME:-zenit}
       APP_VERSION: ${APP_VERSION:-0.1.0}
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://zenit:change_me@postgres:5432/zenit}
+      AUTH_SECRET_KEY: ${AUTH_SECRET_KEY:-development-only-change-this-authentication-secret}
+      AUTH_ACCESS_TOKEN_MINUTES: ${AUTH_ACCESS_TOKEN_MINUTES:-30}
+      AUTH_TOKEN_ISSUER: ${AUTH_TOKEN_ISSUER:-zenit}
+      AUTH_TOKEN_AUDIENCE: ${AUTH_TOKEN_AUDIENCE:-zenit-api}
+      RECOMMENDATION_REVIEW_POLICY_VERSION: ${RECOMMENDATION_REVIEW_POLICY_VERSION:-recommendation-review-mvp-v1}
+      INSPECTION_ORDER_POLICY_VERSION: ${INSPECTION_ORDER_POLICY_VERSION:-prepared-inspection-order-v1}
     ports:
       - "8000:8000"
     depends_on:
@@ -73,6 +82,9 @@ services:
       dockerfile: apps/dashboard/Dockerfile
     environment:
       INTERNAL_API_URL: http://api:8000
+      DASHBOARD_APP_ENV: ${APP_ENV:-development}
+      DASHBOARD_PUBLIC_ORIGIN: ${DASHBOARD_PUBLIC_ORIGIN:-http://localhost:3000}
+      DASHBOARD_COOKIE_SECURE: ${DASHBOARD_COOKIE_SECURE:-false}
     ports:
       - "3000:3000"
     depends_on:

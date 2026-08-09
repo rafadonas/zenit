@@ -35,10 +35,16 @@ vegetation or mowing result is claimed. A 5 × 11 pixel Process API NDVI crop an
 its contributor metadata are checksummed in ignored processed storage and
 labelled `partially_cached`, not as a complete source scene.
 
-Sprint 4 has started with an append-only recommendation-review schema. It can
-preserve accept, reject, and adjust events with actor, rationale, idempotency,
-and supersession, but no review-write endpoint or work-order authorization is
-enabled until identity, RBAC, and approval policy are defined.
+Sprint 4 now includes local MVP identity, road-scoped manager/supervisor RBAC,
+an immutable prepared review-policy version, and authenticated append-only
+decisions. The dashboard keeps the bearer token in a server-only `HttpOnly`
+cookie and proxies mutations through an exact-origin and CSRF-validated
+boundary. It preserves accept, reject, and adjust events with actor, rationale,
+idempotency, and supersession. Reviews remain incapable of creating or
+authorizing field work. An accepted or adjusted inspection decision can now
+create an immutable prepared inspection order with three estimated centerline
+points; every database and API contract keeps execution and official reporting
+blocked.
 
 ## Planned architecture
 
@@ -116,19 +122,29 @@ export DOCKER_HOST="unix:///run/user/$(id -u)/docker.sock"
 ```
 
 PostGIS, MinIO, the API, and the dashboard have been built and validated as
-healthy. Flutter is not installed yet because the mobile application starts in
-Sprint 5.
+healthy. Sprint 5 now includes an Android-first Flutter scaffold that supports
+online login, encrypted offline download of prepared inspection orders, and
+three prepared measurement drafts. It deliberately has no GPS,
+photos, or field execution. The app now persists event/batch UUIDs, registers
+its logical device, sends the exact idempotent batch, and retains local events
+until a persistent accepted/rejected/conflict result arrives. The API has an
+append-only, idempotent prepared-sync foundation with authenticated device
+binding, persistent acknowledgements, rejected-event evidence, and conflict
+preservation.
 
-CI repeats this validation from an empty Compose volume after the Python and
-dashboard jobs pass. The smoke job checks the final PostGIS schema, API health,
-an empty provenance-safe satellite response, and dashboard availability without
-requiring raw source files or provider credentials.
+CI repeats this validation from an empty Compose volume after the Python,
+dashboard, and Flutter jobs pass. The Flutter job checks formatting, analysis,
+tests, and a debug Android APK. The smoke job checks the final PostGIS schema,
+API health,
+an empty provenance-safe satellite response, unauthenticated write boundaries,
+and dashboard/login availability without requiring raw source files or provider
+credentials.
 
 ## Database migrations and ingestion
 
 Apply migrations in numeric order before importing sources. The current local
-development database has migrations `0001` through `0008` applied. On the first
-startup of a new Compose volume, Postgres applies these eight up migrations in
+development database has migrations `0001` through `0011` applied. On the first
+startup of a new Compose volume, Postgres applies these eleven up migrations in
 order through `/docker-entrypoint-initdb.d`; existing volumes are never modified
 by that initialization mechanism. The explicit commands below remain useful
 for non-Compose environments and controlled upgrades of existing databases.
@@ -150,6 +166,12 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0007_partial_satellite_cache.sql
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0008_recommendation_review_audit.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
+  < infra/migrations/0009_identity_and_review_policy.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
+  < infra/migrations/0010_prepared_inspection_orders.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
+  < infra/migrations/0011_prepared_mobile_sync.sql
 ```
 
 Migration `0008` starts the Sprint 4 management foundation with immutable,
@@ -158,20 +180,134 @@ decisions, actor subject, rationale, source channel, and supersession without
 creating or authorizing field work. See
 `docs/decisions/ADR-0007-append-only-recommendation-reviews.md`.
 
-The read-only management queue is available at:
+Migration `0009` adds local MVP users, prepared manager/supervisor roles scoped
+to a road, and immutable review-policy versions. The initial policy is a
+configurable project placeholder rather than an official Motiva value, and a
+database constraint fixes `authorizes_field_work=false`. See
+`docs/decisions/ADR-0008-local-mvp-identity-and-review-policy.md`.
+
+Migration `0010` adds an immutable prepared inspection-order policy, orders,
+and exactly three centerline-fraction points. An order requires the effective
+versioned review, an authenticated non-simulated road role, and a rationale.
+Constraints fix field execution and official reporting to false. The policy and
+point fractions are prepared placeholders, not official Motiva values. See
+`docs/decisions/ADR-0010-prepared-inspection-order-foundation.md`.
+
+Migration `0011` adds immutable prepared device registrations, revocations,
+sync batches/events/conflicts, and prepared field measurements. Duplicate
+batches and events are replay-safe; conflicting event payloads preserve both
+versions. Every synchronized measurement remains non-operational and
+ineligible for official reporting. See
+`docs/decisions/ADR-0012-prepared-mobile-sync-foundation.md`.
+
+The public, read-only management queue is available at:
 
 ```text
 GET /v1/recommendations?limit=50
 ```
 
-It returns analysis, segment/zone, explanation, versions, review count, and a
-policy-pending review state without reviewer identity. Every item explicitly
-reports `authorizes_field_work=false`; no review-write endpoint is enabled.
-The dashboard exposes the same read-only queue at `/recommendations` and omits
-all decision controls until authenticated reviewer identity and RBAC exist.
+It returns analysis, segment/zone, road code, explanation, versions, review
+count, and an awaiting/recorded review state without reviewer identity. Every
+item explicitly reports `authorizes_field_work=false`. Recorded items include
+their policy version/status without exposing reviewer identity. The dashboard
+exposes the same queue at `/recommendations`; unauthenticated visitors retain a
+read-only view, while authenticated users only receive decision controls for
+roads where they hold a manager or supervisor role.
+Pre-migration review rows, if present in another environment, remain explicitly
+`review_recorded_policy_pending` rather than being assigned a policy
+retroactively.
 Each queue item links to a shareable corridor URL such as `/?segment=195`,
 opening the geometric segment and its satellite evidence directly without
 presenting the index as official stationing.
+
+Create a local reviewer interactively after migration `0009`; no default user
+or password is committed:
+
+```bash
+zenit-user \
+  --email manager@example.test \
+  --display-name "Local MVP Manager" \
+  --road-code SP021 \
+  --role manager
+```
+
+Obtain a 30-minute bearer token using the email in OAuth2's `username` field:
+
+```text
+POST /v1/auth/token
+Content-Type: application/x-www-form-urlencoded
+
+username=manager%40example.test&password=<local-password>
+```
+
+The authenticated user's own identity and road-scoped roles are available at
+`GET /v1/auth/me`. The dashboard login at `/login` uses this contract
+server-side: the bearer token is never returned to browser JavaScript or stored
+in local storage. Mutating dashboard requests require a separate CSRF token,
+an exact matching `Origin`, and `SameSite=Strict` cookies. Set
+`DASHBOARD_PUBLIC_ORIGIN` to the externally visible origin and require HTTPS
+with `DASHBOARD_COOKIE_SECURE=true` in staging and production.
+
+Record an append-only decision with an authenticated actor and a replay-safe
+key:
+
+```text
+POST /v1/recommendations/{vegetation_analysis_id}/decisions
+Authorization: Bearer <access-token>
+Idempotency-Key: <unique-client-operation-key>
+Content-Type: application/json
+
+{"decision":"rejected","rationale":"Field inspection required"}
+```
+
+Rejected and adjusted decisions require a rationale; adjusted decisions also
+require `adjusted_recommendation`. A successful response always reports
+`authorizes_field_work=false` and whether the prepared policy calls for dual
+review.
+
+After an accepted or adjusted review whose effective action is `inspect`, an
+authenticated reviewer can prepare a non-operational inspection order:
+
+```text
+POST /v1/work-orders
+Authorization: Bearer <access-token>
+Idempotency-Key: <unique-client-operation-key>
+Content-Type: application/json
+
+{
+  "source_review_id": "<effective-review-uuid>",
+  "planning_rationale": "Low-confidence evidence requires field inspection"
+}
+```
+
+`GET /v1/work-orders?limit=50` lists only orders on roads assigned to the
+authenticated user. Responses include the source data-status labels and three
+EPSG:4326 planning points, while explicitly reporting
+`authorizes_field_work=false`, `eligible_for_field_execution=false`, and
+`eligible_for_official_reporting=false`. The points are derived from the
+estimated segment centerline and are not surveyed field locations.
+
+Local MVP authentication still has no corporate identity, refresh-token,
+password-reset, or login-rate-limiting flow. It must not be exposed directly to
+the internet; these controls are a bounded development/MVP security boundary.
+
+Register a client-generated Android device identifier with the authenticated
+user before synchronization:
+
+```text
+POST /v1/mobile/devices
+Authorization: Bearer <access-token>
+Content-Type: application/json
+
+{"device_id":"<device-uuid>","platform":"android","app_version":"1.0.0+1"}
+```
+
+`POST /v1/sync/batch` accepts idempotent prepared event batches. This increment
+only persists `measurement/create`; a `work_order/start` event is recorded as
+rejected because current orders do not authorize field execution. Responses
+contain `accepted`, `rejected`, `conflicts`, and `next_sync_cursor`. The mobile
+app persists the exact pending batch before sending and retains it across
+transport failure for replay with the same identifiers.
 
 Use `zenit-import` for one immutable raw file at a time. Full examples are in
 `docs/architecture/source-ingestion.md`.
@@ -241,9 +377,19 @@ recommendation, reporting gate, rule version, and artifact checksum. It does
 not substitute simulated data or presume a result when either API is
 unavailable. When multiple observations exist, the audit history keeps each
 run selectable with its own acquisition, zone, versions, gates, and artifact
-checksums instead of overwriting earlier evidence. The segment-index locator provides direct keyboard-accessible
-navigation—for example, index `195` selects the prepared validation AOI without
-presenting that geometric index as an official kilometer marker.
+checksums instead of overwriting earlier evidence. The segment-index locator
+provides direct keyboard-accessible navigation—for example, index `195` selects
+the prepared validation AOI without presenting that geometric index as an
+official kilometer marker.
+
+At `/recommendations`, the public queue remains read-only. After a local user
+signs in at `/login`, the server resolves their current road-scoped roles and
+renders append-only accept, reject, and adjust controls only for matching
+roads. Corrections supersede the latest review instead of modifying history.
+The API repeats every authorization check and derives the actor solely from the
+verified bearer token. For an effective inspection decision, the dashboard can
+also prepare the three non-operational points through the same session/CSRF
+boundary. None of these controls authorizes field work.
 
 History responses report the returned count, total count, applied limit, and an
 explicit `truncated` flag. The dashboard warns when it is showing only the most
@@ -267,3 +413,18 @@ npm run dashboard:typecheck
 npm run dashboard:test
 npm run dashboard:build
 ```
+
+The Android-first mobile scaffold uses the locked Flutter dependencies under
+`apps/mobile`. From that directory, validate the current offline prepared-draft
+slice with:
+
+```bash
+../../.tools/flutter/bin/flutter --no-version-check --suppress-analytics pub get --enforce-lockfile
+../../.tools/flutter/bin/dart format --output=none --set-exit-if-changed lib test
+../../.tools/flutter/bin/flutter --no-version-check --suppress-analytics analyze
+../../.tools/flutter/bin/flutter --no-version-check --suppress-analytics test
+```
+
+The emulator-only default API URL is `http://10.0.2.2:8000`. Production builds
+must pass an HTTPS URL through `--dart-define=ZENIT_API_BASE_URL=...`; cleartext
+traffic is enabled only by the debug Android manifest.

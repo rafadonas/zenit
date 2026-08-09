@@ -1,0 +1,268 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from typing import Annotated, Literal, Protocol
+from uuid import UUID, uuid4
+
+import jwt
+import psycopg
+from fastapi import APIRouter, Depends, Form, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from jwt.exceptions import InvalidTokenError
+from pwdlib import PasswordHash
+from pwdlib.exceptions import UnknownHashError
+from pydantic import BaseModel
+
+from zenit_api.config import Settings, get_settings
+
+TOKEN_ALGORITHM = "HS256"
+PASSWORD_HASH = PasswordHash.recommended()
+_DUMMY_PASSWORD_HASH = PASSWORD_HASH.hash("zenit-dummy-password-for-timing-equality")
+
+
+@dataclass(frozen=True, slots=True)
+class UserIdentity:
+    id: UUID
+    email: str
+    display_name: str
+    password_hash: str
+    status: str
+
+
+@dataclass(frozen=True, slots=True)
+class AuthenticatedUser:
+    id: UUID
+    email: str
+    display_name: str
+
+
+@dataclass(frozen=True, slots=True)
+class RoadRoleAssignment:
+    road_code: str
+    role: Literal["manager", "supervisor"]
+    data_status: Literal["real", "prepared", "simulated"]
+
+
+class IdentityReader(Protocol):
+    async def by_email(self, email: str) -> UserIdentity | None: ...
+
+    async def by_id(self, user_id: UUID) -> UserIdentity | None: ...
+
+
+class RoadRoleReader(Protocol):
+    async def for_user(self, user_id: UUID) -> tuple[RoadRoleAssignment, ...]: ...
+
+
+class PostgresIdentityRepository:
+    def __init__(self, database_url: str) -> None:
+        self._database_url = database_url.replace("postgresql+psycopg://", "postgresql://", 1)
+
+    async def by_email(self, email: str) -> UserIdentity | None:
+        return await self._one("lower(email) = lower(%s)", email)
+
+    async def by_id(self, user_id: UUID) -> UserIdentity | None:
+        return await self._one("id = %s", user_id)
+
+    async def for_user(self, user_id: UUID) -> tuple[RoadRoleAssignment, ...]:
+        query = """
+            SELECT road.code, assignment.role, assignment.data_status
+            FROM road_user_role assignment
+            JOIN road ON road.id = assignment.road_id
+            WHERE assignment.user_id = %s
+            ORDER BY road.code, assignment.role
+        """
+        connection = await psycopg.AsyncConnection.connect(self._database_url)
+        async with connection, connection.cursor() as cursor:
+            await cursor.execute(query, (user_id,))
+            rows = await cursor.fetchall()
+        return tuple(
+            RoadRoleAssignment(
+                road_code=row[0],
+                role=row[1],
+                data_status=row[2],
+            )
+            for row in rows
+        )
+
+    async def _one(self, predicate: str, value: object) -> UserIdentity | None:
+        query = f"""
+            SELECT id, email, display_name, password_hash, status
+            FROM app_user
+            WHERE {predicate}
+        """
+        connection = await psycopg.AsyncConnection.connect(self._database_url)
+        async with connection, connection.cursor() as cursor:
+            await cursor.execute(query, (value,))
+            row = await cursor.fetchone()
+        if row is None:
+            return None
+        return UserIdentity(
+            id=row[0],
+            email=row[1],
+            display_name=row[2],
+            password_hash=row[3],
+            status=row[4],
+        )
+
+
+class AuthenticatedUserResponse(BaseModel):
+    id: UUID
+    email: str
+    display_name: str
+
+
+class AccessTokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int
+    user: AuthenticatedUserResponse
+
+
+class RoadRoleResponse(BaseModel):
+    road_code: str
+    role: Literal["manager", "supervisor"]
+    data_status: Literal["real", "prepared", "simulated"]
+
+
+class AuthenticatedContextResponse(BaseModel):
+    user: AuthenticatedUserResponse
+    road_roles: list[RoadRoleResponse]
+
+
+async def get_identity_reader() -> IdentityReader:
+    return PostgresIdentityRepository(get_settings().database_url)
+
+
+async def get_road_role_reader() -> RoadRoleReader:
+    return PostgresIdentityRepository(get_settings().database_url)
+
+
+async def get_auth_settings() -> Settings:
+    return get_settings()
+
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/v1/auth/token")
+
+
+def create_access_token(
+    user_id: UUID,
+    settings: Settings,
+    *,
+    now: datetime | None = None,
+) -> tuple[str, int]:
+    issued_at = now or datetime.now(UTC)
+    expires_in = settings.auth_access_token_minutes * 60
+    payload = {
+        "sub": str(user_id),
+        "iss": settings.auth_token_issuer,
+        "aud": settings.auth_token_audience,
+        "iat": issued_at,
+        "exp": issued_at + timedelta(seconds=expires_in),
+        "jti": str(uuid4()),
+    }
+    token = jwt.encode(
+        payload,
+        settings.auth_secret_key.get_secret_value(),
+        algorithm=TOKEN_ALGORITHM,
+    )
+    return token, expires_in
+
+
+def decode_access_token(token: str, settings: Settings) -> UUID:
+    payload = jwt.decode(
+        token,
+        settings.auth_secret_key.get_secret_value(),
+        algorithms=[TOKEN_ALGORITHM],
+        audience=settings.auth_token_audience,
+        issuer=settings.auth_token_issuer,
+        options={"require": ["sub", "iss", "aud", "iat", "exp", "jti"]},
+    )
+    return UUID(payload["sub"])
+
+
+def _credentials_error() -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
+async def get_current_user(
+    token: Annotated[str, Depends(oauth2_scheme)],
+    reader: Annotated[IdentityReader, Depends(get_identity_reader)],
+    settings: Annotated[Settings, Depends(get_auth_settings)],
+) -> AuthenticatedUser:
+    try:
+        user_id = decode_access_token(token, settings)
+    except (InvalidTokenError, TypeError, ValueError):
+        raise _credentials_error() from None
+
+    identity = await reader.by_id(user_id)
+    if identity is None or identity.status != "active":
+        raise _credentials_error()
+    return AuthenticatedUser(
+        id=identity.id,
+        email=identity.email,
+        display_name=identity.display_name,
+    )
+
+
+router = APIRouter(prefix="/v1/auth", tags=["auth"])
+
+
+@router.post("/token", response_model=AccessTokenResponse)
+async def login_for_access_token(
+    username: Annotated[str, Form(min_length=3, max_length=320)],
+    password: Annotated[str, Form(min_length=1, max_length=1024)],
+    reader: Annotated[IdentityReader, Depends(get_identity_reader)],
+    settings: Annotated[Settings, Depends(get_auth_settings)],
+) -> AccessTokenResponse:
+    identity = await reader.by_email(username.strip())
+    password_hash = identity.password_hash if identity is not None else _DUMMY_PASSWORD_HASH
+    try:
+        password_matches = PASSWORD_HASH.verify(password, password_hash)
+    except UnknownHashError:
+        password_matches = False
+
+    if identity is None or identity.status != "active" or not password_matches:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token, expires_in = create_access_token(identity.id, settings)
+    return AccessTokenResponse(
+        access_token=token,
+        expires_in=expires_in,
+        user=AuthenticatedUserResponse(
+            id=identity.id,
+            email=identity.email,
+            display_name=identity.display_name,
+        ),
+    )
+
+
+@router.get("/me", response_model=AuthenticatedContextResponse)
+async def read_authenticated_context(
+    user: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    role_reader: Annotated[RoadRoleReader, Depends(get_road_role_reader)],
+) -> AuthenticatedContextResponse:
+    roles = await role_reader.for_user(user.id)
+    return AuthenticatedContextResponse(
+        user=AuthenticatedUserResponse(
+            id=user.id,
+            email=user.email,
+            display_name=user.display_name,
+        ),
+        road_roles=[
+            RoadRoleResponse(
+                road_code=role.road_code,
+                role=role.role,
+                data_status=role.data_status,
+            )
+            for role in roles
+        ],
+    )

@@ -15,6 +15,13 @@ COMPOSE_FILE = Path("compose.yaml")
 RECOMMENDATION_REVIEW_MIGRATION = Path(
     "infra/migrations/0008_recommendation_review_audit.sql"
 )
+IDENTITY_REVIEW_POLICY_MIGRATION = Path(
+    "infra/migrations/0009_identity_and_review_policy.sql"
+)
+PREPARED_INSPECTION_ORDER_MIGRATION = Path(
+    "infra/migrations/0010_prepared_inspection_orders.sql"
+)
+PREPARED_MOBILE_SYNC_MIGRATION = Path("infra/migrations/0011_prepared_mobile_sync.sql")
 
 
 class MigrationContractTests(unittest.TestCase):
@@ -119,7 +126,7 @@ class MigrationContractTests(unittest.TestCase):
             for line in compose.splitlines()
             if "/docker-entrypoint-initdb.d/" in line
         ]
-        self.assertEqual(len(mounts), 8)
+        self.assertEqual(len(mounts), 11)
         for version, mount in enumerate(mounts, start=1):
             prefix = f"{version:04d}"
             self.assertIn(f"infra/migrations/{prefix}_", mount)
@@ -138,6 +145,52 @@ class MigrationContractTests(unittest.TestCase):
         self.assertIn("recommendation_review_chain_guard", sql)
         self.assertIn("recommendation_review_immutable", sql)
         self.assertIn("append-only", sql)
+
+    def test_authenticated_review_policy_is_versioned_and_never_authorizes_work(self) -> None:
+        sql = IDENTITY_REVIEW_POLICY_MIGRATION.read_text(encoding="utf-8")
+
+        self.assertIn("CREATE TABLE app_user", sql)
+        self.assertIn("CREATE TABLE road_user_role", sql)
+        self.assertIn("CREATE TABLE recommendation_review_policy", sql)
+        self.assertIn("recommendation-review-mvp-v1", sql)
+        self.assertIn("official_motiva_policy", sql)
+        self.assertIn("CHECK (NOT authorizes_field_work)", sql)
+        self.assertIn("recommendation_review_identity_policy_guard", sql)
+        self.assertIn("recommendation review policies are immutable", sql)
+
+    def test_prepared_inspection_orders_are_linked_non_operational_and_audited(self) -> None:
+        sql = PREPARED_INSPECTION_ORDER_MIGRATION.read_text(encoding="utf-8")
+
+        self.assertIn("CREATE TABLE inspection_order_policy", sql)
+        self.assertIn("CREATE TABLE work_order", sql)
+        self.assertIn("source_review_id uuid NOT NULL UNIQUE", sql)
+        self.assertIn("CREATE TABLE work_order_planned_point", sql)
+        self.assertIn("cardinality(planned_point_fractions) = 3", sql)
+        self.assertIn("CHECK (NOT authorizes_field_work)", sql)
+        self.assertIn("CHECK (NOT eligible_for_field_execution)", sql)
+        self.assertIn("prepared_inspection_order_guard", sql)
+        self.assertIn("requires exactly three planned points", sql)
+        self.assertIn("prepared inspection orders are immutable", sql)
+
+    def test_mobile_sync_is_idempotent_append_only_and_non_operational(self) -> None:
+        sql = PREPARED_MOBILE_SYNC_MIGRATION.read_text(encoding="utf-8")
+
+        for table in (
+            "mobile_device_registration",
+            "mobile_device_revocation",
+            "mobile_sync_batch",
+            "mobile_sync_event",
+            "mobile_sync_conflict",
+            "prepared_field_measurement",
+        ):
+            self.assertIn(f"CREATE TABLE {table}", sql)
+        self.assertIn("CREATE SEQUENCE mobile_sync_cursor_seq", sql)
+        self.assertIn("batch_id uuid PRIMARY KEY", sql)
+        self.assertIn("event_id uuid PRIMARY KEY", sql)
+        self.assertIn("CHECK (NOT authorizes_field_work)", sql)
+        self.assertIn("CHECK (NOT eligible_for_official_reporting)", sql)
+        self.assertIn("prepared mobile sync records are append-only", sql)
+        self.assertIn("prepared measurement requires its accepted sync event", sql)
 
 
 if __name__ == "__main__":

@@ -42,9 +42,32 @@ jobs:
       - name: Build
         run: npm run dashboard:build
 
+  mobile:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.9"
+          channel: stable
+          cache: true
+      - name: Install locked mobile dependencies
+        run: flutter pub get --enforce-lockfile
+      - name: Check formatting
+        run: dart format --output=none --set-exit-if-changed lib test
+      - name: Analyze
+        run: flutter analyze
+      - name: Test
+        run: flutter test
+      - name: Build debug Android APK
+        run: flutter build apk --debug --dart-define=ZENIT_API_BASE_URL=https://api.example.invalid
+
   compose-smoke:
     runs-on: ubuntu-latest
-    needs: [api, dashboard]
+    needs: [api, dashboard, mobile]
     timeout-minutes: 15
     env:
       COMPOSE_PROJECT_NAME: zenit-ci
@@ -58,7 +81,17 @@ jobs:
             "SELECT to_regclass('public.source_file') IS NOT NULL
                 AND to_regclass('public.road_segment') IS NOT NULL
                 AND to_regclass('public.vegetation_analysis') IS NOT NULL
-                AND to_regclass('public.recommendation_review') IS NOT NULL;" \
+                AND to_regclass('public.recommendation_review') IS NOT NULL
+                AND to_regclass('public.app_user') IS NOT NULL
+                AND to_regclass('public.recommendation_review_policy') IS NOT NULL
+                AND to_regclass('public.inspection_order_policy') IS NOT NULL
+                AND to_regclass('public.work_order') IS NOT NULL
+                AND to_regclass('public.work_order_planned_point') IS NOT NULL
+                AND to_regclass('public.mobile_device_registration') IS NOT NULL
+                AND to_regclass('public.mobile_sync_batch') IS NOT NULL
+                AND to_regclass('public.mobile_sync_event') IS NOT NULL
+                AND to_regclass('public.mobile_sync_conflict') IS NOT NULL
+                AND to_regclass('public.prepared_field_measurement') IS NOT NULL;" \
             | grep -qx t
           docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit -Atc \
             "SELECT postgis_typmod_type(a.atttypmod)
@@ -75,7 +108,26 @@ jobs:
             | python -c "import json,sys; payload=json.load(sys.stdin); assert payload['items'] == []; assert payload['metadata']['result_count'] == 0"
           curl --fail --silent --show-error http://localhost:8000/v1/recommendations \
             | python -c "import json,sys; payload=json.load(sys.stdin); assert payload['items'] == []; assert payload['metadata']['result_count'] == 0"
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            http://localhost:8000/v1/auth/me)" = 401
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            -X POST -H 'Content-Type: application/json' -H 'Idempotency-Key: ci-auth-check' \
+            -d '{"decision":"accepted"}' \
+            http://localhost:8000/v1/recommendations/00000000-0000-4000-8000-000000000001/decisions)" = 401
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            http://localhost:8000/v1/work-orders)" = 401
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            -X POST -H 'Content-Type: application/json' -H 'Idempotency-Key: ci-order-check' \
+            -d '{"source_review_id":"00000000-0000-4000-8000-000000000001","planning_rationale":"CI authentication boundary"}' \
+            http://localhost:8000/v1/work-orders)" = 401
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            -X POST -H 'Content-Type: application/json' -d '{}' \
+            http://localhost:8000/v1/mobile/devices)" = 401
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            -X POST -H 'Content-Type: application/json' -d '{}' \
+            http://localhost:8000/v1/sync/batch)" = 401
           curl --fail --silent --show-error --output /dev/null http://localhost:3000
+          curl --fail --silent --show-error --output /dev/null http://localhost:3000/login
       - name: Show service logs on failure
         if: failure()
         run: docker compose logs --no-color

@@ -10,14 +10,18 @@ readme = "README.md"
 requires-python = ">=3.12,<3.15"
 dependencies = [
   "fastapi>=0.116,<1",
+  "pwdlib[argon2]>=0.3,<1",
   "pydantic-settings>=2.10,<3",
   "psycopg[binary]>=3.2,<4",
+  "pyjwt>=2.10,<3",
+  "python-multipart>=0.0.20,<1",
   "uvicorn[standard]>=0.35,<1",
 ]
 
 [project.scripts]
 zenit-import = "zenit_geospatial.cli:main"
 zenit-satellite = "zenit_geospatial.satellite_cli:main"
+zenit-user = "zenit_api.auth_cli:main"
 
 [project.optional-dependencies]
 dev = [

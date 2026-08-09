@@ -3,6 +3,12 @@
 - Status: accepted
 - Date: 2026-08-07
 
+## Update
+
+ADR-0008 satisfies the identity, RBAC, and policy preconditions for an
+authenticated review-write endpoint. The review remains separate from and
+incapable of authorizing field work.
+
 ## Context
 
 The analysis baseline records whether human approval is required, but that flag
