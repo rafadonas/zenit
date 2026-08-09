@@ -5,6 +5,7 @@ import 'data/device_identity_store.dart';
 import 'data/secure_session_store.dart';
 import 'data/zenit_gateway.dart';
 import 'domain/auth_session.dart';
+import 'domain/demo_order_lifecycle.dart';
 import 'domain/measurement_draft.dart';
 import 'domain/mobile_sync.dart';
 import 'domain/prepared_work_order.dart';
@@ -128,6 +129,64 @@ class ZenitAppController extends ChangeNotifier {
   Future<List<MeasurementDraft>> readDrafts(String orderId) =>
       vault.readDrafts(orderId);
 
+  Future<List<DemoLifecycleEvent>> readLifecycleEvents(String orderId) =>
+      vault.readLifecycleEvents(orderId);
+
+  Future<bool> confirmDemoOrder(PreparedWorkOrder order) => _run(() async {
+    final events = await vault.readLifecycleEvents(order.id);
+    if (events.isNotEmpty) throw const InvalidDemoLifecycleError();
+    await vault.replaceLifecycleEvents(order.id, [
+      DemoLifecycleEvent(
+        eventId: _uuidFactory(),
+        orderId: order.id,
+        operation: DemoLifecycleOperation.confirm,
+        occurredAt: _clock().toUtc(),
+      ),
+    ]);
+  });
+
+  Future<bool> startDemoOrder(PreparedWorkOrder order) => _run(() async {
+    final events = await vault.readLifecycleEvents(order.id);
+    if (events.length != 1 ||
+        events.single.operation != DemoLifecycleOperation.confirm ||
+        events.single.syncState != DraftSyncState.localOnly) {
+      throw const InvalidDemoLifecycleError();
+    }
+    final demoPoint = order.points.first;
+    await vault.replaceLifecycleEvents(order.id, [
+      ...events,
+      DemoLifecycleEvent(
+        eventId: _uuidFactory(),
+        orderId: order.id,
+        operation: DemoLifecycleOperation.start,
+        occurredAt: _clock().toUtc(),
+        simulatedLatitude: demoPoint.latitude,
+        simulatedLongitude: demoPoint.longitude,
+      ),
+    ]);
+  });
+
+  Future<bool> finishDemoOrder(PreparedWorkOrder order) => _run(() async {
+    final events = await vault.readLifecycleEvents(order.id);
+    final drafts = await vault.readDrafts(order.id);
+    if (events.length != 2 ||
+        events[0].operation != DemoLifecycleOperation.confirm ||
+        events[1].operation != DemoLifecycleOperation.start ||
+        drafts.length != 3 ||
+        events.any((event) => event.syncState != DraftSyncState.localOnly)) {
+      throw const InvalidDemoLifecycleError();
+    }
+    await vault.replaceLifecycleEvents(order.id, [
+      ...events,
+      DemoLifecycleEvent(
+        eventId: _uuidFactory(),
+        orderId: order.id,
+        operation: DemoLifecycleOperation.finish,
+        occurredAt: _clock().toUtc(),
+      ),
+    ]);
+  });
+
   Future<bool> saveThreeDrafts(
     PreparedWorkOrder order,
     List<double> heights,
@@ -154,6 +213,11 @@ class ZenitAppController extends ChangeNotifier {
       if (existing.any((draft) => draft.syncState == DraftSyncState.pending)) {
         throw const PendingBatchEditError();
       }
+      final lifecycle = await vault.readLifecycleEvents(order.id);
+      if (lifecycle.length != 2 ||
+          lifecycle.last.operation != DemoLifecycleOperation.start) {
+        throw const DemoOrderNotStartedError();
+      }
       final existingByPoint = {
         for (final draft in existing) draft.plannedPointId: draft,
       };
@@ -178,6 +242,7 @@ class ZenitAppController extends ChangeNotifier {
     if (current == null) return false;
     return _run(() async {
       var drafts = await vault.readDrafts(order.id);
+      var lifecycle = await vault.readLifecycleEvents(order.id);
       final expectedPoints = {for (final point in order.points) point.id};
       if (drafts.length != 3 ||
           drafts.any((draft) => draft.orderId != order.id) ||
@@ -188,12 +253,21 @@ class ZenitAppController extends ChangeNotifier {
               .containsAll(expectedPoints)) {
         throw const IncompleteDraftBatchError();
       }
+      if (lifecycle.length != 3 ||
+          lifecycle[0].operation != DemoLifecycleOperation.confirm ||
+          lifecycle[1].operation != DemoLifecycleOperation.start ||
+          lifecycle[2].operation != DemoLifecycleOperation.finish) {
+        throw const IncompleteDemoLifecycleError();
+      }
 
       var pendingBatch = await vault.readPendingSyncBatch();
       if (pendingBatch == null) {
         if (drafts.any(
-          (draft) => draft.syncState != DraftSyncState.localOnly,
-        )) {
+              (draft) => draft.syncState != DraftSyncState.localOnly,
+            ) ||
+            lifecycle.any(
+              (event) => event.syncState != DraftSyncState.localOnly,
+            )) {
           throw const PersistedDraftEditError();
         }
         final deviceId = await deviceIdentityStore.readOrCreate();
@@ -202,7 +276,12 @@ class ZenitAppController extends ChangeNotifier {
           deviceId: deviceId,
           orderId: order.id,
           baseSyncCursor: await vault.readSyncCursor(),
-          eventIds: drafts.map((draft) => draft.eventId).toList(),
+          eventIds: [
+            lifecycle[0].eventId,
+            lifecycle[1].eventId,
+            ...drafts.map((draft) => draft.eventId),
+            lifecycle[2].eventId,
+          ],
         );
         drafts = drafts
             .map(
@@ -212,13 +291,24 @@ class ZenitAppController extends ChangeNotifier {
               ),
             )
             .toList();
-        await vault.savePendingSyncBatch(pendingBatch, drafts);
+        lifecycle = lifecycle
+            .map(
+              (event) => event.copyWith(
+                syncState: DraftSyncState.pending,
+                clearResult: true,
+              ),
+            )
+            .toList();
+        await vault.savePendingSyncBatch(pendingBatch, drafts, lifecycle);
       } else if (pendingBatch.orderId != order.id) {
         throw const AnotherOrderPendingError();
       }
-      final localEventIds = drafts.map((draft) => draft.eventId).toSet();
-      if (pendingBatch.eventIds.length != drafts.length ||
-          pendingBatch.eventIds.toSet().length != drafts.length ||
+      final localEventIds = {
+        ...drafts.map((draft) => draft.eventId),
+        ...lifecycle.map((event) => event.eventId),
+      };
+      if (pendingBatch.eventIds.length != localEventIds.length ||
+          pendingBatch.eventIds.toSet().length != localEventIds.length ||
           !localEventIds.containsAll(pendingBatch.eventIds)) {
         throw const CorruptedPendingBatchError();
       }
@@ -228,11 +318,13 @@ class ZenitAppController extends ChangeNotifier {
         pendingBatch.deviceId,
         appVersion,
       );
-      final result = await gateway.syncBatch(
-        current.accessToken,
-        pendingBatch,
-        drafts,
-      );
+      final result = await gateway
+          .syncBatch(current.accessToken, pendingBatch, [
+            lifecycle[0].toSyncEventJson(),
+            lifecycle[1].toSyncEventJson(),
+            ...drafts.map((draft) => draft.toSyncEventJson()),
+            lifecycle[2].toSyncEventJson(),
+          ]);
       final coveredEventIds = {
         ...result.acceptedEventIds,
         ...result.rejectedEvents.keys,
@@ -268,8 +360,43 @@ class ZenitAppController extends ChangeNotifier {
           syncResultMessage: conflict.message,
         );
       }).toList();
-      await vault.completeSyncBatch(order.id, completed, result.nextSyncCursor);
+      final completedLifecycle = lifecycle
+          .map((event) => _completeLifecycleEvent(event, result))
+          .toList();
+      await vault.completeSyncBatch(
+        order.id,
+        completed,
+        completedLifecycle,
+        result.nextSyncCursor,
+      );
     });
+  }
+
+  DemoLifecycleEvent _completeLifecycleEvent(
+    DemoLifecycleEvent event,
+    MobileSyncResult result,
+  ) {
+    if (result.acceptedEventIds.contains(event.eventId)) {
+      return event.copyWith(
+        syncState: DraftSyncState.acknowledged,
+        syncResultCode: 'persisted',
+        syncResultMessage: 'Confirmação persistente recebida.',
+      );
+    }
+    final rejection = result.rejectedEvents[event.eventId];
+    if (rejection != null) {
+      return event.copyWith(
+        syncState: DraftSyncState.rejected,
+        syncResultCode: rejection.code,
+        syncResultMessage: rejection.message,
+      );
+    }
+    final conflict = result.conflictingEvents[event.eventId]!;
+    return event.copyWith(
+      syncState: DraftSyncState.conflict,
+      syncResultCode: conflict.code,
+      syncResultMessage: conflict.message,
+    );
   }
 
   Future<bool> _run(Future<void> Function() action) async {
@@ -331,4 +458,21 @@ class AnotherOrderPendingError extends MobileWorkflowException {
 class CorruptedPendingBatchError extends MobileWorkflowException {
   const CorruptedPendingBatchError()
     : super('O lote pendente não corresponde às medições locais.');
+}
+
+class InvalidDemoLifecycleError extends MobileWorkflowException {
+  const InvalidDemoLifecycleError()
+    : super(
+        'A sequência demonstrativa deve ser confirmar, iniciar e finalizar.',
+      );
+}
+
+class DemoOrderNotStartedError extends MobileWorkflowException {
+  const DemoOrderNotStartedError()
+    : super('Confirme e inicie a demonstração antes das medições.');
+}
+
+class IncompleteDemoLifecycleError extends MobileWorkflowException {
+  const IncompleteDemoLifecycleError()
+    : super('Finalize a demonstração antes de sincronizar.');
 }

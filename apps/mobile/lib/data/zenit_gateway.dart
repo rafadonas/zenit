@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../domain/auth_session.dart';
-import '../domain/measurement_draft.dart';
 import '../domain/mobile_sync.dart';
 import '../domain/prepared_work_order.dart';
 
@@ -18,7 +17,7 @@ abstract interface class ZenitGateway {
   Future<MobileSyncResult> syncBatch(
     String accessToken,
     PendingSyncBatch batch,
-    List<MeasurementDraft> drafts,
+    List<Map<String, Object?>> events,
   );
 }
 
@@ -136,12 +135,12 @@ class HttpZenitGateway implements ZenitGateway {
   Future<MobileSyncResult> syncBatch(
     String accessToken,
     PendingSyncBatch batch,
-    List<MeasurementDraft> drafts,
+    List<Map<String, Object?>> events,
   ) async {
     final response = await _client.post(
       _uri('/v1/sync/batch'),
       headers: _authorizedHeaders(accessToken),
-      body: jsonEncode(batch.toRequestJson(drafts)),
+      body: jsonEncode(batch.toRequestJson(events)),
     );
     final payload = _decodeObject(response);
     if (response.statusCode != 200) {

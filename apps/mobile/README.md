@@ -9,6 +9,8 @@ Current P0 slice:
 - prepared inspection orders downloaded from `GET /v1/work-orders`;
 - order snapshot and three measurement drafts stored in an AES-256 encrypted
   Hive CE vault whose key is protected by Android secure storage;
+- offline demo lifecycle (`confirm`, simulated-location `start`, and `finish`)
+  persisted alongside the measurements;
 - persistent event and batch UUIDs created before network delivery;
 - authenticated device registration and idempotent prepared-batch sync;
 - accepted, rejected, and conflicting outcomes retained locally;
@@ -18,9 +20,9 @@ Current P0 slice:
 Safety boundary: every accepted order must explicitly have
 `authorizes_field_work=false`, `eligible_for_field_execution=false`, and
 `eligible_for_official_reporting=false`. Measurements remain `prepared` and
-explicitly declare GPS and photos as not collected. Synchronization never starts
-or completes a work order and never makes the measurement operational or
-official.
+declare GPS/photos as not collected. The demo start uses the first estimated
+planned point only as an explicitly `simulated`, `demo_only` coordinate. These
+events do not mutate the prepared order or make any data operational/official.
 
 Run checks from this directory with the repository-local Flutter SDK:
 

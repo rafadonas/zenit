@@ -27,6 +27,7 @@ void main() {
 
       expect(await controller.login('field@example.test', 'secret'), isTrue);
       expect(vault.orders.single.id, order.id);
+      await _startDemo(controller, order);
       expect(await controller.saveThreeDrafts(order, [8, 22, 35]), isTrue);
 
       final drafts = await vault.readDrafts(order.id);
@@ -114,6 +115,7 @@ void main() {
     await controller.initialize();
 
     expect(await controller.login('field@example.test', 'secret'), isTrue);
+    await _startDemo(controller, order);
     expect(await controller.saveThreeDrafts(order, [0, 9.9, 30]), isTrue);
     expect((await vault.readDrafts(order.id)).first.heightCm, 0);
   });
@@ -135,10 +137,13 @@ void main() {
     );
     await controller.initialize();
     await controller.login('field@example.test', 'secret');
+    await _startDemo(controller, order);
     await controller.saveThreeDrafts(order, [8, 22, 35]);
+    await controller.finishDemoOrder(order);
 
     expect(await controller.syncPreparedDrafts(order), isFalse);
     final firstBatch = vault.pendingBatch!;
+    expect(firstBatch.eventIds, hasLength(6));
     expect(
       (await vault.readDrafts(
         order.id,
@@ -151,12 +156,26 @@ void main() {
 
     expect(gateway.lastBatch!.batchId, firstBatch.batchId);
     expect(gateway.lastBatch!.eventIds, firstBatch.eventIds);
+    expect(gateway.lastEvents!.map((event) => event['operation']).toList(), [
+      'confirm',
+      'start',
+      'create',
+      'create',
+      'create',
+      'finish',
+    ]);
     expect(vault.pendingBatch, isNull);
     expect(vault.syncCursor, 1);
     expect(
       (await vault.readDrafts(
         order.id,
       )).every((draft) => draft.syncState == DraftSyncState.acknowledged),
+      isTrue,
+    );
+    expect(
+      (await vault.readLifecycleEvents(
+        order.id,
+      )).every((event) => event.syncState == DraftSyncState.acknowledged),
       isTrue,
     );
   });
@@ -174,7 +193,9 @@ void main() {
     );
     await controller.initialize();
     await controller.login('field@example.test', 'secret');
+    await _startDemo(controller, order);
     await controller.saveThreeDrafts(order, [8, 22, 35]);
+    await controller.finishDemoOrder(order);
     await controller.syncPreparedDrafts(order);
 
     expect(await controller.saveThreeDrafts(order, [9, 23, 36]), isFalse);
@@ -190,15 +211,20 @@ void main() {
         orders: [order],
         syncResultFactory: (batch) => MobileSyncResult(
           batchId: batch.batchId,
-          acceptedEventIds: {batch.eventIds[0]},
+          acceptedEventIds: {
+            batch.eventIds[0],
+            batch.eventIds[1],
+            batch.eventIds[2],
+            batch.eventIds[5],
+          },
           rejectedEvents: {
-            batch.eventIds[1]: const SyncEventResult(
+            batch.eventIds[3]: const SyncEventResult(
               code: 'road_access_denied',
               message: 'access denied',
             ),
           },
           conflictingEvents: {
-            batch.eventIds[2]: const SyncEventResult(
+            batch.eventIds[4]: const SyncEventResult(
               code: 'event_id_reused',
               message: 'conflict preserved',
             ),
@@ -216,7 +242,9 @@ void main() {
       );
       await controller.initialize();
       await controller.login('field@example.test', 'secret');
+      await _startDemo(controller, order);
       await controller.saveThreeDrafts(order, [8, 22, 35]);
+      await controller.finishDemoOrder(order);
 
       expect(await controller.syncPreparedDrafts(order), isTrue);
 
@@ -284,6 +312,14 @@ void main() {
   });
 }
 
+Future<void> _startDemo(
+  ZenitAppController controller,
+  PreparedWorkOrder order,
+) async {
+  expect(await controller.confirmDemoOrder(order), isTrue);
+  expect(await controller.startDemoOrder(order), isTrue);
+}
+
 String Function() _uuidFactory() {
   var counter = 0;
   return () {
@@ -312,6 +348,6 @@ class _UnauthorizedGateway implements ZenitGateway {
   Future<MobileSyncResult> syncBatch(
     String accessToken,
     PendingSyncBatch batch,
-    List<MeasurementDraft> drafts,
+    List<Map<String, Object?>> events,
   ) => throw UnimplementedError();
 }

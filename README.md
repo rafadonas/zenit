@@ -124,8 +124,9 @@ export DOCKER_HOST="unix:///run/user/$(id -u)/docker.sock"
 PostGIS, MinIO, the API, and the dashboard have been built and validated as
 healthy. Sprint 5 now includes an Android-first Flutter scaffold that supports
 online login, encrypted offline download of prepared inspection orders, and
-three prepared measurement drafts. It deliberately has no GPS,
-photos, or field execution. The app now persists event/batch UUIDs, registers
+an offline demo sequence with confirmation, explicitly simulated-location
+start, three prepared measurements, and finish. It deliberately has no real
+GPS, photos, or field execution. The app persists event/batch UUIDs, registers
 its logical device, sends the exact idempotent batch, and retains local events
 until a persistent accepted/rejected/conflict result arrives. The API has an
 append-only, idempotent prepared-sync foundation with authenticated device
@@ -424,8 +425,8 @@ npm run dashboard:build
 ```
 
 The Android-first mobile scaffold uses the locked Flutter dependencies under
-`apps/mobile`. From that directory, validate the current offline prepared-draft
-slice with:
+`apps/mobile`. From that directory, validate the current offline demo slice
+with:
 
 ```bash
 ../../.tools/flutter/bin/flutter --no-version-check --suppress-analytics pub get --enforce-lockfile

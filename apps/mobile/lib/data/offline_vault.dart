@@ -4,6 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hive_ce_flutter/hive_flutter.dart';
 
 import '../domain/measurement_draft.dart';
+import '../domain/demo_order_lifecycle.dart';
 import '../domain/mobile_sync.dart';
 import '../domain/prepared_work_order.dart';
 
@@ -13,6 +14,11 @@ abstract interface class OfflineVault {
   Future<void> replaceOrders(List<PreparedWorkOrder> orders);
   Future<List<MeasurementDraft>> readDrafts(String orderId);
   Future<void> replaceDrafts(String orderId, List<MeasurementDraft> drafts);
+  Future<List<DemoLifecycleEvent>> readLifecycleEvents(String orderId);
+  Future<void> replaceLifecycleEvents(
+    String orderId,
+    List<DemoLifecycleEvent> events,
+  );
   Future<String?> readOwnerUserId();
   Future<void> bindOwnerUserId(String userId);
   Future<bool> hasUnacknowledgedEvents();
@@ -21,10 +27,12 @@ abstract interface class OfflineVault {
   Future<void> savePendingSyncBatch(
     PendingSyncBatch batch,
     List<MeasurementDraft> drafts,
+    List<DemoLifecycleEvent> lifecycleEvents,
   );
   Future<void> completeSyncBatch(
     String orderId,
     List<MeasurementDraft> drafts,
+    List<DemoLifecycleEvent> lifecycleEvents,
     int nextSyncCursor,
   );
   Future<void> clearUserData();
@@ -82,10 +90,29 @@ class HiveOfflineVault implements OfflineVault {
     final allowedIds = orders.map((order) => order.id).toSet();
     final pending = await readPendingSyncBatch();
     if (pending != null) allowedIds.add(pending.orderId);
+    for (final key in _openBox.keys.whereType<String>()) {
+      if (key.startsWith('measurement_drafts:')) {
+        final orderId = key.substring('measurement_drafts:'.length);
+        final drafts = await readDrafts(orderId);
+        if (drafts.any((draft) => !draft.hasPersistentServerResult)) {
+          allowedIds.add(orderId);
+        }
+      } else if (key.startsWith('demo_lifecycle:')) {
+        final orderId = key.substring('demo_lifecycle:'.length);
+        final events = await readLifecycleEvents(orderId);
+        if (events.any((event) => !event.hasPersistentServerResult)) {
+          allowedIds.add(orderId);
+        }
+      }
+    }
     final obsoleteDraftKeys = _openBox.keys.whereType<String>().where(
       (key) =>
-          key.startsWith('measurement_drafts:') &&
-          !allowedIds.contains(key.substring('measurement_drafts:'.length)),
+          (key.startsWith('measurement_drafts:') &&
+              !allowedIds.contains(
+                key.substring('measurement_drafts:'.length),
+              )) ||
+          (key.startsWith('demo_lifecycle:') &&
+              !allowedIds.contains(key.substring('demo_lifecycle:'.length))),
     );
     await _openBox.deleteAll(obsoleteDraftKeys);
     await _openBox.put(
@@ -115,6 +142,29 @@ class HiveOfflineVault implements OfflineVault {
       );
 
   @override
+  Future<List<DemoLifecycleEvent>> readLifecycleEvents(String orderId) async {
+    final encoded = _openBox.get(_lifecycleKey(orderId));
+    if (encoded == null) return const [];
+    final items = jsonDecode(encoded) as List<Object?>;
+    return items
+        .map(
+          (item) => DemoLifecycleEvent.fromJson(
+            (item! as Map).cast<String, Object?>(),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  @override
+  Future<void> replaceLifecycleEvents(
+    String orderId,
+    List<DemoLifecycleEvent> events,
+  ) => _openBox.put(
+    _lifecycleKey(orderId),
+    jsonEncode(events.map((event) => event.toJson()).toList()),
+  );
+
+  @override
   Future<String?> readOwnerUserId() async => _openBox.get(_ownerUserIdKey);
 
   @override
@@ -128,6 +178,12 @@ class HiveOfflineVault implements OfflineVault {
       final orderId = key.substring('measurement_drafts:'.length);
       final drafts = await readDrafts(orderId);
       if (drafts.any((draft) => !draft.hasPersistentServerResult)) return true;
+    }
+    for (final key in _openBox.keys.whereType<String>()) {
+      if (!key.startsWith('demo_lifecycle:')) continue;
+      final orderId = key.substring('demo_lifecycle:'.length);
+      final events = await readLifecycleEvents(orderId);
+      if (events.any((event) => !event.hasPersistentServerResult)) return true;
     }
     return false;
   }
@@ -151,17 +207,22 @@ class HiveOfflineVault implements OfflineVault {
   Future<void> savePendingSyncBatch(
     PendingSyncBatch batch,
     List<MeasurementDraft> drafts,
+    List<DemoLifecycleEvent> lifecycleEvents,
   ) => _openBox.putAll({
     _draftKey(batch.orderId): jsonEncode(
       drafts.map((draft) => draft.toJson()).toList(),
     ),
     _pendingBatchKey: jsonEncode(batch.toJson()),
+    _lifecycleKey(batch.orderId): jsonEncode(
+      lifecycleEvents.map((event) => event.toJson()).toList(),
+    ),
   });
 
   @override
   Future<void> completeSyncBatch(
     String orderId,
     List<MeasurementDraft> drafts,
+    List<DemoLifecycleEvent> lifecycleEvents,
     int nextSyncCursor,
   ) async {
     await _openBox.putAll({
@@ -169,6 +230,9 @@ class HiveOfflineVault implements OfflineVault {
         drafts.map((draft) => draft.toJson()).toList(),
       ),
       _syncCursorKey: nextSyncCursor.toString(),
+      _lifecycleKey(orderId): jsonEncode(
+        lifecycleEvents.map((event) => event.toJson()).toList(),
+      ),
     });
     await _openBox.delete(_pendingBatchKey);
   }
@@ -177,4 +241,5 @@ class HiveOfflineVault implements OfflineVault {
   Future<void> clearUserData() => _openBox.clear();
 
   static String _draftKey(String orderId) => 'measurement_drafts:$orderId';
+  static String _lifecycleKey(String orderId) => 'demo_lifecycle:$orderId';
 }

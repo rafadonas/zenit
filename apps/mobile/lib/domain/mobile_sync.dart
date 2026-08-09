@@ -1,5 +1,3 @@
-import 'measurement_draft.dart';
-
 class PendingSyncBatch {
   const PendingSyncBatch({
     required this.batchId,
@@ -15,11 +13,13 @@ class PendingSyncBatch {
   final int baseSyncCursor;
   final List<String> eventIds;
 
-  Map<String, Object?> toRequestJson(List<MeasurementDraft> drafts) {
-    final byId = {for (final draft in drafts) draft.eventId: draft};
+  Map<String, Object?> toRequestJson(List<Map<String, Object?>> localEvents) {
+    final byId = {
+      for (final event in localEvents) event['event_id']! as String: event,
+    };
     if (eventIds.toSet().length != eventIds.length ||
-        byId.length != drafts.length ||
-        eventIds.length != drafts.length ||
+        byId.length != localEvents.length ||
+        eventIds.length != localEvents.length ||
         eventIds.any((eventId) => !byId.containsKey(eventId))) {
       throw StateError('Pending batch does not match the local events');
     }
@@ -28,8 +28,8 @@ class PendingSyncBatch {
       'batch_id': batchId,
       'base_sync_cursor': baseSyncCursor,
       'events': eventIds
-          .map((eventId) => byId[eventId]!.toSyncEventJson())
-          .toList(),
+          .map((eventId) => byId[eventId]!)
+          .toList(growable: false),
     };
   }
 

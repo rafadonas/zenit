@@ -135,7 +135,9 @@ void main() {
       );
 
       await gateway.registerDevice('signed-token', deviceId, '1.0.0+1');
-      final result = await gateway.syncBatch('signed-token', batch, [draft]);
+      final result = await gateway.syncBatch('signed-token', batch, [
+        draft.toSyncEventJson(),
+      ]);
 
       expect(result.acceptedEventIds, {eventId});
       expect(result.nextSyncCursor, 7);

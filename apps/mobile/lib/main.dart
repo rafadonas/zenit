@@ -5,6 +5,7 @@ import 'data/device_identity_store.dart';
 import 'data/offline_vault.dart';
 import 'data/secure_session_store.dart';
 import 'data/zenit_gateway.dart';
+import 'domain/demo_order_lifecycle.dart';
 import 'domain/measurement_draft.dart';
 import 'domain/prepared_work_order.dart';
 
@@ -254,6 +255,7 @@ class _OrderDraftPageState extends State<OrderDraftPage> {
   bool syncing = false;
   String? confirmation;
   List<MeasurementDraft> drafts = const [];
+  List<DemoLifecycleEvent> lifecycle = const [];
 
   bool get canEdit =>
       drafts.every((draft) => draft.syncState == DraftSyncState.localOnly);
@@ -266,6 +268,9 @@ class _OrderDraftPageState extends State<OrderDraftPage> {
 
   Future<void> _load() async {
     final loadedDrafts = await widget.controller.readDrafts(widget.order.id);
+    final loadedLifecycle = await widget.controller.readLifecycleEvents(
+      widget.order.id,
+    );
     if (!mounted) return;
     for (
       var index = 0;
@@ -276,6 +281,7 @@ class _OrderDraftPageState extends State<OrderDraftPage> {
     }
     setState(() {
       drafts = loadedDrafts;
+      lifecycle = loadedLifecycle;
       loading = false;
     });
   }
@@ -317,14 +323,18 @@ class _OrderDraftPageState extends State<OrderDraftPage> {
     if (!mounted) return;
     await _load();
     if (!mounted) return;
-    final acknowledged = drafts
-        .where((draft) => draft.syncState == DraftSyncState.acknowledged)
+    final states = [
+      ...lifecycle.map((event) => event.syncState),
+      ...drafts.map((draft) => draft.syncState),
+    ];
+    final acknowledged = states
+        .where((state) => state == DraftSyncState.acknowledged)
         .length;
-    final rejected = drafts
-        .where((draft) => draft.syncState == DraftSyncState.rejected)
+    final rejected = states
+        .where((state) => state == DraftSyncState.rejected)
         .length;
-    final conflicts = drafts
-        .where((draft) => draft.syncState == DraftSyncState.conflict)
+    final conflicts = states
+        .where((state) => state == DraftSyncState.conflict)
         .length;
     setState(() {
       syncing = false;
@@ -332,6 +342,20 @@ class _OrderDraftPageState extends State<OrderDraftPage> {
           ? 'Resultado persistido: $acknowledged aceitos, $rejected rejeitados, $conflicts conflitos.'
           : widget.controller.errorMessage;
     });
+  }
+
+  Future<void> _transition(
+    Future<bool> Function(PreparedWorkOrder) action,
+  ) async {
+    final changed = await action(widget.order);
+    if (!mounted) return;
+    if (changed) await _load();
+    if (!mounted) return;
+    setState(
+      () => confirmation = changed
+          ? 'Evento demonstrativo criptografado no aparelho.'
+          : widget.controller.errorMessage,
+    );
   }
 
   @override
@@ -350,6 +374,51 @@ class _OrderDraftPageState extends State<OrderDraftPage> {
               ),
               const SizedBox(height: 4),
               Text(widget.order.planningRationale),
+              const SizedBox(height: 12),
+              const Text(
+                'AMBIENTE DEMONSTRATIVO · localização simulada',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  OutlinedButton(
+                    onPressed:
+                        lifecycle.isEmpty && !syncing && !widget.controller.busy
+                        ? () => _transition(widget.controller.confirmDemoOrder)
+                        : null,
+                    child: const Text('1. Confirmar'),
+                  ),
+                  OutlinedButton(
+                    onPressed:
+                        lifecycle.length == 1 &&
+                            !syncing &&
+                            !widget.controller.busy
+                        ? () => _transition(widget.controller.startDemoOrder)
+                        : null,
+                    child: const Text('2. Iniciar (GPS simulado)'),
+                  ),
+                  OutlinedButton(
+                    onPressed:
+                        lifecycle.length == 2 &&
+                            drafts.length == 3 &&
+                            !syncing &&
+                            !widget.controller.busy
+                        ? () => _transition(widget.controller.finishDemoOrder)
+                        : null,
+                    child: const Text('3. Finalizar'),
+                  ),
+                ],
+              ),
+              if (lifecycle.length >= 2) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'GPS simulado: ${lifecycle[1].simulatedLatitude}, '
+                  '${lifecycle[1].simulatedLongitude} · prepared_point_demo_v1',
+                ),
+              ],
               const SizedBox(height: 16),
               for (
                 var index = 0;
@@ -358,7 +427,7 @@ class _OrderDraftPageState extends State<OrderDraftPage> {
               ) ...[
                 TextField(
                   controller: fields[index],
-                  readOnly: syncing || !canEdit,
+                  readOnly: syncing || !canEdit || lifecycle.length != 2,
                   keyboardType: const TextInputType.numberWithOptions(
                     decimal: true,
                   ),
@@ -371,13 +440,17 @@ class _OrderDraftPageState extends State<OrderDraftPage> {
                 const SizedBox(height: 14),
               ],
               FilledButton.icon(
-                onPressed: syncing || widget.controller.busy || !canEdit
+                onPressed:
+                    syncing ||
+                        widget.controller.busy ||
+                        !canEdit ||
+                        lifecycle.length != 2
                     ? null
                     : _save,
                 icon: const Icon(Icons.lock),
                 label: const Text('Salvar 3 rascunhos no aparelho'),
               ),
-              if (drafts.length == 3) ...[
+              if (drafts.length == 3 && lifecycle.length == 3) ...[
                 const SizedBox(height: 10),
                 OutlinedButton.icon(
                   onPressed:
@@ -392,6 +465,19 @@ class _OrderDraftPageState extends State<OrderDraftPage> {
                   label: const Text('Sincronizar lote preparado'),
                 ),
                 const SizedBox(height: 12),
+                for (final event in lifecycle)
+                  ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(_syncIcon(event.syncState)),
+                    title: Text(
+                      '${_operationLabel(event.operation)}: '
+                      '${_syncLabel(event.syncState)}',
+                    ),
+                    subtitle: event.syncResultMessage == null
+                        ? null
+                        : Text(event.syncResultMessage!),
+                  ),
                 for (final draft in drafts)
                   ListTile(
                     dense: true,
@@ -411,7 +497,7 @@ class _OrderDraftPageState extends State<OrderDraftPage> {
               ],
               const SizedBox(height: 20),
               const Text(
-                'GPS e fotos permanecem não coletados. Mesmo sincronizadas, estas medições preparadas não comprovam inspeção e não autorizam roçada.',
+                'O GPS exibido é simulado e fotos permanecem não coletadas. Estes dados não comprovam inspeção, não entram em relatório oficial e não autorizam roçada.',
               ),
             ],
           ),
@@ -424,6 +510,12 @@ String _syncLabel(DraftSyncState state) => switch (state) {
   DraftSyncState.acknowledged => 'persistido no servidor',
   DraftSyncState.rejected => 'rejeitado pelo servidor',
   DraftSyncState.conflict => 'conflito preservado',
+};
+
+String _operationLabel(DemoLifecycleOperation operation) => switch (operation) {
+  DemoLifecycleOperation.confirm => 'Confirmação',
+  DemoLifecycleOperation.start => 'Início simulado',
+  DemoLifecycleOperation.finish => 'Finalização',
 };
 
 IconData _syncIcon(DraftSyncState state) => switch (state) {

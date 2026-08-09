@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zenit_mobile/data/device_identity_store.dart';
+import 'package:zenit_mobile/domain/demo_order_lifecycle.dart';
 import 'package:zenit_mobile/domain/measurement_draft.dart';
 import 'package:zenit_mobile/domain/mobile_sync.dart';
 
@@ -113,6 +114,32 @@ void main() {
       ],
     );
 
-    expect(() => batch.toRequestJson([draft]), throwsStateError);
+    expect(
+      () => batch.toRequestJson([draft.toSyncEventJson()]),
+      throwsStateError,
+    );
+  });
+
+  test('demo start is explicitly simulated and never operational', () {
+    final event = DemoLifecycleEvent(
+      eventId: '77777777-7777-4777-8777-777777777777',
+      orderId: '11111111-1111-4111-8111-111111111111',
+      operation: DemoLifecycleOperation.start,
+      occurredAt: DateTime.utc(2026, 8, 9, 17),
+      simulatedLatitude: -23.5,
+      simulatedLongitude: -46.6,
+    );
+
+    final syncPayload = event.toSyncEventJson();
+    final payload = (syncPayload['payload']! as Map).cast<String, Object?>();
+    expect(payload['data_status'], 'simulated');
+    expect(payload['simulation_scope'], 'demo_only');
+    expect(payload['location_status'], 'simulated');
+    expect(payload['simulation_method'], 'prepared_point_demo_v1');
+    expect(payload['authorizes_field_work'], isFalse);
+    expect(payload['eligible_for_official_reporting'], isFalse);
+
+    final unsafe = event.toJson()..['authorizes_field_work'] = true;
+    expect(() => DemoLifecycleEvent.fromJson(unsafe), throwsFormatException);
   });
 }

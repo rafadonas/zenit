@@ -3,6 +3,7 @@ import 'package:zenit_mobile/data/device_identity_store.dart';
 import 'package:zenit_mobile/data/secure_session_store.dart';
 import 'package:zenit_mobile/data/zenit_gateway.dart';
 import 'package:zenit_mobile/domain/auth_session.dart';
+import 'package:zenit_mobile/domain/demo_order_lifecycle.dart';
 import 'package:zenit_mobile/domain/measurement_draft.dart';
 import 'package:zenit_mobile/domain/mobile_sync.dart';
 import 'package:zenit_mobile/domain/prepared_work_order.dart';
@@ -61,6 +62,7 @@ class FakeGateway implements ZenitGateway {
   int registrationCalls = 0;
   int syncCalls = 0;
   PendingSyncBatch? lastBatch;
+  List<Map<String, Object?>>? lastEvents;
 
   @override
   Future<AuthSession> login(String email, String password) async =>
@@ -84,10 +86,11 @@ class FakeGateway implements ZenitGateway {
   Future<MobileSyncResult> syncBatch(
     String accessToken,
     PendingSyncBatch batch,
-    List<MeasurementDraft> drafts,
+    List<Map<String, Object?>> events,
   ) async {
     syncCalls++;
     lastBatch = batch;
+    lastEvents = events;
     if (syncFailure case final failure?) throw failure;
     if (syncResultFactory case final factory?) return factory(batch);
     return MobileSyncResult(
@@ -128,6 +131,7 @@ class MemorySessionStore implements SessionStore {
 class MemoryVault implements OfflineVault {
   List<PreparedWorkOrder> orders = const [];
   final Map<String, List<MeasurementDraft>> drafts = {};
+  final Map<String, List<DemoLifecycleEvent>> lifecycleEvents = {};
   String? ownerUserId;
   PendingSyncBatch? pendingBatch;
   int syncCursor = 0;
@@ -139,6 +143,7 @@ class MemoryVault implements OfflineVault {
   Future<void> clearUserData() async {
     orders = const [];
     drafts.clear();
+    lifecycleEvents.clear();
     ownerUserId = null;
     pendingBatch = null;
     syncCursor = 0;
@@ -152,6 +157,10 @@ class MemoryVault implements OfflineVault {
   Future<List<PreparedWorkOrder>> readOrders() async => orders;
 
   @override
+  Future<List<DemoLifecycleEvent>> readLifecycleEvents(String orderId) async =>
+      lifecycleEvents[orderId] ?? const [];
+
+  @override
   Future<void> replaceDrafts(
     String orderId,
     List<MeasurementDraft> values,
@@ -162,23 +171,35 @@ class MemoryVault implements OfflineVault {
       orders = List.unmodifiable(values);
 
   @override
+  Future<void> replaceLifecycleEvents(
+    String orderId,
+    List<DemoLifecycleEvent> values,
+  ) async => lifecycleEvents[orderId] = List.unmodifiable(values);
+
+  @override
   Future<void> bindOwnerUserId(String userId) async => ownerUserId = userId;
 
   @override
   Future<void> completeSyncBatch(
     String orderId,
     List<MeasurementDraft> values,
+    List<DemoLifecycleEvent> lifecycleValues,
     int nextSyncCursor,
   ) async {
     drafts[orderId] = List.unmodifiable(values);
+    lifecycleEvents[orderId] = List.unmodifiable(lifecycleValues);
     syncCursor = nextSyncCursor;
     pendingBatch = null;
   }
 
   @override
-  Future<bool> hasUnacknowledgedEvents() async => drafts.values
-      .expand((values) => values)
-      .any((draft) => !draft.hasPersistentServerResult);
+  Future<bool> hasUnacknowledgedEvents() async =>
+      drafts.values
+          .expand((values) => values)
+          .any((draft) => !draft.hasPersistentServerResult) ||
+      lifecycleEvents.values
+          .expand((values) => values)
+          .any((event) => !event.hasPersistentServerResult);
 
   @override
   Future<String?> readOwnerUserId() async => ownerUserId;
@@ -193,8 +214,10 @@ class MemoryVault implements OfflineVault {
   Future<void> savePendingSyncBatch(
     PendingSyncBatch batch,
     List<MeasurementDraft> values,
+    List<DemoLifecycleEvent> lifecycleValues,
   ) async {
     pendingBatch = batch;
     drafts[batch.orderId] = List.unmodifiable(values);
+    lifecycleEvents[batch.orderId] = List.unmodifiable(lifecycleValues);
   }
 }
