@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
 interface PageProps {
   searchParams: Promise<{
     review?: string; summary?: string; export?: string; proposal?: string;
-    proposal_review?: string; mowing_order?: string;
+    proposal_review?: string; mowing_order?: string; resource_plan?: string;
   }>;
 }
 
@@ -73,8 +73,14 @@ async function loadProposals(): Promise<PreparedProposalCollection | null> {
 
 function message(
   review?: string, summary?: string, exportStatus?: string, proposal?: string,
-  proposalReview?: string, mowingOrder?: string,
+  proposalReview?: string, mowingOrder?: string, resourcePlan?: string,
 ): string | null {
+  if (resourcePlan === "recorded") return "Referências candidatas de equipe e equipamento registradas, ainda não atribuídas.";
+  if (resourcePlan === "forbidden") return "Seu usuário não pode planejar recursos para esta rodovia.";
+  if (resourcePlan === "missing") return "A ordem de roçada preparada não foi encontrada.";
+  if (resourcePlan === "conflict") return "A ordem ficou obsoleta, a correção não substitui o plano efetivo ou a chave entrou em conflito.";
+  if (resourcePlan === "invalid") return "Informe referências candidatas e uma justificativa válidas.";
+  if (resourcePlan === "service-unavailable") return "O serviço de planejamento de recursos não está disponível agora.";
   if (mowingOrder === "created") return "Ordem de roçada preparada para planejamento, sem autorização de execução.";
   if (mowingOrder === "forbidden") return "Seu usuário não pode preparar ordem de roçada para esta rodovia.";
   if (mowingOrder === "missing") return "A revisão humana efetiva não foi encontrada.";
@@ -128,7 +134,7 @@ export default async function PhotoReviewsPage({ searchParams }: PageProps) {
   ]);
   const operationMessage = message(
     query.review, query.summary, query.export, query.proposal, query.proposal_review,
-    query.mowing_order,
+    query.mowing_order, query.resource_plan,
   );
   const summaryByOrder = new Map<string, PreparedInspectionSummary>(
     summaries?.items.map((summary) => [summary.work_order_id, summary]) ?? [],
@@ -195,10 +201,19 @@ export default async function PhotoReviewsPage({ searchParams }: PageProps) {
                   <div className="decision-rationale"><label htmlFor={`proposal-review-rationale-${proposal.proposal_id}`}>Justificativa</label><textarea id={`proposal-review-rationale-${proposal.proposal_id}`} maxLength={2000} name="rationale" placeholder="Obrigatória ao rejeitar ou ajustar" rows={2} /></div>
                   <button className="primary-button" type="submit">{proposal.latest_review_id ? "Registrar correção auditável" : "Registrar decisão humana"}</button><small>Aceitar significa apenas concordar com o sinal preparado para planejamento; uso em campo permanece bloqueado.</small>
                 </form>
-                {proposal.prepared_mowing_order_id ? <div className="post-inspection-proposal">
-                  <div><strong>Ordem de roçada preparada</strong><span>ID {proposal.prepared_mowing_order_id}</span></div><span className="status-pill prepared">Não executável</span>
-                  <small>Equipe e equipamento não atribuídos; clima e segurança pendentes; aprovação operacional obrigatória.</small>
-                </div> : effectiveProposalRecommendation === "mowing_review" && proposal.latest_review_id ? <form action="/api/prepared-mowing-orders" className="prepared-summary-form" method="post">
+                {proposal.prepared_mowing_order_id ? <>
+                  <div className="post-inspection-proposal">
+                    <div><strong>Ordem de roçada preparada</strong><span>ID {proposal.prepared_mowing_order_id}</span>{proposal.latest_resource_plan_id ? <span>Recursos candidatos: {proposal.latest_team_reference} · {proposal.latest_equipment_reference}</span> : null}</div><span className="status-pill prepared">Não executável</span>
+                    <small>Equipe e equipamento continuam não atribuídos; as referências são placeholders pendentes de validação. Clima e segurança seguem pendentes.</small>
+                  </div>
+                  <form action={`/api/prepared-mowing-orders/${proposal.prepared_mowing_order_id}/resource-plans`} className="prepared-summary-form" method="post">
+                    <input name="csrf_token" type="hidden" value={session.csrfToken} /><input name="idempotency_key" type="hidden" value={randomUUID()} />{proposal.latest_resource_plan_id ? <input name="supersedes_plan_id" type="hidden" value={proposal.latest_resource_plan_id} /> : null}
+                    <label htmlFor={`team-reference-${proposal.proposal_id}`}>Referência candidata de equipe</label><input defaultValue={proposal.latest_team_reference ?? "Equipe candidata — validar externamente"} id={`team-reference-${proposal.proposal_id}`} maxLength={200} name="team_reference" required />
+                    <label htmlFor={`equipment-reference-${proposal.proposal_id}`}>Referência candidata de equipamento</label><input defaultValue={proposal.latest_equipment_reference ?? "Equipamento candidato — validar externamente"} id={`equipment-reference-${proposal.proposal_id}`} maxLength={200} name="equipment_reference" required />
+                    <label htmlFor={`resource-rationale-${proposal.proposal_id}`}>Justificativa do plano de recursos</label><textarea defaultValue="Registrar candidatos preparados sem atribuir recursos operacionais" id={`resource-rationale-${proposal.proposal_id}`} maxLength={2000} name="planning_rationale" required rows={2} />
+                    <button className="secondary-button" type="submit">{proposal.latest_resource_plan_id ? "Corrigir plano de recursos" : "Registrar recursos candidatos"}</button><small>O registro é append-only, não confirma disponibilidade e não atribui equipe ou equipamento.</small>
+                  </form>
+                </> : effectiveProposalRecommendation === "mowing_review" && proposal.latest_review_id ? <form action="/api/prepared-mowing-orders" className="prepared-summary-form" method="post">
                   <input name="csrf_token" type="hidden" value={session.csrfToken} /><input name="idempotency_key" type="hidden" value={randomUUID()} /><input name="source_review_id" type="hidden" value={proposal.latest_review_id} />
                   <label htmlFor={`mowing-rationale-${proposal.proposal_id}`}>Justificativa do planejamento de roçada</label><textarea defaultValue="Preparar ordem de roçada sem liberar execução operacional" id={`mowing-rationale-${proposal.proposal_id}`} maxLength={2000} name="planning_rationale" required rows={2} />
                   <button className="primary-button" type="submit">Preparar ordem de roçada</button><small>Cria apenas a fundação de planejamento. Não atribui equipe/equipamento, não verifica clima/segurança e não autoriza campo.</small>

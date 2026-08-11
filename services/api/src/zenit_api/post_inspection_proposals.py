@@ -64,6 +64,12 @@ class PreparedProposalResponse(BaseModel):
     mowing_order_state: Literal[
         "not_prepared", "prepared_no_execution_authorization"
     ] = "not_prepared"
+    resource_plan_count: int = Field(default=0, ge=0)
+    latest_resource_plan_id: UUID | None = None
+    latest_team_reference: str | None = None
+    latest_equipment_reference: str | None = None
+    latest_resource_plan_rationale: str | None = None
+    latest_resource_plan_created_at: datetime | None = None
 
     @model_validator(mode="after")
     def validate_review_state(self) -> PreparedProposalResponse:
@@ -100,6 +106,18 @@ class PreparedProposalResponse(BaseModel):
             and effective_recommendation != "mowing_review"
         ):
             raise ValueError("prepared mowing order requires an effective mowing-review decision")
+        resource_metadata = (
+            self.latest_resource_plan_id, self.latest_team_reference,
+            self.latest_equipment_reference, self.latest_resource_plan_rationale,
+            self.latest_resource_plan_created_at,
+        )
+        if self.resource_plan_count == 0:
+            if any(value is not None for value in resource_metadata):
+                raise ValueError("unplanned mowing order cannot expose resource metadata")
+        elif self.prepared_mowing_order_id is None or any(
+            value is None for value in resource_metadata
+        ):
+            raise ValueError("resource plan requires a current prepared mowing order")
         return self
 
 
@@ -466,7 +484,9 @@ class PostgresPreparedProposalRepository:
                    proposal.threshold_exceeded, proposal.created_at,
                    COALESCE(review_total.review_count, 0), latest.id, latest.decision,
                    latest.adjusted_recommendation, latest.rationale, latest.reviewed_at,
-                   mowing.id
+                   mowing.id, COALESCE(plan_total.plan_count, 0), latest_plan.id,
+                   latest_plan.team_reference, latest_plan.equipment_reference,
+                   latest_plan.planning_rationale, latest_plan.created_at
             FROM prepared_post_inspection_proposal proposal
             JOIN prepared_post_inspection_policy policy ON policy.id = proposal.policy_id
             JOIN prepared_inspection_summary summary ON summary.id = proposal.summary_id
@@ -491,6 +511,21 @@ class PostgresPreparedProposalRepository:
                 ORDER BY review.reviewed_at DESC LIMIT 1
             ) latest ON true
             LEFT JOIN prepared_mowing_order mowing ON mowing.source_review_id = latest.id
+            LEFT JOIN LATERAL (
+                SELECT count(*) AS plan_count
+                FROM prepared_mowing_resource_plan plan
+                WHERE plan.mowing_order_id = mowing.id
+            ) plan_total ON true
+            LEFT JOIN LATERAL (
+                SELECT plan.id, plan.team_reference, plan.equipment_reference,
+                       plan.planning_rationale, plan.created_at
+                FROM prepared_mowing_resource_plan plan
+                WHERE plan.mowing_order_id = mowing.id
+                  AND NOT EXISTS (
+                      SELECT 1 FROM prepared_mowing_resource_plan newer
+                      WHERE newer.supersedes_plan_id = plan.id)
+                ORDER BY plan.created_at DESC LIMIT 1
+            ) latest_plan ON true
             WHERE proposal.location_status = 'simulated' AND proposal.data_status = 'prepared'
               AND NOT proposal.eligible_for_official_reporting
               AND NOT proposal.authorizes_field_work AND {where_clause}"""
@@ -513,6 +548,9 @@ class PostgresPreparedProposalRepository:
             mowing_order_state=(
                 "prepared_no_execution_authorization" if row[19] else "not_prepared"
             ),
+            resource_plan_count=row[20], latest_resource_plan_id=row[21],
+            latest_team_reference=row[22], latest_equipment_reference=row[23],
+            latest_resource_plan_rationale=row[24], latest_resource_plan_created_at=row[25],
         )
 
 

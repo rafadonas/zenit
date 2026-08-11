@@ -41,6 +41,9 @@ PREPARED_POST_INSPECTION_REVIEW_MIGRATION = Path(
 PREPARED_MOWING_ORDER_MIGRATION = Path(
     "infra/migrations/0024_prepared_mowing_order.sql"
 )
+PREPARED_MOWING_RESOURCE_PLAN_MIGRATION = Path(
+    "infra/migrations/0025_prepared_mowing_resource_plan.sql"
+)
 
 
 class MigrationContractTests(unittest.TestCase):
@@ -143,7 +146,7 @@ class MigrationContractTests(unittest.TestCase):
         mounts = [
             line.strip() for line in compose.splitlines() if "/docker-entrypoint-initdb.d/" in line
         ]
-        self.assertEqual(len(mounts), 24)
+        self.assertEqual(len(mounts), 25)
         for version, mount in enumerate(mounts, start=1):
             prefix = f"{version:04d}"
             self.assertIn(f"infra/migrations/{prefix}_", mount)
@@ -338,6 +341,19 @@ class MigrationContractTests(unittest.TestCase):
         self.assertIn("CHECK (NOT authorizes_field_work)", sql)
         self.assertIn("CHECK (NOT eligible_for_field_execution)", sql)
         self.assertIn("prepared_mowing_order_immutable", sql)
+
+    def test_mowing_resource_plan_is_linear_unverified_and_non_authorizing(self) -> None:
+        sql = PREPARED_MOWING_RESOURCE_PLAN_MIGRATION.read_text(encoding="utf-8")
+        self.assertIn("prepared-mowing-resource-plan-v1", sql)
+        self.assertIn("prepared_placeholder_pending_validation", sql)
+        self.assertIn("resource_references_are_verified", sql)
+        self.assertIn("prepared-post-inspection-review:", sql)
+        self.assertIn("prepared-mowing-resource-plan:", sql)
+        self.assertIn("can only supersede its effective plan", sql)
+        self.assertIn("team_assignment_status = 'unassigned'", sql)
+        self.assertIn("equipment_assignment_status = 'unassigned'", sql)
+        self.assertIn("CHECK (NOT authorizes_field_work)", sql)
+        self.assertIn("prepared_mowing_resource_plan_immutable", sql)
 
 
 if __name__ == "__main__":

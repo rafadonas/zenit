@@ -150,8 +150,8 @@ credentials.
 ## Database migrations and ingestion
 
 Apply migrations in numeric order before importing sources. The current local
-development database must have migrations `0001` through `0024` applied. On the first
-startup of a new Compose volume, Postgres applies these twenty-four up migrations in
+development database must have migrations `0001` through `0025` applied. On the first
+startup of a new Compose volume, Postgres applies these twenty-five up migrations in
 order through `/docker-entrypoint-initdb.d`; existing volumes are never modified
 by that initialization mechanism. The explicit commands below remain useful
 for non-Compose environments and controlled upgrades of existing databases.
@@ -205,6 +205,8 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0023_prepared_post_inspection_review.sql
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0024_prepared_mowing_order.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
+  < infra/migrations/0025_prepared_mowing_resource_plan.sql
 ```
 
 Migration `0008` starts the Sprint 4 management foundation with immutable,
@@ -303,6 +305,11 @@ effective human review selecting `mowing_review` can create one. Team and
 equipment remain unassigned, weather and safety remain pending, and the order
 cannot authorize field execution. See
 `docs/decisions/ADR-0026-prepared-mowing-order-foundation.md`.
+
+Migration `0025` adds append-only candidate resource plans for prepared mowing
+orders. Team and equipment references remain unverified placeholders pending
+external validation; assignment stays `unassigned` and field execution remains
+blocked. See `docs/decisions/ADR-0027-prepared-mowing-resource-plan.md`.
 
 The public, read-only management queue is available at:
 
@@ -573,6 +580,20 @@ Authorization: Bearer <access-token>
 The creation endpoint rejects rejected, superseded, or effective `monitor`
 reviews. Its result remains prepared, simulated-location, non-official, and
 ineligible for field execution.
+
+Record or correct candidate resource references:
+
+```text
+POST /v1/prepared-mowing-orders/{mowing_order_id}/resource-plans
+Authorization: Bearer <access-token>
+Idempotency-Key: <client-generated-stable-key>
+Content-Type: application/json
+
+{"team_reference":"candidate label pending validation","equipment_reference":"candidate label pending validation","planning_rationale":"Prepare resource planning without assignment"}
+```
+
+The API and dashboard identify these values as prepared placeholders. They do
+not confirm availability, create assignments, or change any execution gate.
 
 Use `zenit-import` for one immutable raw file at a time. Full examples are in
 `docs/architecture/source-ingestion.md`.

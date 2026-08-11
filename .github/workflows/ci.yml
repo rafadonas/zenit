@@ -96,7 +96,8 @@ jobs:
                 AND to_regclass('public.prepared_inspection_summary_export_event') IS NOT NULL
                 AND to_regclass('public.prepared_post_inspection_proposal') IS NOT NULL
                 AND to_regclass('public.prepared_post_inspection_review') IS NOT NULL
-                AND to_regclass('public.prepared_mowing_order') IS NOT NULL;" \
+                AND to_regclass('public.prepared_mowing_order') IS NOT NULL
+                AND to_regclass('public.prepared_mowing_resource_plan') IS NOT NULL;" \
             | grep -qx t
           docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit -Atc \
             "SELECT postgis_typmod_type(a.atttypmod)
@@ -149,6 +150,10 @@ jobs:
             -X POST -H 'Content-Type: application/json' -H 'Idempotency-Key: ci-mowing-order-check' \
             -d '{"source_review_id":"00000000-0000-4000-8000-000000000001","planning_rationale":"CI authentication boundary"}' \
             http://localhost:8000/v1/prepared-mowing-orders)" = 401
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            -X POST -H 'Content-Type: application/json' -H 'Idempotency-Key: ci-resource-plan-check' \
+            -d '{"team_reference":"candidate","equipment_reference":"candidate","planning_rationale":"CI authentication boundary"}' \
+            http://localhost:8000/v1/prepared-mowing-orders/00000000-0000-4000-8000-000000000001/resource-plans)" = 401
           curl --fail --silent --show-error --output /dev/null http://localhost:3000
           curl --fail --silent --show-error --output /dev/null http://localhost:3000/login
       - name: Show service logs on failure

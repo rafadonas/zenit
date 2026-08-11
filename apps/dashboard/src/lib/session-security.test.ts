@@ -6,6 +6,7 @@ import {
   parseDecisionSubmission,
   parsePreparedInspectionOrderSubmission,
   parsePreparedMowingOrderSubmission,
+  parsePreparedMowingResourcePlanSubmission,
   parsePhotoReviewSubmission,
   parsePreparedProposalSubmission,
   parsePreparedProposalReviewSubmission,
@@ -192,5 +193,24 @@ describe("dashboard session security", () => {
     });
     form.set("planning_rationale", " ");
     expect(parsePreparedMowingOrderSubmission(form)).toBeNull();
+  });
+
+  it("allowlists unverified candidate resource references", () => {
+    const form = new FormData();
+    form.set("csrf_token", csrfToken);
+    form.set("idempotency_key", "10000000-0000-4000-8000-000000000001");
+    form.set("team_reference", "Equipe candidata A");
+    form.set("equipment_reference", "Equipamento candidato B");
+    form.set("planning_rationale", "Planejar recursos pendentes de validação");
+    form.set("team_assignment_status", "assigned");
+    expect(parsePreparedMowingResourcePlanSubmission(form)).toEqual({
+      csrfToken,
+      idempotencyKey: "10000000-0000-4000-8000-000000000001",
+      teamReference: "Equipe candidata A",
+      equipmentReference: "Equipamento candidato B",
+      planningRationale: "Planejar recursos pendentes de validação",
+    });
+    form.set("equipment_reference", " ");
+    expect(parsePreparedMowingResourcePlanSubmission(form)).toBeNull();
   });
 });

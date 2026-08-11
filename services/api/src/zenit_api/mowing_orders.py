@@ -8,7 +8,7 @@ from uuid import UUID
 import psycopg
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from psycopg.errors import UniqueViolation
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from zenit_api.auth import AuthenticatedUser, get_current_user
 from zenit_api.config import get_settings
@@ -56,6 +56,35 @@ class PreparedMowingOrderResponse(BaseModel):
     eligible_for_field_execution: Literal[False] = False
     eligible_for_official_reporting: Literal[False] = False
     created_at: datetime
+    resource_plan_count: int = Field(default=0, ge=0)
+    latest_resource_plan_id: UUID | None = None
+    latest_team_reference: str | None = None
+    latest_equipment_reference: str | None = None
+    latest_resource_plan_rationale: str | None = None
+    latest_resource_plan_created_at: datetime | None = None
+    resource_plan_state: Literal[
+        "not_planned", "candidate_resources_pending_validation"
+    ] = "not_planned"
+
+    @model_validator(mode="after")
+    def validate_resource_plan_state(self) -> PreparedMowingOrderResponse:
+        metadata = (
+            self.latest_resource_plan_id, self.latest_team_reference,
+            self.latest_equipment_reference, self.latest_resource_plan_rationale,
+            self.latest_resource_plan_created_at,
+        )
+        if self.resource_plan_count == 0:
+            if (
+                any(value is not None for value in metadata)
+                or self.resource_plan_state != "not_planned"
+            ):
+                raise ValueError("unplanned mowing order cannot expose resource metadata")
+        elif (
+            any(value is None for value in metadata)
+            or self.resource_plan_state != "candidate_resources_pending_validation"
+        ):
+            raise ValueError("planned mowing order requires one effective candidate resource plan")
+        return self
 
 
 class PreparedMowingOrderCollection(BaseModel):
@@ -291,7 +320,10 @@ class PostgresPreparedMowingOrderRepository:
                    mowing.location_status, mowing.source_evidence_status,
                    mowing.team_assignment_status, mowing.equipment_assignment_status,
                    mowing.weather_check_status, mowing.safety_check_status,
-                   mowing.requires_operational_approval, mowing.created_at
+                   mowing.requires_operational_approval, mowing.created_at,
+                   COALESCE(plan_total.plan_count, 0), latest_plan.id,
+                   latest_plan.team_reference, latest_plan.equipment_reference,
+                   latest_plan.planning_rationale, latest_plan.created_at
             FROM prepared_mowing_order mowing
             JOIN prepared_mowing_order_policy policy ON policy.id = mowing.creation_policy_id
             JOIN prepared_post_inspection_review review ON review.id = mowing.source_review_id
@@ -301,6 +333,21 @@ class PostgresPreparedMowingOrderRepository:
             JOIN road_segment segment ON segment.id = zone.road_segment_id
             JOIN road_axis_candidate axis ON axis.id = segment.road_axis_candidate_id
             JOIN road ON road.id = axis.road_id
+            LEFT JOIN LATERAL (
+                SELECT count(*) AS plan_count
+                FROM prepared_mowing_resource_plan plan
+                WHERE plan.mowing_order_id = mowing.id
+            ) plan_total ON true
+            LEFT JOIN LATERAL (
+                SELECT plan.id, plan.team_reference, plan.equipment_reference,
+                       plan.planning_rationale, plan.created_at
+                FROM prepared_mowing_resource_plan plan
+                WHERE plan.mowing_order_id = mowing.id
+                  AND NOT EXISTS (
+                      SELECT 1 FROM prepared_mowing_resource_plan newer
+                      WHERE newer.supersedes_plan_id = plan.id)
+                ORDER BY plan.created_at DESC LIMIT 1
+            ) latest_plan ON true
             WHERE mowing.id = %s
             """,
             (mowing_order_id,),
@@ -318,6 +365,12 @@ class PostgresPreparedMowingOrderRepository:
             equipment_assignment_status=row[18], weather_check_status=row[19],
             safety_check_status=row[20], requires_operational_approval=row[21],
             created_at=row[22],
+            resource_plan_count=row[23], latest_resource_plan_id=row[24],
+            latest_team_reference=row[25], latest_equipment_reference=row[26],
+            latest_resource_plan_rationale=row[27], latest_resource_plan_created_at=row[28],
+            resource_plan_state=(
+                "candidate_resources_pending_validation" if row[24] else "not_planned"
+            ),
         )
 
 

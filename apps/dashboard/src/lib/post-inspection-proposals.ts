@@ -28,6 +28,12 @@ export interface PreparedPostInspectionProposal {
   review_state: "awaiting_review" | "review_recorded_no_work_authorization";
   prepared_mowing_order_id: string | null;
   mowing_order_state: "not_prepared" | "prepared_no_execution_authorization";
+  resource_plan_count: number;
+  latest_resource_plan_id: string | null;
+  latest_team_reference: string | null;
+  latest_equipment_reference: string | null;
+  latest_resource_plan_rationale: string | null;
+  latest_resource_plan_created_at: string | null;
 }
 
 export interface PreparedProposalCollection {
@@ -73,9 +79,20 @@ function isProposal(value: unknown): value is PreparedPostInspectionProposal {
     : typeof value.prepared_mowing_order_id === "string" &&
       value.mowing_order_state === "prepared_no_execution_authorization" &&
       effectiveRecommendation === "mowing_review";
+  const resourceMetadata = [
+    value.latest_resource_plan_id, value.latest_team_reference,
+    value.latest_equipment_reference, value.latest_resource_plan_rationale,
+    value.latest_resource_plan_created_at,
+  ];
+  const resourcePlanConsistent = value.resource_plan_count === 0
+    ? resourceMetadata.every((item) => item === null)
+    : typeof value.resource_plan_count === "number" && value.resource_plan_count > 0 &&
+      value.prepared_mowing_order_id !== null &&
+      resourceMetadata.every((item) => typeof item === "string");
   return [10, 30].includes(threshold) && value.threshold_exceeded === exceeded &&
     typeof value.review_count === "number" && Number.isInteger(value.review_count) &&
-    reviewConsistent && mowingOrderConsistent &&
+    reviewConsistent && mowingOrderConsistent && resourcePlanConsistent &&
+    Number.isInteger(value.resource_plan_count) &&
     value.recommendation === (exceeded ? "mowing_review" : "monitor") &&
     typeof value.proposal_id === "string" &&
     typeof value.summary_id === "string" && typeof value.work_order_id === "string" &&

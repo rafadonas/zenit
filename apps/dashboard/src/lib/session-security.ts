@@ -69,6 +69,15 @@ export interface PreparedMowingOrderSubmission {
   planningRationale: string;
 }
 
+export interface PreparedMowingResourcePlanSubmission {
+  csrfToken: string;
+  idempotencyKey: string;
+  teamReference: string;
+  equipmentReference: string;
+  planningRationale: string;
+  supersedesPlanId?: string;
+}
+
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CSRF_PATTERN = /^[0-9a-f]{64}$/;
 
@@ -321,4 +330,29 @@ export function parsePreparedMowingOrderSubmission(
     planningRationale.length > 2000
   ) return null;
   return { csrfToken, idempotencyKey, sourceReviewId, planningRationale };
+}
+
+export function parsePreparedMowingResourcePlanSubmission(
+  form: FormData,
+): PreparedMowingResourcePlanSubmission | null {
+  const csrfToken = formString(form, "csrf_token");
+  const idempotencyKey = formString(form, "idempotency_key");
+  const teamReference = formString(form, "team_reference");
+  const equipmentReference = formString(form, "equipment_reference");
+  const planningRationale = formString(form, "planning_rationale");
+  const supersedesPlanId = formString(form, "supersedes_plan_id");
+  if (
+    csrfToken === null || !CSRF_PATTERN.test(csrfToken) ||
+    idempotencyKey === null || !UUID_PATTERN.test(idempotencyKey) ||
+    teamReference === null || teamReference.length < 1 || teamReference.length > 200 ||
+    equipmentReference === null || equipmentReference.length < 1 ||
+    equipmentReference.length > 200 || planningRationale === null ||
+    planningRationale.length < 1 || planningRationale.length > 2000 ||
+    (supersedesPlanId !== null && supersedesPlanId !== "" &&
+      !UUID_PATTERN.test(supersedesPlanId))
+  ) return null;
+  return {
+    csrfToken, idempotencyKey, teamReference, equipmentReference, planningRationale,
+    ...(supersedesPlanId ? { supersedesPlanId } : {}),
+  };
 }
