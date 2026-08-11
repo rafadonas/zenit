@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createMapProjection,
   findSegmentIdByIndex,
   formatDistance,
   isSegmentCollection,
@@ -40,6 +41,17 @@ describe("segment utilities", () => {
     expect(projectSegments([feature])).toEqual([
       expect.objectContaining({ id: "segment-1", path: expect.stringMatching(/^M.+ L.+$/) }),
     ]);
+  });
+
+  it("shares the map projection with georeferenced overlays", () => {
+    const project = createMapProjection([feature]);
+
+    expect(project).not.toBeNull();
+    expect(project!([-46.8, -23.5]).x).toBeCloseTo(214);
+    expect(project!([-46.8, -23.5]).y).toBeCloseTo(626);
+    expect(project!([-46.79, -23.49]).x).toBeCloseTo(786);
+    expect(project!([-46.79, -23.49]).y).toBeCloseTo(54);
+    expect(createMapProjection([])).toBeNull();
   });
 
   it("formats operational distance in Portuguese", () => {

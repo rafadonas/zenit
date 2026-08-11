@@ -60,6 +60,21 @@ describe("satellite observation utilities", () => {
     ).toBe(false);
   });
 
+  it("rejects an unknown cache state", () => {
+    expect(
+      isSatelliteObservationCollection({
+        items: [{ ...observation, cache_status: "available_somewhere" }],
+        metadata: {
+          segment_id: "segment-1",
+          result_count: 1,
+          total_count: 1,
+          limit: 10,
+          truncated: false,
+        },
+      }),
+    ).toBe(false);
+  });
+
   it("formats the acquisition date without presenting it as current", () => {
     expect(formatAcquisitionDate(observation.acquired_at)).toBe("29/07/2026");
   });

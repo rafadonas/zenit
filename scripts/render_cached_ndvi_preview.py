@@ -7,6 +7,7 @@ from __future__ import annotations
 import hashlib
 import html
 import json
+import math
 import struct
 import zlib
 from pathlib import Path
@@ -21,6 +22,9 @@ SOURCE_TIFF = SOURCE_DIR / "ndvi.tif"
 SOURCE_METADATA = SOURCE_DIR / "userdata.json"
 OUTPUT_HTML = ROOT / "docs/previews/sentinel-ndvi-preview.html"
 OUTPUT_MANIFEST = ROOT / "data/manifests/sentinel-ndvi-preview.json"
+OUTPUT_DASHBOARD_LAYER = (
+    ROOT / "apps/dashboard/src/data/cached-ndvi-preview.json"
+)
 
 EXPECTED_TIFF_SHA256 = "49a56d955b5f47cfb1c009004a0ab7f0515644961f108f7b8a7bac083ccd76dc"
 EXPECTED_METADATA_SHA256 = (
@@ -36,7 +40,15 @@ def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def read_tiff_values(path: Path) -> tuple[int, int, float, list[float]]:
+def web_mercator_to_lon_lat(x: float, y: float) -> tuple[float, float]:
+    longitude = math.degrees(x / 6_378_137)
+    latitude = math.degrees(2 * math.atan(math.exp(y / 6_378_137)) - math.pi / 2)
+    return longitude, latitude
+
+
+def read_tiff_values(
+    path: Path,
+) -> tuple[int, int, float, list[float], dict[str, float]]:
     content = path.read_bytes()
     endian = ">" if content[:2] == b"MM" else "<" if content[:2] == b"II" else None
     if endian is None or struct.unpack(f"{endian}H", content[2:4])[0] != 42:
@@ -88,7 +100,20 @@ def read_tiff_values(path: Path) -> tuple[int, int, float, list[float]]:
     if nodata_type != 2:
         raise ValueError("Expected ASCII GDAL NoData tag")
     nodata = float(nodata_bytes[:nodata_count].rstrip(b"\x00").decode("ascii"))
-    return width, height, nodata, raster_values
+    pixel_scale = tuple(float(value) for value in values(33550))
+    tiepoint = tuple(float(value) for value in values(33922))
+    west_m = tiepoint[3] - tiepoint[0] * pixel_scale[0]
+    north_m = tiepoint[4] + tiepoint[1] * pixel_scale[1]
+    east_m = west_m + width * pixel_scale[0]
+    south_m = north_m - height * pixel_scale[1]
+    west, north = web_mercator_to_lon_lat(west_m, north_m)
+    east, south = web_mercator_to_lon_lat(east_m, south_m)
+    return width, height, nodata, raster_values, {
+        "west": west,
+        "south": south,
+        "east": east,
+        "north": north,
+    }
 
 
 def ndvi_color(value: float | None) -> str:
@@ -155,7 +180,7 @@ def render() -> tuple[str, dict[str, object]]:
         raise ValueError("Cached NDVI GeoTIFF checksum does not match provenance")
     if sha256(SOURCE_METADATA) != EXPECTED_METADATA_SHA256:
         raise ValueError("Cached Sentinel metadata checksum does not match provenance")
-    width, height, nodata, raster = read_tiff_values(SOURCE_TIFF)
+    width, height, nodata, raster, bounds = read_tiff_values(SOURCE_TIFF)
     display_values = [None if value == nodata else value for value in raster]
     valid = [value for value in display_values if value is not None]
     metadata = json.loads(SOURCE_METADATA.read_text(encoding="utf-8"))
@@ -246,6 +271,7 @@ def render() -> tuple[str, dict[str, object]]:
             "mean_ndvi_cached_geotiff": mean,
             "related_statistical_api_mean_ndvi": 0.097354,
         },
+        "bounds_epsg_4326": bounds,
     }
     return report, lineage
 
@@ -254,9 +280,35 @@ def main() -> None:
     report, lineage = render()
     OUTPUT_HTML.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT_HTML.write_text(report, encoding="utf-8")
+    dashboard_layer = {
+        "schema_version": 1,
+        "processor_version": PROCESSOR_VERSION,
+        "source_asset_sha256": EXPECTED_TIFF_SHA256,
+        "source_metadata_sha256": EXPECTED_METADATA_SHA256,
+        "sensor_product": "Sentinel-2 L2A",
+        "acquired_at": "2026-07-29T13:12:39Z",
+        "data_status": "real_provider_response",
+        "spatial_scope_status": "prepared_estimated_aoi",
+        "result_status": "inconclusive",
+        "operational_eligibility": False,
+        "eligible_for_official_reporting": False,
+        "width": lineage["statistics"]["width"],
+        "height": lineage["statistics"]["height"],
+        "bounds_epsg_4326": lineage["bounds_epsg_4326"],
+        "values": [None if value == -9999 else value for value in read_tiff_values(SOURCE_TIFF)[3]],
+    }
+    OUTPUT_DASHBOARD_LAYER.parent.mkdir(parents=True, exist_ok=True)
+    OUTPUT_DASHBOARD_LAYER.write_text(
+        json.dumps(dashboard_layer, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
     lineage["artifact"] = {
         "relative_path": str(OUTPUT_HTML.relative_to(ROOT)),
         "sha256": sha256(OUTPUT_HTML),
+    }
+    lineage["dashboard_layer"] = {
+        "relative_path": str(OUTPUT_DASHBOARD_LAYER.relative_to(ROOT)),
+        "sha256": sha256(OUTPUT_DASHBOARD_LAYER),
     }
     OUTPUT_MANIFEST.write_text(
         json.dumps(lineage, ensure_ascii=False, indent=2) + "\n",
@@ -264,6 +316,7 @@ def main() -> None:
     )
     print(OUTPUT_HTML.relative_to(ROOT))
     print(OUTPUT_MANIFEST.relative_to(ROOT))
+    print(OUTPUT_DASHBOARD_LAYER.relative_to(ROOT))
 
 
 if __name__ == "__main__":

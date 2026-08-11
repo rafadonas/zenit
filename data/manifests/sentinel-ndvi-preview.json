@@ -26,8 +26,18 @@
     "mean_ndvi_cached_geotiff": 0.07995302099734544,
     "related_statistical_api_mean_ndvi": 0.097354
   },
+  "bounds_epsg_4326": {
+    "west": -46.818348331098555,
+    "south": -23.54129614537441,
+    "east": -46.81789266067068,
+    "north": -23.540378237276762
+  },
   "artifact": {
     "relative_path": "docs/previews/sentinel-ndvi-preview.html",
     "sha256": "e201a4015b8a52b510ebef775f00df2064345cb11832c464c25dffccf18a0e7d"
+  },
+  "dashboard_layer": {
+    "relative_path": "apps/dashboard/src/data/cached-ndvi-preview.json",
+    "sha256": "ab4c1668f21d94d533abfa8b19f465957d837c4161860e2600d729e6c6f048ac"
   }
 }

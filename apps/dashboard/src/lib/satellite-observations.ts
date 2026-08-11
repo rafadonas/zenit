@@ -67,6 +67,7 @@ function isObservation(value: unknown): value is SatelliteObservation {
     typeof value.collection === "string" &&
     (value.sensor === "sentinel-2" || value.sensor === "cbers-4a") &&
     typeof value.acquired_at === "string" &&
+    ["discovered", "partially_cached", "cached"].includes(String(value.cache_status)) &&
     typeof value.scene_data_status === "string" &&
     typeof value.zone_data_status === "string" &&
     ["left", "right", "median", "special"].includes(String(value.zone_type)) &&

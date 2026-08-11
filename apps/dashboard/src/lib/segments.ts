@@ -37,6 +37,13 @@ export interface ProjectedSegment {
   properties: SegmentProperties;
 }
 
+export interface ProjectedPosition {
+  x: number;
+  y: number;
+}
+
+export type MapProjection = (position: Position) => ProjectedPosition;
+
 const MAP_WIDTH = 1000;
 const MAP_HEIGHT = 680;
 const MAP_PADDING = 54;
@@ -69,9 +76,9 @@ export function isSegmentCollection(value: unknown): value is SegmentCollection 
   );
 }
 
-export function projectSegments(features: SegmentFeature[]): ProjectedSegment[] {
+export function createMapProjection(features: SegmentFeature[]): MapProjection | null {
   const positions = features.flatMap((feature) => feature.geometry.coordinates);
-  if (positions.length === 0) return [];
+  if (positions.length === 0) return null;
 
   const longitudes = positions.map(([longitude]) => longitude);
   const latitudes = positions.map(([, latitude]) => latitude);
@@ -89,10 +96,18 @@ export function projectSegments(features: SegmentFeature[]): ProjectedSegment[] 
   const offsetX = (MAP_WIDTH - drawnWidth) / 2;
   const offsetY = (MAP_HEIGHT - drawnHeight) / 2;
 
+  return ([longitude, latitude]: Position) => ({
+    x: offsetX + (longitude - minLongitude) * scale,
+    y: MAP_HEIGHT - (offsetY + (latitude - minLatitude) * scale),
+  });
+}
+
+export function projectSegments(features: SegmentFeature[]): ProjectedSegment[] {
+  const project = createMapProjection(features);
+  if (project === null) return [];
   return features.map((feature) => {
     const commands = feature.geometry.coordinates.map(([longitude, latitude], index) => {
-      const x = offsetX + (longitude - minLongitude) * scale;
-      const y = MAP_HEIGHT - (offsetY + (latitude - minLatitude) * scale);
+      const { x, y } = project([longitude, latitude]);
       return `${index === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
     });
     return {

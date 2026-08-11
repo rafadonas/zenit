@@ -42,3 +42,9 @@ def test_cached_ndvi_preview_reads_the_expected_float_grid() -> None:
     assert statistics["minimum_ndvi"] == -0.15737704932689667
     assert statistics["maximum_ndvi"] == 0.28398269414901733
     assert statistics["mean_ndvi_cached_geotiff"] == 0.07995302099734544
+    assert lineage["bounds_epsg_4326"] == {
+        "west": -46.818348331098555,
+        "south": -23.54129614537441,
+        "east": -46.81789266067068,
+        "north": -23.540378237276762,
+    }

@@ -99,6 +99,12 @@ credentials. Its warning states that satellite quality is neither vegetation
 height nor mowing authorization. Results are ordered newest first and the
 bounded `limit` parameter accepts 1 through 100 items.
 
+The dashboard has one checksum-bound visualization for the validated 5 by 11
+NDVI crop. It activates only for the exact persisted artifact and preserves the
+prepared, inconclusive, non-official gates. This is a derived fixed preview,
+not a generic raster-serving API or evidence that a complete scene is cached;
+see `docs/decisions/ADR-0033-checksum-bound-cached-ndvi-dashboard-layer.md`.
+
 ## Reproducible command
 
 The prepared development flow is available as one idempotent command:

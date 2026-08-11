@@ -4,12 +4,18 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 
 import {
+  createMapProjection,
   findSegmentIdByIndex,
   formatDistance,
   projectSegments,
   type SegmentCollection,
   type SegmentProperties,
 } from "../lib/segments";
+import {
+  cachedNdviCells,
+  ndviCellColor,
+  observationSupportsCachedNdviLayer,
+} from "../lib/cached-ndvi-layer";
 import {
   formatAcquisitionDate,
   isSatelliteObservationCollection,
@@ -67,7 +73,15 @@ type ObservationState =
   | { segmentId: string; status: "error" }
   | null;
 
-function SatelliteEvidence({ segmentId }: { segmentId: string | null }) {
+function SatelliteEvidence({
+  ndviVisible,
+  onNdviVisibilityChange,
+  segmentId,
+}: {
+  ndviVisible: boolean;
+  onNdviVisibilityChange: (visible: boolean) => void;
+  segmentId: string | null;
+}) {
   const [state, setState] = useState<ObservationState>(null);
   const [selectedRun, setSelectedRun] = useState<{ segmentId: string; runId: string } | null>(null);
 
@@ -127,7 +141,10 @@ function SatelliteEvidence({ segmentId }: { segmentId: string | null }) {
             <button
               aria-pressed={item.analysis_run_id === observation.analysis_run_id}
               key={item.analysis_run_id}
-              onClick={() => setSelectedRun({ segmentId, runId: item.analysis_run_id })}
+              onClick={() => {
+                setSelectedRun({ segmentId, runId: item.analysis_run_id });
+                onNdviVisibilityChange(false);
+              }}
               type="button"
             >
               <strong>{index === 0 ? "Mais recente" : formatAcquisitionDate(item.acquired_at)}</strong>
@@ -149,6 +166,18 @@ function SatelliteEvidence({ segmentId }: { segmentId: string | null }) {
         <div><dt>Confiança</dt><dd>{observation.confidence_band === "low" ? "Baixa" : observation.confidence_band}</dd></div>
         <div><dt>Recomendação</dt><dd>{observation.recommendation === "inspect" ? "Inspecionar" : observation.recommendation}</dd></div>
       </dl>
+      {observationSupportsCachedNdviLayer(observation) ? (
+        <div className="ndvi-layer-control">
+          <button
+            aria-pressed={ndviVisible}
+            onClick={() => onNdviVisibilityChange(!ndviVisible)}
+            type="button"
+          >
+            {ndviVisible ? "Ocultar recorte NDVI" : "Mostrar recorte NDVI no mapa"}
+          </button>
+          <small>5 × 11 pixels · 10 m · AOI preparada · checksum verificado</small>
+        </div>
+      ) : null}
       <div className="evidence-gates">
         <strong>{observation.requires_human_approval ? "Aprovação humana obrigatória" : "Revisão humana preservada"}</strong>
         <span>Relatório oficial: {observation.eligible_for_official_reporting ? "elegível" : "bloqueado"}</span>
@@ -189,6 +218,25 @@ export function CorridorDashboard({
     initialSelectedId && initialSegmentIndex !== null ? String(initialSegmentIndex) : "",
   );
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [ndviVisible, setNdviVisible] = useState(false);
+  const mapProjection = useMemo(
+    () => createMapProjection(collection.features),
+    [collection.features],
+  );
+  const projectedNdviCells = useMemo(() => {
+    if (mapProjection === null) return [];
+    return cachedNdviCells().map((cell) => {
+      const northWest = mapProjection(cell.northWest);
+      const southEast = mapProjection(cell.southEast);
+      return {
+        ...cell,
+        x: northWest.x,
+        y: northWest.y,
+        width: southEast.x - northWest.x,
+        height: southEast.y - northWest.y,
+      };
+    });
+  }, [mapProjection]);
   const selected = projected.find((segment) => segment.id === selectedId)?.properties ?? null;
   const totalDistance = Math.max(
     0,
@@ -203,6 +251,7 @@ export function CorridorDashboard({
     setSelectedId(segmentId);
     setSegmentSearch(String(segmentIndex));
     setSearchError(null);
+    setNdviVisible(false);
     window.history.replaceState(null, "", `/?segment=${segmentIndex}`);
     if (focus) {
       requestAnimationFrame(() => document.getElementById(`segment-${segmentId}`)?.focus());
@@ -303,6 +352,26 @@ export function CorridorDashboard({
                   </filter>
                 </defs>
                 <rect width="1000" height="680" fill="url(#grid)" />
+                {ndviVisible ? (
+                  <g className="ndvi-raster-layer" aria-label="Recorte NDVI Sentinel-2 preparado e não operacional">
+                    {projectedNdviCells.map((cell) => (
+                      <rect
+                        fill={ndviCellColor(cell.value)}
+                        height={cell.height}
+                        key={`${cell.row}-${cell.column}`}
+                        width={cell.width}
+                        x={cell.x}
+                        y={cell.y}
+                      >
+                        <title>
+                          {cell.value === null
+                            ? `NDVI NoData · linha ${cell.row + 1}, coluna ${cell.column + 1}`
+                            : `NDVI ${cell.value.toFixed(3)} · linha ${cell.row + 1}, coluna ${cell.column + 1}`}
+                        </title>
+                      </rect>
+                    ))}
+                  </g>
+                ) : null}
                 <g className="route-shadow" aria-hidden="true">
                   {projected.map((segment) => <path d={segment.path} key={`shadow-${segment.id}`} />)}
                 </g>
@@ -330,11 +399,27 @@ export function CorridorDashboard({
                   })}
                 </g>
               </svg>
+              {ndviVisible ? (
+                <div className="ndvi-inset" role="img" aria-label="Ampliação dos 55 pixels do recorte NDVI cacheado">
+                  <div><strong>NDVI · ampliação</strong><span>Sentinel-2 · 29/07/2026</span></div>
+                  <div className="ndvi-inset-grid" aria-hidden="true">
+                    {projectedNdviCells.map((cell) => (
+                      <i
+                        key={`inset-${cell.row}-${cell.column}`}
+                        style={{ backgroundColor: ndviCellColor(cell.value) }}
+                        title={cell.value === null ? "NoData" : cell.value.toFixed(3)}
+                      />
+                    ))}
+                  </div>
+                  <small>AOI estimada · não operacional · NDVI não é altura</small>
+                </div>
+              ) : null}
               <div className="north-indicator" aria-hidden="true"><span>N</span><i /></div>
               <div className="map-legend" aria-label="Legenda">
                 <strong>Legenda</strong>
                 <span><i className="legend-line estimated-line" /> Eixo estimado</span>
                 <span><i className="legend-line selected-line" /> Segmento selecionado</span>
+                {ndviVisible ? <span><i className="legend-ndvi" /> NDVI cacheado · preparado</span> : null}
                 <span><i className="legend-lock">×</i> Uso operacional bloqueado</span>
               </div>
             </div>
@@ -348,7 +433,11 @@ export function CorridorDashboard({
         <aside className="side-panel">
           <div className="side-heading"><p className="eyebrow">Inspeção</p><h2>Detalhes do trecho</h2></div>
           <SegmentDetails segment={selected} />
-          <SatelliteEvidence segmentId={selectedId} />
+          <SatelliteEvidence
+            ndviVisible={ndviVisible}
+            onNdviVisibilityChange={setNdviVisible}
+            segmentId={selectedId}
+          />
           <div className="quality-note">
             <span aria-hidden="true">i</span>
             <div><strong>Sobre esta camada</strong><p>Distâncias seguem a linha candidata de 30,85 km. A fonte não contém eixo rodoviário oficial.</p></div>

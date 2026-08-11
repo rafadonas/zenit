@@ -34,6 +34,10 @@ because the axis and buffer are not official and NDVI is not height. No current
 vegetation or mowing result is claimed. A 5 × 11 pixel Process API NDVI crop and
 its contributor metadata are checksummed in ignored processed storage and
 labelled `partially_cached`, not as a complete source scene.
+The corridor dashboard can render that exact 5 × 11 crop as an optional,
+checksum-bound NDVI layer with an enlarged inset. The control appears only for
+the matching persisted prepared observation and never represents height,
+current conditions, or mowing authorization.
 
 Sprint 4 now includes local MVP identity, road-scoped manager/supervisor RBAC,
 an immutable prepared review-policy version, and authenticated append-only
