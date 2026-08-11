@@ -98,7 +98,8 @@ jobs:
                 AND to_regclass('public.prepared_post_inspection_review') IS NOT NULL
                 AND to_regclass('public.prepared_mowing_order') IS NOT NULL
                 AND to_regclass('public.prepared_mowing_resource_plan') IS NOT NULL
-                AND to_regclass('public.prepared_mowing_readiness_assessment') IS NOT NULL;" \
+                AND to_regclass('public.prepared_mowing_readiness_assessment') IS NOT NULL
+                AND to_regclass('public.prepared_mowing_planning_approval') IS NOT NULL;" \
             | grep -qx t
           docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit -Atc \
             "SELECT postgis_typmod_type(a.atttypmod)
@@ -159,6 +160,10 @@ jobs:
             -X POST -H 'Content-Type: application/json' -H 'Idempotency-Key: ci-readiness-check' \
             -d '{"resource_plan_id":"00000000-0000-4000-8000-000000000001","weather_result":"inconclusive","weather_source_reference":"manual","safety_result":"inconclusive","safety_source_reference":"manual","assessment_rationale":"CI authentication boundary"}' \
             http://localhost:8000/v1/prepared-mowing-orders/00000000-0000-4000-8000-000000000001/readiness-assessments)" = 401
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            -X POST -H 'Content-Type: application/json' -H 'Idempotency-Key: ci-planning-approval-check' \
+            -d '{"readiness_assessment_id":"00000000-0000-4000-8000-000000000001","decision":"rejected","decision_rationale":"CI authentication boundary"}' \
+            http://localhost:8000/v1/prepared-mowing-orders/00000000-0000-4000-8000-000000000001/planning-approvals)" = 401
           curl --fail --silent --show-error --output /dev/null http://localhost:3000
           curl --fail --silent --show-error --output /dev/null http://localhost:3000/login
       - name: Show service logs on failure

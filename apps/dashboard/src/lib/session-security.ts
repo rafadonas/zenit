@@ -90,6 +90,15 @@ export interface PreparedMowingReadinessSubmission {
   supersedesAssessmentId?: string;
 }
 
+export interface PreparedMowingPlanningApprovalSubmission {
+  csrfToken: string;
+  idempotencyKey: string;
+  readinessAssessmentId: string;
+  decision: "approved_for_planning" | "changes_requested" | "rejected";
+  decisionRationale: string;
+  supersedesApprovalId?: string;
+}
+
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CSRF_PATTERN = /^[0-9a-f]{64}$/;
 
@@ -402,5 +411,32 @@ export function parsePreparedMowingReadinessSubmission(
     safetyResult: safetyResult as PreparedMowingReadinessSubmission["safetyResult"],
     safetySourceReference, assessmentRationale,
     ...(supersedesAssessmentId ? { supersedesAssessmentId } : {}),
+  };
+}
+
+export function parsePreparedMowingPlanningApprovalSubmission(
+  form: FormData,
+): PreparedMowingPlanningApprovalSubmission | null {
+  const csrfToken = formString(form, "csrf_token");
+  const idempotencyKey = formString(form, "idempotency_key");
+  const readinessAssessmentId = formString(form, "readiness_assessment_id");
+  const decision = formString(form, "decision");
+  const decisionRationale = formString(form, "decision_rationale");
+  const supersedesApprovalId = formString(form, "supersedes_approval_id");
+  if (
+    csrfToken === null || !CSRF_PATTERN.test(csrfToken) ||
+    idempotencyKey === null || !UUID_PATTERN.test(idempotencyKey) ||
+    readinessAssessmentId === null || !UUID_PATTERN.test(readinessAssessmentId) ||
+    !["approved_for_planning", "changes_requested", "rejected"].includes(decision ?? "") ||
+    decisionRationale === null || decisionRationale.length < 1 ||
+    decisionRationale.length > 2000 ||
+    (supersedesApprovalId !== null && supersedesApprovalId !== "" &&
+      !UUID_PATTERN.test(supersedesApprovalId))
+  ) return null;
+  return {
+    csrfToken, idempotencyKey, readinessAssessmentId,
+    decision: decision as PreparedMowingPlanningApprovalSubmission["decision"],
+    decisionRationale,
+    ...(supersedesApprovalId ? { supersedesApprovalId } : {}),
   };
 }

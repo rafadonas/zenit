@@ -1,0 +1,9 @@
+BEGIN;
+DROP TRIGGER IF EXISTS prepared_mowing_planning_approval_immutable ON prepared_mowing_planning_approval;
+DROP TRIGGER IF EXISTS prepared_mowing_planning_approval_policy_immutable ON prepared_mowing_planning_approval_policy;
+DROP FUNCTION IF EXISTS prevent_prepared_mowing_planning_approval_mutation();
+DROP TRIGGER IF EXISTS prepared_mowing_planning_approval_guard ON prepared_mowing_planning_approval;
+DROP FUNCTION IF EXISTS validate_prepared_mowing_planning_approval();
+DROP TABLE IF EXISTS prepared_mowing_planning_approval;
+DROP TABLE IF EXISTS prepared_mowing_planning_approval_policy;
+COMMIT;

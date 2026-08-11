@@ -8,6 +8,7 @@ import {
   parsePreparedMowingOrderSubmission,
   parsePreparedMowingResourcePlanSubmission,
   parsePreparedMowingReadinessSubmission,
+  parsePreparedMowingPlanningApprovalSubmission,
   parsePhotoReviewSubmission,
   parsePreparedProposalSubmission,
   parsePreparedProposalReviewSubmission,
@@ -232,5 +233,21 @@ describe("dashboard session security", () => {
     });
     form.set("weather_source_reference", " ");
     expect(parsePreparedMowingReadinessSubmission(form)).toBeNull();
+  });
+
+  it("allowlists only planning approval fields", () => {
+    const form = new FormData();
+    form.set("csrf_token", csrfToken);
+    form.set("idempotency_key", "10000000-0000-4000-8000-000000000001");
+    form.set("readiness_assessment_id", "20000000-0000-4000-8000-000000000001");
+    form.set("decision", "approved_for_planning");
+    form.set("decision_rationale", "Aprovar apenas o cenário preparado");
+    form.set("operational_approval_satisfied", "true");
+    expect(parsePreparedMowingPlanningApprovalSubmission(form)).toMatchObject({
+      decision: "approved_for_planning",
+      decisionRationale: "Aprovar apenas o cenário preparado",
+    });
+    form.set("decision", "approved_for_execution");
+    expect(parsePreparedMowingPlanningApprovalSubmission(form)).toBeNull();
   });
 });

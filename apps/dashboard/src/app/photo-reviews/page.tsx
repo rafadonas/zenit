@@ -22,7 +22,7 @@ interface PageProps {
   searchParams: Promise<{
     review?: string; summary?: string; export?: string; proposal?: string;
     proposal_review?: string; mowing_order?: string; resource_plan?: string;
-    readiness?: string;
+    readiness?: string; planning_approval?: string;
   }>;
 }
 
@@ -75,8 +75,14 @@ async function loadProposals(): Promise<PreparedProposalCollection | null> {
 function message(
   review?: string, summary?: string, exportStatus?: string, proposal?: string,
   proposalReview?: string, mowingOrder?: string, resourcePlan?: string,
-  readiness?: string,
+  readiness?: string, planningApproval?: string,
 ): string | null {
+  if (planningApproval === "recorded") return "Decisão sobre o planejamento registrada; aprovação operacional continua não satisfeita.";
+  if (planningApproval === "forbidden") return "Seu usuário não pode decidir este planejamento.";
+  if (planningApproval === "missing") return "A ordem de roçada preparada não foi encontrada.";
+  if (planningApproval === "conflict") return "A avaliação mudou, não permite aprovação ou a correção entrou em conflito.";
+  if (planningApproval === "invalid") return "Informe uma decisão e justificativa válidas.";
+  if (planningApproval === "service-unavailable") return "O serviço de decisão não está disponível agora.";
   if (readiness === "recorded") return "Avaliação manual de clima e segurança registrada; validação operacional continua pendente.";
   if (readiness === "forbidden") return "Seu usuário não pode avaliar esta ordem.";
   if (readiness === "missing") return "A ordem de roçada preparada não foi encontrada.";
@@ -142,7 +148,7 @@ export default async function PhotoReviewsPage({ searchParams }: PageProps) {
   ]);
   const operationMessage = message(
     query.review, query.summary, query.export, query.proposal, query.proposal_review,
-    query.mowing_order, query.resource_plan, query.readiness,
+    query.mowing_order, query.resource_plan, query.readiness, query.planning_approval,
   );
   const summaryByOrder = new Map<string, PreparedInspectionSummary>(
     summaries?.items.map((summary) => [summary.work_order_id, summary]) ?? [],
@@ -232,6 +238,15 @@ export default async function PhotoReviewsPage({ searchParams }: PageProps) {
                       <label htmlFor={`readiness-rationale-${proposal.proposal_id}`}>Justificativa da avaliação</label><textarea defaultValue="Registrar avaliação manual preparada sem liberar execução" id={`readiness-rationale-${proposal.proposal_id}`} maxLength={2000} name="assessment_rationale" required rows={2} />
                       <button className="secondary-button" type="submit">{proposal.latest_readiness_assessment_id ? "Corrigir avaliação" : "Registrar avaliação manual"}</button><small>Resultados são declarações preparadas pendentes de validação e nunca substituem aprovação operacional.</small>
                     </form>
+                    {proposal.latest_readiness_assessment_id ? <>
+                      {proposal.latest_planning_approval_id ? <div className="post-inspection-proposal"><div><strong>Decisão de planejamento: {proposal.latest_planning_decision}</strong><span>{proposal.latest_planning_decision_rationale}</span></div><span className="status-pill review">Somente planejamento</span><small>Aprovação operacional não satisfeita; regra de aprovação dupla ainda depende de política oficial.</small></div> : null}
+                      <form action={`/api/prepared-mowing-orders/${proposal.prepared_mowing_order_id}/planning-approvals`} className="prepared-summary-form" method="post">
+                        <input name="csrf_token" type="hidden" value={session.csrfToken} /><input name="idempotency_key" type="hidden" value={randomUUID()} /><input name="readiness_assessment_id" type="hidden" value={proposal.latest_readiness_assessment_id} />{proposal.latest_planning_approval_id ? <input name="supersedes_approval_id" type="hidden" value={proposal.latest_planning_approval_id} /> : null}
+                        <label htmlFor={`planning-decision-${proposal.proposal_id}`}>Decisão segregada</label><select defaultValue={proposal.latest_weather_result === "clear" && proposal.latest_safety_result === "clear" ? "approved_for_planning" : "changes_requested"} id={`planning-decision-${proposal.proposal_id}`} name="decision"><option disabled={proposal.latest_weather_result !== "clear" || proposal.latest_safety_result !== "clear"} value="approved_for_planning">Aprovar somente para planejamento</option><option value="changes_requested">Solicitar alterações</option><option value="rejected">Rejeitar planejamento</option></select>
+                        <label htmlFor={`planning-decision-rationale-${proposal.proposal_id}`}>Justificativa da decisão</label><textarea defaultValue="Registrar decisão sobre o cenário preparado sem autorizar execução" id={`planning-decision-rationale-${proposal.proposal_id}`} maxLength={2000} name="decision_rationale" required rows={2} />
+                        <button className="secondary-button" type="submit">{proposal.latest_planning_approval_id ? "Corrigir decisão de planejamento" : "Registrar decisão de planejamento"}</button><small>Mesmo aprovada, a ordem permanece simulada, não executável e sujeita à política oficial de aprovação.</small>
+                      </form>
+                    </> : null}
                   </> : null}
                 </> : effectiveProposalRecommendation === "mowing_review" && proposal.latest_review_id ? <form action="/api/prepared-mowing-orders" className="prepared-summary-form" method="post">
                   <input name="csrf_token" type="hidden" value={session.csrfToken} /><input name="idempotency_key" type="hidden" value={randomUUID()} /><input name="source_review_id" type="hidden" value={proposal.latest_review_id} />

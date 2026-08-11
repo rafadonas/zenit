@@ -150,8 +150,8 @@ credentials.
 ## Database migrations and ingestion
 
 Apply migrations in numeric order before importing sources. The current local
-development database must have migrations `0001` through `0026` applied. On the first
-startup of a new Compose volume, Postgres applies these twenty-six up migrations in
+development database must have migrations `0001` through `0027` applied. On the first
+startup of a new Compose volume, Postgres applies these twenty-seven up migrations in
 order through `/docker-entrypoint-initdb.d`; existing volumes are never modified
 by that initialization mechanism. The explicit commands below remain useful
 for non-Compose environments and controlled upgrades of existing databases.
@@ -209,6 +209,8 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0025_prepared_mowing_resource_plan.sql
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0026_prepared_mowing_readiness_assessment.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
+  < infra/migrations/0027_prepared_mowing_planning_approval.sql
 ```
 
 Migration `0008` starts the Sprint 4 management foundation with immutable,
@@ -317,6 +319,12 @@ Migration `0026` adds append-only manual weather and safety assessments tied to
 the effective candidate resource plan. Declared sources are mandatory and all
 results remain prepared, pending validation, and non-authorizing. See
 `docs/decisions/ADR-0028-prepared-mowing-readiness-assessment.md`.
+
+Migration `0027` adds a segregated planning-decision chain. A positive decision
+requires prepared `clear` weather and safety results but never satisfies
+operational approval or authorizes execution. Dual-approval rules remain
+pending official policy validation. See
+`docs/decisions/ADR-0029-prepared-mowing-planning-approval.md`.
 
 The public, read-only management queue is available at:
 
@@ -615,6 +623,21 @@ Content-Type: application/json
 
 Even two `clear` results are manual prepared statements only. They do not
 authorize work, schedule a crew, or make the order field-executable.
+
+Record or correct the segregated planning decision:
+
+```text
+POST /v1/prepared-mowing-orders/{mowing_order_id}/planning-approvals
+Authorization: Bearer <access-token>
+Idempotency-Key: <client-generated-stable-key>
+Content-Type: application/json
+
+{"readiness_assessment_id":"<effective-assessment-uuid>","decision":"approved_for_planning","decision_rationale":"Approve only the prepared planning scenario"}
+```
+
+`approved_for_planning` is not an operational approval. The response fixes
+`operational_approval_satisfied=false`, `authorizes_field_work=false`, and
+`eligible_for_field_execution=false`.
 
 Use `zenit-import` for one immutable raw file at a time. Full examples are in
 `docs/architecture/source-ingestion.md`.

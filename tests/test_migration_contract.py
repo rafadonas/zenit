@@ -47,6 +47,9 @@ PREPARED_MOWING_RESOURCE_PLAN_MIGRATION = Path(
 PREPARED_MOWING_READINESS_MIGRATION = Path(
     "infra/migrations/0026_prepared_mowing_readiness_assessment.sql"
 )
+PREPARED_MOWING_PLANNING_APPROVAL_MIGRATION = Path(
+    "infra/migrations/0027_prepared_mowing_planning_approval.sql"
+)
 
 
 class MigrationContractTests(unittest.TestCase):
@@ -149,7 +152,7 @@ class MigrationContractTests(unittest.TestCase):
         mounts = [
             line.strip() for line in compose.splitlines() if "/docker-entrypoint-initdb.d/" in line
         ]
-        self.assertEqual(len(mounts), 26)
+        self.assertEqual(len(mounts), 27)
         for version, mount in enumerate(mounts, start=1):
             prefix = f"{version:04d}"
             self.assertIn(f"infra/migrations/{prefix}_", mount)
@@ -370,6 +373,18 @@ class MigrationContractTests(unittest.TestCase):
         self.assertIn("requires the effective resource plan", sql)
         self.assertIn("CHECK (NOT authorizes_field_work)", sql)
         self.assertIn("prepared_mowing_readiness_immutable", sql)
+
+    def test_mowing_planning_approval_never_promotes_operational_execution(self) -> None:
+        sql = PREPARED_MOWING_PLANNING_APPROVAL_MIGRATION.read_text(encoding="utf-8")
+        self.assertIn("prepared-mowing-planning-approval-v1", sql)
+        self.assertIn("approved_for_planning", sql)
+        self.assertIn("planning_only_no_execution_authorization", sql)
+        self.assertIn("pending_official_policy_validation", sql)
+        self.assertIn("planning approval requires clear prepared weather", sql)
+        self.assertIn("requires the effective readiness assessment", sql)
+        self.assertIn("CHECK (NOT operational_approval_satisfied)", sql)
+        self.assertIn("CHECK (NOT authorizes_field_work)", sql)
+        self.assertIn("prepared_mowing_planning_approval_immutable", sql)
 
 
 if __name__ == "__main__":

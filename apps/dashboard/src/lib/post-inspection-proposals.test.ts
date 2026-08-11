@@ -27,6 +27,10 @@ const value = {
     latest_weather_source_reference: null, latest_safety_result: null,
     latest_safety_source_reference: null, latest_readiness_rationale: null,
     latest_readiness_assessed_at: null,
+    planning_approval_count: 0, latest_planning_approval_id: null,
+    latest_planning_approval_readiness_id: null, latest_planning_decision: null,
+    latest_planning_decision_rationale: null, latest_planning_decided_at: null,
+    operational_approval_satisfied: false,
   }], result_count: 1, limit: 50, truncated: false,
   warning: "Requires human review and never authorizes mowing.",
 };

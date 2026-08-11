@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     prepared_mowing_order_policy_version: str = "prepared-mowing-order-v1"
     prepared_mowing_resource_policy_version: str = "prepared-mowing-resource-plan-v1"
     prepared_mowing_readiness_policy_version: str = "prepared-mowing-readiness-v1"
+    prepared_mowing_approval_policy_version: str = "prepared-mowing-planning-approval-v1"
     object_storage_endpoint: str = "http://minio:9000"
     object_storage_access_key: str = "zenit"
     object_storage_secret_key: SecretStr = SecretStr("change_me")

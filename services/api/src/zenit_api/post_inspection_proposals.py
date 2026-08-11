@@ -79,6 +79,15 @@ class PreparedProposalResponse(BaseModel):
     latest_safety_source_reference: str | None = None
     latest_readiness_rationale: str | None = None
     latest_readiness_assessed_at: datetime | None = None
+    planning_approval_count: int = Field(default=0, ge=0)
+    latest_planning_approval_id: UUID | None = None
+    latest_planning_approval_readiness_id: UUID | None = None
+    latest_planning_decision: Literal[
+        "approved_for_planning", "changes_requested", "rejected"
+    ] | None = None
+    latest_planning_decision_rationale: str | None = None
+    latest_planning_decided_at: datetime | None = None
+    operational_approval_satisfied: Literal[False] = False
 
     @model_validator(mode="after")
     def validate_review_state(self) -> PreparedProposalResponse:
@@ -141,6 +150,22 @@ class PreparedProposalResponse(BaseModel):
             or self.latest_readiness_resource_plan_id != self.latest_resource_plan_id
         ):
             raise ValueError("readiness assessment requires the effective resource plan")
+        approval_metadata = (
+            self.latest_planning_approval_id,
+            self.latest_planning_approval_readiness_id,
+            self.latest_planning_decision,
+            self.latest_planning_decision_rationale,
+            self.latest_planning_decided_at,
+        )
+        if self.planning_approval_count == 0:
+            if any(value is not None for value in approval_metadata):
+                raise ValueError("undecided planning state cannot expose approval metadata")
+        elif (
+            any(value is None for value in approval_metadata)
+            or self.latest_planning_approval_readiness_id
+            != self.latest_readiness_assessment_id
+        ):
+            raise ValueError("planning approval requires the effective readiness assessment")
         return self
 
 
@@ -514,7 +539,10 @@ class PostgresPreparedProposalRepository:
                    latest_readiness.resource_plan_id, latest_readiness.weather_result,
                    latest_readiness.weather_source_reference, latest_readiness.safety_result,
                    latest_readiness.safety_source_reference,
-                   latest_readiness.assessment_rationale, latest_readiness.assessed_at
+                   latest_readiness.assessment_rationale, latest_readiness.assessed_at,
+                   COALESCE(approval_total.approval_count, 0), latest_approval.id,
+                   latest_approval.readiness_assessment_id, latest_approval.decision,
+                   latest_approval.decision_rationale, latest_approval.decided_at
             FROM prepared_post_inspection_proposal proposal
             JOIN prepared_post_inspection_policy policy ON policy.id = proposal.policy_id
             JOIN prepared_inspection_summary summary ON summary.id = proposal.summary_id
@@ -571,6 +599,22 @@ class PostgresPreparedProposalRepository:
                       WHERE newer.supersedes_assessment_id = assessment.id)
                 ORDER BY assessment.assessed_at DESC LIMIT 1
             ) latest_readiness ON true
+            LEFT JOIN LATERAL (
+                SELECT count(*) AS approval_count
+                FROM prepared_mowing_planning_approval approval
+                WHERE approval.readiness_assessment_id = latest_readiness.id
+            ) approval_total ON true
+            LEFT JOIN LATERAL (
+                SELECT approval.id, approval.readiness_assessment_id,
+                       approval.decision, approval.decision_rationale,
+                       approval.decided_at
+                FROM prepared_mowing_planning_approval approval
+                WHERE approval.readiness_assessment_id = latest_readiness.id
+                  AND NOT EXISTS (
+                      SELECT 1 FROM prepared_mowing_planning_approval newer
+                      WHERE newer.supersedes_approval_id = approval.id)
+                ORDER BY approval.decided_at DESC LIMIT 1
+            ) latest_approval ON true
             WHERE proposal.location_status = 'simulated' AND proposal.data_status = 'prepared'
               AND NOT proposal.eligible_for_official_reporting
               AND NOT proposal.authorizes_field_work AND {where_clause}"""
@@ -601,6 +645,10 @@ class PostgresPreparedProposalRepository:
             latest_weather_source_reference=row[30], latest_safety_result=row[31],
             latest_safety_source_reference=row[32], latest_readiness_rationale=row[33],
             latest_readiness_assessed_at=row[34],
+            planning_approval_count=row[35], latest_planning_approval_id=row[36],
+            latest_planning_approval_readiness_id=row[37],
+            latest_planning_decision=row[38],
+            latest_planning_decision_rationale=row[39], latest_planning_decided_at=row[40],
         )
 
 

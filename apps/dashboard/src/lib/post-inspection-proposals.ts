@@ -43,6 +43,13 @@ export interface PreparedPostInspectionProposal {
   latest_safety_source_reference: string | null;
   latest_readiness_rationale: string | null;
   latest_readiness_assessed_at: string | null;
+  planning_approval_count: number;
+  latest_planning_approval_id: string | null;
+  latest_planning_approval_readiness_id: string | null;
+  latest_planning_decision: "approved_for_planning" | "changes_requested" | "rejected" | null;
+  latest_planning_decision_rationale: string | null;
+  latest_planning_decided_at: string | null;
+  operational_approval_satisfied: false;
 }
 
 export interface PreparedProposalCollection {
@@ -112,11 +119,24 @@ function isProposal(value: unknown): value is PreparedPostInspectionProposal {
       value.latest_readiness_resource_plan_id === value.latest_resource_plan_id &&
       ["clear", "blocked", "inconclusive"].includes(String(value.latest_weather_result)) &&
       ["clear", "blocked", "inconclusive"].includes(String(value.latest_safety_result));
+  const approvalMetadata = [value.latest_planning_approval_id,
+    value.latest_planning_approval_readiness_id, value.latest_planning_decision_rationale,
+    value.latest_planning_decided_at];
+  const approvalConsistent = value.planning_approval_count === 0
+    ? approvalMetadata.every((item) => item === null) && value.latest_planning_decision === null
+    : typeof value.planning_approval_count === "number" && value.planning_approval_count > 0 &&
+      approvalMetadata.every((item) => typeof item === "string") &&
+      value.latest_planning_approval_readiness_id === value.latest_readiness_assessment_id &&
+      ["approved_for_planning", "changes_requested", "rejected"].includes(
+        String(value.latest_planning_decision),
+      );
   return [10, 30].includes(threshold) && value.threshold_exceeded === exceeded &&
     typeof value.review_count === "number" && Number.isInteger(value.review_count) &&
     reviewConsistent && mowingOrderConsistent && resourcePlanConsistent && readinessConsistent &&
+    approvalConsistent && value.operational_approval_satisfied === false &&
     Number.isInteger(value.resource_plan_count) &&
     Number.isInteger(value.readiness_assessment_count) &&
+    Number.isInteger(value.planning_approval_count) &&
     value.recommendation === (exceeded ? "mowing_review" : "monitor") &&
     typeof value.proposal_id === "string" &&
     typeof value.summary_id === "string" && typeof value.work_order_id === "string" &&
