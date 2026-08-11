@@ -5,6 +5,11 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { loadDashboardSession } from "../../lib/dashboard-session";
+import {
+  isPreparedMowingRehearsalCollection,
+  type MowingRehearsalState,
+  type PreparedMowingRehearsalCollection,
+} from "../../lib/mowing-rehearsals";
 import { isPhotoReviewQueue, type PhotoReviewQueue } from "../../lib/photo-reviews";
 import {
   isPreparedProposalCollection, type PreparedPostInspectionProposal,
@@ -68,6 +73,22 @@ async function loadProposals(): Promise<PreparedProposalCollection | null> {
   const payload: unknown = await response.json();
   if (!isPreparedProposalCollection(payload)) {
     throw new Error("Prepared proposal safety contract is invalid");
+  }
+  return payload;
+}
+
+async function loadMowingRehearsals(): Promise<PreparedMowingRehearsalCollection | null> {
+  const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
+  if (!token) return null;
+  const baseUrl = process.env.INTERNAL_API_URL ?? "http://localhost:8000";
+  const response = await fetch(`${baseUrl}/v1/prepared-mowing-rehearsals?limit=50`, {
+    cache: "no-store", headers: { Authorization: `Bearer ${token}` },
+  });
+  if (response.status === 401) return null;
+  if (!response.ok) throw new Error(`Prepared mowing rehearsal list returned HTTP ${response.status}`);
+  const payload: unknown = await response.json();
+  if (!isPreparedMowingRehearsalCollection(payload)) {
+    throw new Error("Prepared mowing rehearsal safety contract is invalid");
   }
   return payload;
 }
@@ -142,9 +163,43 @@ function formatHeight(value: string | number): string {
   return Number(value).toLocaleString("pt-BR", { maximumFractionDigits: 4 });
 }
 
+function rehearsalStateLabel(state: MowingRehearsalState): string {
+  return {
+    not_started: "Não iniciado",
+    confirmed: "Confirmado",
+    in_progress: "Em andamento",
+    paused: "Pausado",
+    finished: "Ensaio finalizado",
+  }[state];
+}
+
+function rehearsalOperationLabel(operation: string): string {
+  return {
+    confirm: "Confirmação",
+    start: "Início simulado",
+    pause: "Pausa",
+    resume: "Retomada",
+    finish: "Encerramento do ensaio",
+  }[operation] ?? operation;
+}
+
+function formatRehearsalTime(value: string): string {
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short", timeStyle: "medium", timeZone: "America/Sao_Paulo",
+  }).format(new Date(value));
+}
+
+function formatRecordedSpan(seconds: number | null): string {
+  if (seconds === null) return "—";
+  const minutes = Math.floor(seconds / 60);
+  const remainder = Math.round(seconds % 60);
+  return minutes === 0 ? `${remainder}s` : `${minutes}min ${remainder}s`;
+}
+
 export default async function PhotoReviewsPage({ searchParams }: PageProps) {
-  const [session, queue, summaries, proposals, query] = await Promise.all([
-    loadDashboardSession(), loadQueue(), loadSummaries(), loadProposals(), searchParams,
+  const [session, queue, summaries, proposals, rehearsals, query] = await Promise.all([
+    loadDashboardSession(), loadQueue(), loadSummaries(), loadProposals(),
+    loadMowingRehearsals(), searchParams,
   ]);
   const operationMessage = message(
     query.review, query.summary, query.export, query.proposal, query.proposal_review,
@@ -156,6 +211,9 @@ export default async function PhotoReviewsPage({ searchParams }: PageProps) {
   const orderGroups = new Map<string, PhotoReviewQueue["items"]>();
   const proposalBySummary = new Map<string, PreparedPostInspectionProposal>(
     proposals?.items.map((proposal) => [proposal.summary_id, proposal]) ?? [],
+  );
+  const rehearsalByMowingOrder = new Map(
+    rehearsals?.items.map((rehearsal) => [rehearsal.mowing_order_id, rehearsal]) ?? [],
   );
   for (const item of queue?.items ?? []) {
     const group = orderGroups.get(item.work_order_id) ?? [];
@@ -190,6 +248,8 @@ export default async function PhotoReviewsPage({ searchParams }: PageProps) {
           const effectiveProposalRecommendation = proposal?.latest_review_decision === "adjusted"
             ? proposal.latest_adjusted_recommendation
             : proposal?.latest_review_decision === "accepted" ? proposal.recommendation : null;
+          const rehearsal = proposal?.prepared_mowing_order_id
+            ? rehearsalByMowingOrder.get(proposal.prepared_mowing_order_id) : undefined;
           return <article className="prepared-summary-card" key={workOrderId}>
             <div className="prepared-summary-heading"><div><p className="eyebrow">{first.road_code} · trecho #{first.segment_index} · {first.zone_type}</p><h2>Retorno dos três pontos</h2></div><span className={`status-pill ${summary ? "review" : "prepared"}`}>{summary ? "Resumo gerado" : `${acceptedCount}/3 aceitos`}</span></div>
             {summary ? <>
@@ -220,6 +280,12 @@ export default async function PhotoReviewsPage({ searchParams }: PageProps) {
                     <div><strong>Ordem de roçada preparada</strong><span>ID {proposal.prepared_mowing_order_id}</span>{proposal.latest_resource_plan_id ? <span>Recursos candidatos: {proposal.latest_team_reference} · {proposal.latest_equipment_reference}</span> : null}</div><span className="status-pill prepared">Não executável</span>
                     <small>Equipe e equipamento continuam não atribuídos; as referências são placeholders pendentes de validação. Clima e segurança seguem pendentes.</small>
                   </div>
+                  {rehearsal ? <div className="mowing-rehearsal-history">
+                    <div className="rehearsal-history-heading"><div><strong>Histórico do ensaio de roçada</strong><span>Sequência append-only sincronizada pelo app</span></div><span className="status-pill simulated">{rehearsalStateLabel(rehearsal.rehearsal_state)}</span></div>
+                    <dl className="rehearsal-metrics"><div><dt>Eventos</dt><dd>{rehearsal.event_count}</dd></div><div><dt>Pausas</dt><dd>{rehearsal.pause_count}</dd></div><div><dt>Intervalo registrado</dt><dd>{formatRecordedSpan(rehearsal.recorded_span_seconds)}</dd></div></dl>
+                    {rehearsal.events.length > 0 ? <ol className="rehearsal-timeline">{rehearsal.events.map((event) => <li key={event.event_id}><i aria-hidden="true" /><div><strong>{rehearsalOperationLabel(event.operation)}</strong><time dateTime={event.client_occurred_at}>{formatRehearsalTime(event.client_occurred_at)}</time></div><span>{event.location_status === "simulated" ? "Local preparado" : "Sem localização"}</span></li>)}</ol> : <p className="rehearsal-empty">Nenhum evento de ensaio sincronizado.</p>}
+                    <small>Estado simulado e não operacional. “Ensaio finalizado” não comprova roçada, altura pós-serviço ou conclusão oficial.</small>
+                  </div> : null}
                   <form action={`/api/prepared-mowing-orders/${proposal.prepared_mowing_order_id}/resource-plans`} className="prepared-summary-form" method="post">
                     <input name="csrf_token" type="hidden" value={session.csrfToken} /><input name="idempotency_key" type="hidden" value={randomUUID()} />{proposal.latest_resource_plan_id ? <input name="supersedes_plan_id" type="hidden" value={proposal.latest_resource_plan_id} /> : null}
                     <label htmlFor={`team-reference-${proposal.proposal_id}`}>Referência candidata de equipe</label><input defaultValue={proposal.latest_team_reference ?? "Equipe candidata — validar externamente"} id={`team-reference-${proposal.proposal_id}`} maxLength={200} name="team_reference" required />

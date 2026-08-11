@@ -270,6 +270,23 @@ h1 { margin-bottom: 8px; font: 600 clamp(2.1rem, 4vw, 3.2rem)/1 Georgia, serif; 
 .post-inspection-proposal strong { color: #694719; font-size: .76rem; }
 .post-inspection-proposal span, .post-inspection-proposal small { color: #73552a; font-size: .63rem; }
 .post-inspection-proposal small { grid-column: 1 / -1; }
+.mowing-rehearsal-history { display: grid; gap: 11px; padding: 14px; border: 1px solid rgb(77 94 128 / 22%); border-radius: 9px; background: #f4f5fa; }
+.rehearsal-history-heading { display: flex; justify-content: space-between; gap: 12px; align-items: start; }
+.rehearsal-history-heading > div { display: grid; gap: 3px; }
+.rehearsal-history-heading strong { font-size: .76rem; }
+.rehearsal-history-heading span, .mowing-rehearsal-history > small { color: var(--muted); font-size: .6rem; line-height: 1.45; }
+.status-pill.simulated { color: #4d3d78; background: #e9e4f7; }
+.rehearsal-metrics { display: grid; grid-template-columns: repeat(3, 1fr); margin: 0; overflow: hidden; border: 1px solid rgb(77 94 128 / 18%); border-radius: 7px; background: white; }
+.rehearsal-metrics div { padding: 8px; border-right: 1px solid rgb(77 94 128 / 14%); }
+.rehearsal-metrics div:last-child { border-right: 0; }
+.rehearsal-metrics dt { color: var(--muted); font-size: .55rem; text-transform: uppercase; letter-spacing: .04em; }
+.rehearsal-metrics dd { margin: 3px 0 0; font-size: .7rem; font-weight: 750; }
+.rehearsal-timeline { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.rehearsal-timeline li { display: grid; grid-template-columns: 9px 1fr auto; gap: 8px; align-items: center; }
+.rehearsal-timeline i { width: 7px; height: 7px; border-radius: 50%; background: #6d5b9d; }
+.rehearsal-timeline div { display: grid; gap: 1px; }
+.rehearsal-timeline strong { font-size: .64rem; }
+.rehearsal-timeline time, .rehearsal-timeline li > span, .rehearsal-empty { color: var(--muted); font-size: .56rem; }
 .proposal-review-form { margin-top: 10px; border-color: #dfb875; background: #fffaf0; }
 .login-shell { min-height: 100vh; display: grid; place-items: center; padding: 30px; }
 .login-card { width: min(460px, 100%); padding: 34px; border: 1px solid var(--line); border-radius: 18px; background: var(--card); box-shadow: var(--shadow); }

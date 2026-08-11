@@ -148,6 +148,11 @@ until a persistent accepted/rejected/conflict result arrives. The API has an
 append-only, idempotent prepared-sync foundation with authenticated device
 binding, persistent acknowledgements, rejected-event evidence, and conflict
 preservation.
+Managers can now inspect an authenticated, road-scoped read projection of each
+simulated mowing rehearsal in the dashboard. The timeline revalidates event
+ordering, timestamps, and every execution block, and labels a terminal event
+only as `rehearsal_only_no_field_completion_claim`; it is not post-service
+evidence or real mowing completion.
 
 CI repeats this validation from an empty Compose volume after the Python,
 dashboard, and Flutter jobs pass. The Flutter job checks formatting, analysis,
@@ -352,6 +357,19 @@ approval. Eligible snapshots can drive only the encrypted simulated rehearsal
 described in ADR-0031, with persistent UUIDs and idempotent sync. See
 `docs/decisions/ADR-0030-read-only-prepared-mowing-mobile.md` and
 `docs/decisions/ADR-0032-mobile-prepared-mowing-demo-orchestration.md`.
+
+The authenticated management projection for synchronized rehearsals is
+available at:
+
+```text
+GET /v1/prepared-mowing-rehearsals?limit=50
+```
+
+It returns only actor-accessible, non-operational prepared orders and derives
+the rehearsal state and timeline from immutable events. It excludes actor,
+device, and coordinate details and never claims field execution, post-service
+height, or official completion. See
+`docs/decisions/ADR-0034-read-only-prepared-mowing-rehearsal-history.md`.
 
 The public, read-only management queue is available at:
 
