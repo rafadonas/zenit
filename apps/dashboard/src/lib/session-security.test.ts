@@ -6,6 +6,7 @@ import {
   parseDecisionSubmission,
   parsePreparedInspectionOrderSubmission,
   parsePhotoReviewSubmission,
+  parsePreparedSummarySubmission,
   requestOriginMatches,
 } from "./session-security";
 
@@ -108,5 +109,21 @@ describe("dashboard session security", () => {
       rulerStatus: "not_visible",
       rationale: "Régua ausente",
     });
+  });
+
+  it("allowlists a prepared summary rationale without status promotion fields", () => {
+    const form = new FormData();
+    form.set("csrf_token", csrfToken);
+    form.set("idempotency_key", "10000000-0000-4000-8000-000000000001");
+    form.set("generation_rationale", "Consolidar retorno preparado");
+    form.set("eligible_for_official_reporting", "true");
+
+    expect(parsePreparedSummarySubmission(form)).toEqual({
+      csrfToken,
+      idempotencyKey: "10000000-0000-4000-8000-000000000001",
+      generationRationale: "Consolidar retorno preparado",
+    });
+    form.set("generation_rationale", " ");
+    expect(parsePreparedSummarySubmission(form)).toBeNull();
   });
 });

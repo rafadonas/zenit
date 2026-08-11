@@ -229,6 +229,23 @@ h1 { margin-bottom: 8px; font: 600 clamp(2.1rem, 4vw, 3.2rem)/1 Georgia, serif; 
 .photo-meta { color: var(--muted); font-size: .68rem; }
 .latest-photo-review { display: grid; gap: 4px; padding: 12px; border-radius: 8px; color: #496058; background: #edf3ee; font-size: .68rem; }
 .latest-photo-review p { margin: 4px 0 0; }
+.prepared-summary-grid { width: min(1120px, 92vw); margin: 16px auto 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+.prepared-summary-card { padding: 20px; border: 1px solid #d7c79d; border-radius: 14px; background: #fffdf7; box-shadow: var(--shadow); }
+.prepared-summary-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.prepared-summary-heading h2 { margin-top: 3px; font-size: 1.15rem; }
+.summary-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; margin-top: 16px; overflow: hidden; border: 1px solid #d9ddcf; border-radius: 9px; background: #d9ddcf; }
+.summary-metrics div { display: grid; gap: 3px; padding: 12px 8px; text-align: center; background: white; }
+.summary-metrics strong { color: var(--green-dark); font-size: .82rem; }
+.summary-metrics span { color: var(--muted); font-size: .6rem; text-transform: uppercase; }
+.summary-classes { display: flex; gap: 7px; margin-top: 10px; }
+.summary-classes span { padding: 5px 8px; border-radius: 6px; color: #436257; background: #e9f0ea; font-size: .66rem; font-weight: 750; }
+.summary-rationale { margin: 12px 0 5px; color: #52635c; font-size: .7rem; }
+.prepared-summary-card > small, .prepared-summary-form small { color: #73552a; font-size: .62rem; }
+.prepared-summary-form { display: grid; gap: 7px; margin-top: 15px; }
+.prepared-summary-form label { color: #66512f; font-size: .65rem; font-weight: 750; }
+.prepared-summary-form textarea { padding: 9px; border: 1px solid #d1c18e; border-radius: 7px; resize: vertical; color: var(--ink); background: white; }
+.prepared-summary-form button { justify-self: start; margin-top: 3px; }
+.summary-pending { display: grid; gap: 4px; margin-top: 15px; padding: 12px; border-radius: 8px; color: #69522d; background: #faf1d7; font-size: .68rem; }
 .login-shell { min-height: 100vh; display: grid; place-items: center; padding: 30px; }
 .login-card { width: min(460px, 100%); padding: 34px; border: 1px solid var(--line); border-radius: 18px; background: var(--card); box-shadow: var(--shadow); }
 .login-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 30px; color: var(--green-dark); }

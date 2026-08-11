@@ -54,6 +54,17 @@ class PreparedSummaryResponse(BaseModel):
     generated_at: datetime
 
 
+class PreparedSummaryCollection(BaseModel):
+    items: list[PreparedSummaryResponse]
+    result_count: int
+    limit: int
+    truncated: bool
+    warning: str = (
+        "Prepared summaries use simulated demo locations and typed measurements; "
+        "they are not official reports and do not authorize field work."
+    )
+
+
 class SummaryTargetNotFoundError(Exception):
     pass
 
@@ -87,6 +98,15 @@ class PreparedSummaryWriter(Protocol):
         idempotency_key: str,
         request: PreparedSummaryRequest,
     ) -> PreparedSummaryResponse: ...
+
+
+class PreparedSummaryReader(Protocol):
+    async def list_for_actor(
+        self,
+        *,
+        actor: AuthenticatedUser,
+        limit: int,
+    ) -> PreparedSummaryCollection: ...
 
 
 class PostgresPreparedSummaryRepository:
@@ -126,6 +146,56 @@ class PostgresPreparedSummaryRepository:
             if error.diag.constraint_name == "prepared_inspection_summary_work_order_id_key":
                 raise SummaryAlreadyExistsError from None
             raise
+
+    async def list_for_actor(
+        self,
+        *,
+        actor: AuthenticatedUser,
+        limit: int,
+    ) -> PreparedSummaryCollection:
+        connection = await psycopg.AsyncConnection.connect(self._database_url)
+        async with connection, connection.cursor() as cursor:
+            await cursor.execute(
+                """
+                SELECT summary.id, summary.work_order_id, policy.version,
+                       summary.generation_rationale, summary.measurement_count,
+                       summary.accepted_photo_review_count, summary.minimum_height_cm,
+                       summary.maximum_height_cm, summary.mean_height_cm,
+                       summary.n1_count, summary.n2_count, summary.n3_count,
+                       summary.generated_at
+                FROM prepared_inspection_summary summary
+                JOIN prepared_inspection_summary_policy policy
+                  ON policy.id = summary.summary_policy_id
+                JOIN work_order order_record ON order_record.id = summary.work_order_id
+                JOIN segment_zone zone ON zone.id = order_record.segment_zone_id
+                JOIN road_segment segment ON segment.id = zone.road_segment_id
+                JOIN road_axis_candidate axis
+                  ON axis.id = segment.road_axis_candidate_id
+                WHERE summary.location_status = 'simulated'
+                  AND summary.data_status = 'prepared'
+                  AND NOT summary.eligible_for_official_reporting
+                  AND NOT summary.authorizes_field_work
+                  AND EXISTS (
+                      SELECT 1 FROM road_user_role assignment
+                      WHERE assignment.user_id = %s
+                        AND assignment.road_id = axis.road_id
+                        AND assignment.role IN ('manager', 'supervisor')
+                        AND assignment.data_status <> 'simulated'
+                  )
+                ORDER BY summary.generated_at DESC, summary.id
+                LIMIT %s
+                """,
+                (actor.id, limit + 1),
+            )
+            rows = await cursor.fetchall()
+        truncated = len(rows) > limit
+        visible = rows[:limit]
+        return PreparedSummaryCollection(
+            items=[self._response_from_row(row) for row in visible],
+            result_count=len(visible),
+            limit=limit,
+            truncated=truncated,
+        )
 
     async def _create(self, cursor, work_order_id, actor, key_hash, request):
         await cursor.execute(
@@ -247,6 +317,10 @@ class PostgresPreparedSummaryRepository:
             (summary_id,),
         )
         row = await cursor.fetchone()
+        return self._response_from_row(row)
+
+    @staticmethod
+    def _response_from_row(row: tuple) -> PreparedSummaryResponse:
         return PreparedSummaryResponse(
             summary_id=row[0],
             work_order_id=row[1],
@@ -271,7 +345,26 @@ async def get_prepared_summary_writer() -> PreparedSummaryWriter:
     )
 
 
+async def get_prepared_summary_reader() -> PreparedSummaryReader:
+    settings = get_settings()
+    return PostgresPreparedSummaryRepository(
+        settings.database_url, settings.prepared_inspection_summary_policy_version
+    )
+
+
 router = APIRouter(prefix="/v1/work-orders", tags=["work-orders"])
+collection_router = APIRouter(
+    prefix="/v1/prepared-inspection-summaries", tags=["work-orders"]
+)
+
+
+@collection_router.get("", response_model=PreparedSummaryCollection)
+async def list_prepared_summaries(
+    actor: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    reader: Annotated[PreparedSummaryReader, Depends(get_prepared_summary_reader)],
+    limit: Annotated[int, Field(ge=1, le=100)] = 50,
+) -> PreparedSummaryCollection:
+    return await reader.list_for_actor(actor=actor, limit=limit)
 
 
 @router.post("/{work_order_id}/prepared-summary", response_model=PreparedSummaryResponse)

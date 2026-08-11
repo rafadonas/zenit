@@ -35,6 +35,12 @@ export interface PhotoReviewSubmission {
   supersedesReviewId?: string;
 }
 
+export interface PreparedSummarySubmission {
+  csrfToken: string;
+  idempotencyKey: string;
+  generationRationale: string;
+}
+
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CSRF_PATTERN = /^[0-9a-f]{64}$/;
 
@@ -199,4 +205,17 @@ export function parsePhotoReviewSubmission(form: FormData): PhotoReviewSubmissio
     ...(rationale ? { rationale } : {}),
     ...(supersedesReviewId ? { supersedesReviewId } : {}),
   };
+}
+
+export function parsePreparedSummarySubmission(form: FormData): PreparedSummarySubmission | null {
+  const csrfToken = formString(form, "csrf_token");
+  const idempotencyKey = formString(form, "idempotency_key");
+  const generationRationale = formString(form, "generation_rationale");
+  if (
+    csrfToken === null || !CSRF_PATTERN.test(csrfToken) ||
+    idempotencyKey === null || !UUID_PATTERN.test(idempotencyKey) ||
+    generationRationale === null || generationRationale.length < 1 ||
+    generationRationale.length > 2000
+  ) return null;
+  return { csrfToken, idempotencyKey, generationRationale };
 }

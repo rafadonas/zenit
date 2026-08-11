@@ -8,6 +8,8 @@ from httpx import ASGITransport, AsyncClient
 
 from zenit_api.auth import AuthenticatedUser, get_current_user
 from zenit_api.inspection_summaries import (
+    PreparedSummaryCollection,
+    PreparedSummaryReader,
     PreparedSummaryRequest,
     PreparedSummaryResponse,
     PreparedSummaryWriter,
@@ -17,6 +19,7 @@ from zenit_api.inspection_summaries import (
     SummaryPermissionError,
     SummaryPolicyUnavailableError,
     SummaryTargetNotFoundError,
+    get_prepared_summary_reader,
     get_prepared_summary_writer,
 )
 from zenit_api.main import app
@@ -55,6 +58,33 @@ class FakeSummaryWriter(PreparedSummaryWriter):
             n2_count=1,
             n3_count=1,
             generated_at=datetime(2026, 8, 11, 15, tzinfo=UTC),
+        )
+
+
+class FakeSummaryReader(PreparedSummaryReader):
+    async def list_for_actor(self, **values) -> PreparedSummaryCollection:
+        assert values == {"actor": ACTOR, "limit": 7}
+        return PreparedSummaryCollection(
+            items=[
+                PreparedSummaryResponse(
+                    summary_id=SUMMARY_ID,
+                    work_order_id=ORDER_ID,
+                    summary_policy_version="prepared-inspection-summary-v1",
+                    generation_rationale="Consolidar retorno preparado",
+                    measurement_count=3,
+                    accepted_photo_review_count=3,
+                    minimum_height_cm=Decimal("8"),
+                    maximum_height_cm=Decimal("35"),
+                    mean_height_cm=Decimal("21.6667"),
+                    n1_count=1,
+                    n2_count=1,
+                    n3_count=1,
+                    generated_at=datetime(2026, 8, 11, 15, tzinfo=UTC),
+                )
+            ],
+            result_count=1,
+            limit=7,
+            truncated=False,
         )
 
 
@@ -113,3 +143,47 @@ def test_summary_failures_have_stable_statuses(failure: type[Exception], status:
 
 def test_summary_requires_authentication_and_forbids_extra_fields() -> None:
     assert request_summary(authenticated=False).status_code == 401
+
+
+def test_lists_only_safe_prepared_summary_contract_for_authenticated_actor() -> None:
+    async def fake_actor():
+        return ACTOR
+
+    async def fake_reader():
+        return FakeSummaryReader()
+
+    async def request():
+        app.dependency_overrides[get_current_user] = fake_actor
+        app.dependency_overrides[get_prepared_summary_reader] = fake_reader
+        try:
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                return await client.get("/v1/prepared-inspection-summaries?limit=7")
+        finally:
+            app.dependency_overrides.clear()
+
+    response = asyncio.run(request())
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["result_count"] == 1
+    summary = payload["items"][0]
+    assert summary["location_status"] == "simulated"
+    assert summary["eligible_for_official_reporting"] is False
+    assert summary["authorizes_field_work"] is False
+    assert "generated_by_user_id" not in summary
+
+
+def test_summary_collection_requires_authentication() -> None:
+    async def fake_reader():
+        return FakeSummaryReader()
+
+    async def request():
+        app.dependency_overrides[get_prepared_summary_reader] = fake_reader
+        try:
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                return await client.get("/v1/prepared-inspection-summaries")
+        finally:
+            app.dependency_overrides.clear()
+
+    assert asyncio.run(request()).status_code == 401

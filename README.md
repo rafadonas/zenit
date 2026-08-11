@@ -463,6 +463,20 @@ The response reports minimum, maximum, mean, and N1/N2/N3 counts. These are
 aggregates of prepared typed measurements, not values inferred from photos and
 not an official operational report.
 
+Current non-simulated managers and supervisors can list only summaries from
+their assigned roads:
+
+```text
+GET /v1/prepared-inspection-summaries?limit=50
+Authorization: Bearer <access-token>
+```
+
+At `/photo-reviews`, the authenticated dashboard groups the three planned points
+by order. Once every latest effective review is accepted with accepted quality
+and a visible ruler, it offers a CSRF-checked summary-generation form. Generated
+minimum, mean, maximum, and N1/N2/N3 counts remain visibly labeled as prepared,
+simulated, non-operational, and ineligible for official reporting.
+
 Use `zenit-import` for one immutable raw file at a time. Full examples are in
 `docs/architecture/source-ingestion.md`.
 
