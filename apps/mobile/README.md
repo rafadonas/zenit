@@ -7,6 +7,8 @@ Current P0 slice:
 - initial online OAuth password login against the ZENIT API;
 - access token stored in Android secure storage (the password is never stored);
 - prepared inspection orders downloaded from `GET /v1/work-orders`;
+- prepared mowing-planning snapshots downloaded from
+  `GET /v1/prepared-mowing-orders` for encrypted offline read-only review;
 - order snapshot and three measurement drafts stored in an AES-256 encrypted
   Hive CE vault whose key is protected by Android secure storage;
 - offline demo lifecycle (`confirm`, simulated-location `start`, and `finish`)
@@ -29,6 +31,13 @@ events do not mutate the prepared order or make any data operational/official.
 Photo bytes remain encrypted on the device and, when explicitly uploaded, are
 still prepared and unverified; their ruler presence and quality remain
 unvalidated.
+
+Mowing planning is a separate read-only demonstration surface. Candidate team
+and equipment references, manual weather/safety declarations, and planning
+decisions retain their provenance, but do not satisfy operational approval.
+The app deliberately provides no confirm, start, tracking, finish, dispatch,
+or mowing-sync action for these snapshots. Any promoted execution flag or
+broken plan/readiness/decision link makes the client reject the snapshot.
 
 Run checks from this directory with the repository-local Flutter SDK:
 

@@ -70,6 +70,33 @@ void main() {
     expect(orders.single.points, hasLength(3));
   });
 
+  test('downloads read-only prepared mowing plans', () async {
+    final gateway = HttpZenitGateway(
+      baseUrl: 'https://api.example.test',
+      client: MockClient((request) async {
+        expect(request.url.path, '/v1/prepared-mowing-orders');
+        expect(request.url.queryParameters['limit'], '100');
+        expect(request.headers['Authorization'], 'Bearer signed-token');
+        return http.Response(
+          jsonEncode({
+            'items': [preparedMowingPlanJson()],
+            'result_count': 1,
+            'limit': 100,
+            'truncated': false,
+            'warning': 'Prepared plans never authorize execution.',
+          }),
+          200,
+        );
+      }),
+    );
+
+    final plans = await gateway.listPreparedMowingPlans('signed-token');
+
+    expect(plans, hasLength(1));
+    expect(plans.single.planningDecision, 'approved_for_planning');
+    expect(plans.single.canStart, isFalse);
+  });
+
   test(
     'registers device and receives persistent batch acknowledgements',
     () async {

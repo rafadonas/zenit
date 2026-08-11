@@ -25,4 +25,40 @@ void main() {
     );
     expect(find.byType(TextField), findsNWidgets(2));
   });
+
+  testWidgets('shows mowing planning as read-only and non-executable', (
+    tester,
+  ) async {
+    final controller = ZenitAppController(
+      gateway: FakeGateway(mowingPlans: [preparedMowingPlan()]),
+      sessionStore: MemorySessionStore()..value = validSession(),
+      vault: MemoryVault(),
+      deviceIdentityStore: MemoryDeviceIdentityStore(),
+      appVersion: 'test',
+    );
+    await controller.initialize();
+
+    await tester.pumpWidget(ZenitApp(controller: controller));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Planejamentos de roçada — demonstração'), findsOneWidget);
+    expect(find.textContaining('NÃO EXECUTÁVEL'), findsOneWidget);
+    await tester.tap(find.textContaining('NÃO EXECUTÁVEL'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('DEMONSTRAÇÃO — NÃO EXECUTÁVEL'), findsOneWidget);
+    expect(
+      find.textContaining(
+        'Confirmar, iniciar, rastrear e concluir permanecem bloqueados.',
+      ),
+      findsOneWidget,
+    );
+    await tester.scrollUntilVisible(
+      find.text('Não satisfeita'),
+      300,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(find.text('Não satisfeita'), findsOneWidget);
+    expect(find.byType(FilledButton), findsNothing);
+  });
 }

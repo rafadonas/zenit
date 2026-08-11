@@ -10,6 +10,7 @@ import 'package:zenit_mobile/domain/auth_session.dart';
 import 'package:zenit_mobile/domain/demo_order_lifecycle.dart';
 import 'package:zenit_mobile/domain/measurement_draft.dart';
 import 'package:zenit_mobile/domain/mobile_sync.dart';
+import 'package:zenit_mobile/domain/prepared_mowing_plan.dart';
 import 'package:zenit_mobile/domain/prepared_photo_draft.dart';
 import 'package:zenit_mobile/domain/prepared_work_order.dart';
 
@@ -25,6 +26,7 @@ Map<String, Object?> preparedOrderJson() => {
   'order_data_status': 'prepared',
   'authorizes_field_work': false,
   'eligible_for_field_execution': false,
+  'eligible_for_model_training': false,
   'eligible_for_official_reporting': false,
   'planned_points': List.generate(
     3,
@@ -45,6 +47,63 @@ Map<String, Object?> preparedOrderJson() => {
 PreparedWorkOrder preparedOrder() =>
     PreparedWorkOrder.fromJson(preparedOrderJson());
 
+Map<String, Object?> preparedMowingPlanJson() => {
+  'mowing_order_id': '90000000-0000-4000-8000-000000000001',
+  'proposal_id': '90000000-0000-4000-8000-000000000002',
+  'source_review_id': '90000000-0000-4000-8000-000000000003',
+  'source_inspection_work_order_id': '11111111-1111-4111-8111-111111111111',
+  'road_code': 'SP-001',
+  'segment_index': 12,
+  'zone_type': 'left',
+  'creation_recommendation': 'mowing_review',
+  'source_review_state': 'effective',
+  'order_type': 'mowing',
+  'status': 'prepared',
+  'version': 1,
+  'planning_rationale': 'Prepared planning demonstration only',
+  'creation_policy_version': 'prepared-mowing-order-v1',
+  'data_status': 'prepared',
+  'location_status': 'simulated',
+  'source_evidence_status': 'prepared_reviewed_non_operational',
+  'team_assignment_status': 'unassigned',
+  'equipment_assignment_status': 'unassigned',
+  'weather_check_status': 'pending',
+  'safety_check_status': 'pending',
+  'requires_operational_approval': true,
+  'authorizes_field_work': false,
+  'eligible_for_field_execution': false,
+  'eligible_for_model_training': false,
+  'eligible_for_official_reporting': false,
+  'created_at': '2026-08-11T12:00:00Z',
+  'resource_plan_count': 1,
+  'latest_resource_plan_id': '90000000-0000-4000-8000-000000000004',
+  'latest_team_reference': 'TEAM-CANDIDATE-01',
+  'latest_equipment_reference': 'EQUIPMENT-CANDIDATE-01',
+  'latest_resource_plan_rationale': 'Candidate resources for validation',
+  'latest_resource_plan_created_at': '2026-08-11T12:10:00Z',
+  'resource_plan_state': 'candidate_resources_pending_validation',
+  'readiness_assessment_count': 1,
+  'latest_readiness_assessment_id': '90000000-0000-4000-8000-000000000005',
+  'latest_readiness_resource_plan_id': '90000000-0000-4000-8000-000000000004',
+  'latest_weather_result': 'clear',
+  'latest_weather_source_reference': 'MANUAL-WEATHER-01',
+  'latest_safety_result': 'inconclusive',
+  'latest_safety_source_reference': 'MANUAL-SAFETY-01',
+  'latest_readiness_rationale': 'Manual prepared assessment',
+  'latest_readiness_assessed_at': '2026-08-11T12:20:00Z',
+  'planning_approval_count': 1,
+  'latest_planning_approval_id': '90000000-0000-4000-8000-000000000006',
+  'latest_planning_approval_readiness_id':
+      '90000000-0000-4000-8000-000000000005',
+  'latest_planning_decision': 'approved_for_planning',
+  'latest_planning_decision_rationale': 'Planning review only',
+  'latest_planning_decided_at': '2026-08-11T12:30:00Z',
+  'operational_approval_satisfied': false,
+};
+
+PreparedMowingPlan preparedMowingPlan() =>
+    PreparedMowingPlan.fromJson(preparedMowingPlanJson());
+
 AuthSession validSession() => AuthSession(
   accessToken: 'token',
   expiresAt: DateTime.utc(2030),
@@ -56,11 +115,13 @@ AuthSession validSession() => AuthSession(
 class FakeGateway implements ZenitGateway {
   FakeGateway({
     this.orders = const [],
+    this.mowingPlans = const [],
     this.syncFailure,
     this.loginSession,
     this.syncResultFactory,
   });
   List<PreparedWorkOrder> orders;
+  List<PreparedMowingPlan> mowingPlans;
   Object? syncFailure;
   AuthSession? loginSession;
   MobileSyncResult Function(PendingSyncBatch batch)? syncResultFactory;
@@ -81,6 +142,11 @@ class FakeGateway implements ZenitGateway {
   Future<List<PreparedWorkOrder>> listPreparedOrders(
     String accessToken,
   ) async => orders;
+
+  @override
+  Future<List<PreparedMowingPlan>> listPreparedMowingPlans(
+    String accessToken,
+  ) async => mowingPlans;
 
   @override
   Future<void> registerDevice(
@@ -166,6 +232,7 @@ class MemorySessionStore implements SessionStore {
 
 class MemoryVault implements OfflineVault {
   List<PreparedWorkOrder> orders = const [];
+  List<PreparedMowingPlan> mowingPlans = const [];
   final Map<String, List<MeasurementDraft>> drafts = {};
   final Map<String, List<DemoLifecycleEvent>> lifecycleEvents = {};
   final Map<String, List<PreparedPhotoDraft>> photoDrafts = {};
@@ -179,6 +246,7 @@ class MemoryVault implements OfflineVault {
   @override
   Future<void> clearUserData() async {
     orders = const [];
+    mowingPlans = const [];
     drafts.clear();
     lifecycleEvents.clear();
     photoDrafts.clear();
@@ -193,6 +261,9 @@ class MemoryVault implements OfflineVault {
 
   @override
   Future<List<PreparedWorkOrder>> readOrders() async => orders;
+
+  @override
+  Future<List<PreparedMowingPlan>> readMowingPlans() async => mowingPlans;
 
   @override
   Future<List<DemoLifecycleEvent>> readLifecycleEvents(String orderId) async =>
@@ -211,6 +282,10 @@ class MemoryVault implements OfflineVault {
   @override
   Future<void> replaceOrders(List<PreparedWorkOrder> values) async =>
       orders = List.unmodifiable(values);
+
+  @override
+  Future<void> replaceMowingPlans(List<PreparedMowingPlan> values) async =>
+      mowingPlans = List.unmodifiable(values);
 
   @override
   Future<void> replaceLifecycleEvents(

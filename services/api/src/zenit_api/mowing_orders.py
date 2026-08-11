@@ -54,6 +54,7 @@ class PreparedMowingOrderResponse(BaseModel):
     requires_operational_approval: Literal[True]
     authorizes_field_work: Literal[False] = False
     eligible_for_field_execution: Literal[False] = False
+    eligible_for_model_training: Literal[False] = False
     eligible_for_official_reporting: Literal[False] = False
     created_at: datetime
     resource_plan_count: int = Field(default=0, ge=0)
@@ -65,6 +66,24 @@ class PreparedMowingOrderResponse(BaseModel):
     resource_plan_state: Literal[
         "not_planned", "candidate_resources_pending_validation"
     ] = "not_planned"
+    readiness_assessment_count: int = Field(default=0, ge=0)
+    latest_readiness_assessment_id: UUID | None = None
+    latest_readiness_resource_plan_id: UUID | None = None
+    latest_weather_result: Literal["clear", "blocked", "inconclusive"] | None = None
+    latest_weather_source_reference: str | None = None
+    latest_safety_result: Literal["clear", "blocked", "inconclusive"] | None = None
+    latest_safety_source_reference: str | None = None
+    latest_readiness_rationale: str | None = None
+    latest_readiness_assessed_at: datetime | None = None
+    planning_approval_count: int = Field(default=0, ge=0)
+    latest_planning_approval_id: UUID | None = None
+    latest_planning_approval_readiness_id: UUID | None = None
+    latest_planning_decision: (
+        Literal["approved_for_planning", "changes_requested", "rejected"] | None
+    ) = None
+    latest_planning_decision_rationale: str | None = None
+    latest_planning_decided_at: datetime | None = None
+    operational_approval_satisfied: Literal[False] = False
 
     @model_validator(mode="after")
     def validate_resource_plan_state(self) -> PreparedMowingOrderResponse:
@@ -84,6 +103,39 @@ class PreparedMowingOrderResponse(BaseModel):
             or self.resource_plan_state != "candidate_resources_pending_validation"
         ):
             raise ValueError("planned mowing order requires one effective candidate resource plan")
+        readiness_metadata = (
+            self.latest_readiness_assessment_id,
+            self.latest_readiness_resource_plan_id,
+            self.latest_weather_result,
+            self.latest_weather_source_reference,
+            self.latest_safety_result,
+            self.latest_safety_source_reference,
+            self.latest_readiness_rationale,
+            self.latest_readiness_assessed_at,
+        )
+        if self.readiness_assessment_count == 0:
+            if any(value is not None for value in readiness_metadata):
+                raise ValueError("unassessed mowing order cannot expose readiness metadata")
+        elif (
+            any(value is None for value in readiness_metadata)
+            or self.latest_readiness_resource_plan_id != self.latest_resource_plan_id
+        ):
+            raise ValueError("readiness assessment requires the effective resource plan")
+        approval_metadata = (
+            self.latest_planning_approval_id,
+            self.latest_planning_approval_readiness_id,
+            self.latest_planning_decision,
+            self.latest_planning_decision_rationale,
+            self.latest_planning_decided_at,
+        )
+        if self.planning_approval_count == 0:
+            if any(value is not None for value in approval_metadata):
+                raise ValueError("undecided planning state cannot expose approval metadata")
+        elif (
+            any(value is None for value in approval_metadata)
+            or self.latest_planning_approval_readiness_id != self.latest_readiness_assessment_id
+        ):
+            raise ValueError("planning approval requires the effective readiness assessment")
         return self
 
 
@@ -93,8 +145,9 @@ class PreparedMowingOrderCollection(BaseModel):
     limit: int = Field(ge=1, le=100)
     truncated: bool
     warning: str = (
-        "Prepared mowing orders have no team, equipment, weather or safety clearance "
-        "and never authorize field execution."
+        "Prepared mowing orders have only unverified candidate resources and manual "
+        "readiness or planning records; they never satisfy operational approval or "
+        "authorize field execution."
     )
 
 
@@ -323,7 +376,15 @@ class PostgresPreparedMowingOrderRepository:
                    mowing.requires_operational_approval, mowing.created_at,
                    COALESCE(plan_total.plan_count, 0), latest_plan.id,
                    latest_plan.team_reference, latest_plan.equipment_reference,
-                   latest_plan.planning_rationale, latest_plan.created_at
+                   latest_plan.planning_rationale, latest_plan.created_at,
+                   COALESCE(readiness_total.assessment_count, 0), latest_readiness.id,
+                   latest_readiness.resource_plan_id, latest_readiness.weather_result,
+                   latest_readiness.weather_source_reference, latest_readiness.safety_result,
+                   latest_readiness.safety_source_reference,
+                   latest_readiness.assessment_rationale, latest_readiness.assessed_at,
+                   COALESCE(approval_total.approval_count, 0), latest_approval.id,
+                   latest_approval.readiness_assessment_id, latest_approval.decision,
+                   latest_approval.decision_rationale, latest_approval.decided_at
             FROM prepared_mowing_order mowing
             JOIN prepared_mowing_order_policy policy ON policy.id = mowing.creation_policy_id
             JOIN prepared_post_inspection_review review ON review.id = mowing.source_review_id
@@ -348,6 +409,39 @@ class PostgresPreparedMowingOrderRepository:
                       WHERE newer.supersedes_plan_id = plan.id)
                 ORDER BY plan.created_at DESC LIMIT 1
             ) latest_plan ON true
+            LEFT JOIN LATERAL (
+                SELECT count(*) AS assessment_count
+                FROM prepared_mowing_readiness_assessment assessment
+                WHERE assessment.resource_plan_id = latest_plan.id
+            ) readiness_total ON true
+            LEFT JOIN LATERAL (
+                SELECT assessment.id, assessment.resource_plan_id,
+                       assessment.weather_result, assessment.weather_source_reference,
+                       assessment.safety_result, assessment.safety_source_reference,
+                       assessment.assessment_rationale, assessment.assessed_at
+                FROM prepared_mowing_readiness_assessment assessment
+                WHERE assessment.resource_plan_id = latest_plan.id
+                  AND NOT EXISTS (
+                      SELECT 1 FROM prepared_mowing_readiness_assessment newer
+                      WHERE newer.supersedes_assessment_id = assessment.id)
+                ORDER BY assessment.assessed_at DESC LIMIT 1
+            ) latest_readiness ON true
+            LEFT JOIN LATERAL (
+                SELECT count(*) AS approval_count
+                FROM prepared_mowing_planning_approval approval
+                WHERE approval.readiness_assessment_id = latest_readiness.id
+            ) approval_total ON true
+            LEFT JOIN LATERAL (
+                SELECT approval.id, approval.readiness_assessment_id,
+                       approval.decision, approval.decision_rationale,
+                       approval.decided_at
+                FROM prepared_mowing_planning_approval approval
+                WHERE approval.readiness_assessment_id = latest_readiness.id
+                  AND NOT EXISTS (
+                      SELECT 1 FROM prepared_mowing_planning_approval newer
+                      WHERE newer.supersedes_approval_id = approval.id)
+                ORDER BY approval.decided_at DESC LIMIT 1
+            ) latest_approval ON true
             WHERE mowing.id = %s
             """,
             (mowing_order_id,),
@@ -371,6 +465,15 @@ class PostgresPreparedMowingOrderRepository:
             resource_plan_state=(
                 "candidate_resources_pending_validation" if row[24] else "not_planned"
             ),
+            readiness_assessment_count=row[29], latest_readiness_assessment_id=row[30],
+            latest_readiness_resource_plan_id=row[31], latest_weather_result=row[32],
+            latest_weather_source_reference=row[33], latest_safety_result=row[34],
+            latest_safety_source_reference=row[35], latest_readiness_rationale=row[36],
+            latest_readiness_assessed_at=row[37], planning_approval_count=row[38],
+            latest_planning_approval_id=row[39],
+            latest_planning_approval_readiness_id=row[40],
+            latest_planning_decision=row[41],
+            latest_planning_decision_rationale=row[42], latest_planning_decided_at=row[43],
         )
 
 

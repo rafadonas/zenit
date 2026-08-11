@@ -7,6 +7,7 @@ import 'data/secure_session_store.dart';
 import 'data/zenit_gateway.dart';
 import 'domain/demo_order_lifecycle.dart';
 import 'domain/measurement_draft.dart';
+import 'domain/prepared_mowing_plan.dart';
 import 'domain/prepared_photo_draft.dart';
 import 'domain/prepared_work_order.dart';
 
@@ -207,10 +208,17 @@ class OrdersPage extends StatelessWidget {
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
           ],
+          Text(
+            'Inspeções preparadas',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
           if (controller.orders.isEmpty)
             const Padding(
-              padding: EdgeInsets.symmetric(vertical: 48),
-              child: Center(child: Text('Nenhuma ordem preparada disponível.')),
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: Center(
+                child: Text('Nenhuma inspeção preparada disponível.'),
+              ),
             ),
           for (final order in controller.orders)
             Card(
@@ -231,8 +239,161 @@ class OrdersPage extends StatelessWidget {
                 ),
               ),
             ),
+          const SizedBox(height: 24),
+          Text(
+            'Planejamentos de roçada — demonstração',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Consulta offline. Confirmar, iniciar, rastrear e concluir permanecem bloqueados.',
+          ),
+          const SizedBox(height: 8),
+          if (controller.mowingPlans.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: Center(
+                child: Text('Nenhum planejamento preparado disponível.'),
+              ),
+            ),
+          for (final plan in controller.mowingPlans)
+            Card(
+              child: ListTile(
+                leading: const CircleAvatar(child: Icon(Icons.grass)),
+                title: Text('${plan.roadCode} · segmento ${plan.segmentIndex}'),
+                subtitle: Text(
+                  'Zona ${plan.zoneType} · preparado · NÃO EXECUTÁVEL',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => PreparedMowingPlanPage(plan: plan),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
+    ),
+  );
+}
+
+class PreparedMowingPlanPage extends StatelessWidget {
+  const PreparedMowingPlanPage({super.key, required this.plan});
+
+  final PreparedMowingPlan plan;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(title: const Text('Planejamento de roçada')),
+    body: ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Card(
+          color: Theme.of(context).colorScheme.errorContainer,
+          child: const Padding(
+            padding: EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.block),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'DEMONSTRAÇÃO — NÃO EXECUTÁVEL',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'Confirmar, iniciar, rastrear e concluir permanecem bloqueados. Uma decisão de planejamento não substitui aprovação operacional.',
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          '${plan.roadCode} · segmento ${plan.segmentIndex}',
+          style: Theme.of(context).textTheme.headlineSmall,
+        ),
+        const SizedBox(height: 4),
+        Text('Zona ${plan.zoneType} · localização simulada'),
+        const SizedBox(height: 16),
+        _ReadOnlyValue(label: 'Justificativa', value: plan.planningRationale),
+        _ReadOnlyValue(
+          label: 'Equipe candidata',
+          value: plan.teamReference ?? 'Não planejada',
+        ),
+        _ReadOnlyValue(
+          label: 'Equipamento candidato',
+          value: plan.equipmentReference ?? 'Não planejado',
+        ),
+        _ReadOnlyValue(
+          label: 'Clima (declaração manual)',
+          value: _preparedLabel(plan.weatherResult),
+        ),
+        _ReadOnlyValue(
+          label: 'Fonte do clima',
+          value: plan.weatherSourceReference ?? 'Não avaliada',
+        ),
+        _ReadOnlyValue(
+          label: 'Segurança (declaração manual)',
+          value: _preparedLabel(plan.safetyResult),
+        ),
+        _ReadOnlyValue(
+          label: 'Fonte de segurança',
+          value: plan.safetySourceReference ?? 'Não avaliada',
+        ),
+        _ReadOnlyValue(
+          label: 'Decisão de planejamento',
+          value: _preparedLabel(plan.planningDecision),
+        ),
+        _ReadOnlyValue(
+          label: 'Justificativa da decisão',
+          value: plan.planningDecisionRationale ?? 'Sem decisão registrada',
+        ),
+        _ReadOnlyValue(label: 'Aprovação operacional', value: 'Não satisfeita'),
+        _ReadOnlyValue(
+          label: 'Proveniência',
+          value:
+              'Revisão ${plan.sourceReviewState} · política ${plan.creationPolicyVersion}',
+        ),
+      ],
+    ),
+  );
+
+  static String _preparedLabel(String? value) => switch (value) {
+    'clear' => 'Declarado livre — validação pendente',
+    'blocked' => 'Declarado bloqueado',
+    'inconclusive' => 'Inconclusivo',
+    'approved_for_planning' => 'Aprovado somente para planejamento',
+    'changes_requested' => 'Alterações solicitadas',
+    'rejected' => 'Rejeitado',
+    _ => 'Não registrado',
+  };
+}
+
+class _ReadOnlyValue extends StatelessWidget {
+  const _ReadOnlyValue({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 12),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: Theme.of(context).textTheme.labelLarge),
+        const SizedBox(height: 2),
+        SelectableText(value),
+      ],
     ),
   );
 }

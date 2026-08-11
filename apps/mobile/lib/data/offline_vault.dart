@@ -6,6 +6,7 @@ import 'package:hive_ce_flutter/hive_flutter.dart';
 import '../domain/measurement_draft.dart';
 import '../domain/demo_order_lifecycle.dart';
 import '../domain/mobile_sync.dart';
+import '../domain/prepared_mowing_plan.dart';
 import '../domain/prepared_photo_draft.dart';
 import '../domain/prepared_work_order.dart';
 
@@ -13,6 +14,8 @@ abstract interface class OfflineVault {
   Future<void> initialize();
   Future<List<PreparedWorkOrder>> readOrders();
   Future<void> replaceOrders(List<PreparedWorkOrder> orders);
+  Future<List<PreparedMowingPlan>> readMowingPlans();
+  Future<void> replaceMowingPlans(List<PreparedMowingPlan> plans);
   Future<List<MeasurementDraft>> readDrafts(String orderId);
   Future<void> replaceDrafts(String orderId, List<MeasurementDraft> drafts);
   Future<List<DemoLifecycleEvent>> readLifecycleEvents(String orderId);
@@ -53,6 +56,7 @@ class HiveOfflineVault implements OfflineVault {
   static const _keyName = 'zenit.offline.hive-key.v1';
   static const _boxName = 'zenit_offline_v1';
   static const _ordersKey = 'prepared_orders';
+  static const _mowingPlansKey = 'prepared_mowing_plans';
   static const _ownerUserIdKey = 'owner_user_id';
   static const _pendingBatchKey = 'pending_sync_batch';
   static const _syncCursorKey = 'sync_cursor';
@@ -136,6 +140,27 @@ class HiveOfflineVault implements OfflineVault {
       jsonEncode(orders.map((order) => order.toJson()).toList()),
     );
   }
+
+  @override
+  Future<List<PreparedMowingPlan>> readMowingPlans() async {
+    final encoded = _openBox.get(_mowingPlansKey);
+    if (encoded == null) return const [];
+    final items = jsonDecode(encoded) as List<Object?>;
+    return items
+        .map(
+          (item) => PreparedMowingPlan.fromJson(
+            (item! as Map).cast<String, Object?>(),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  @override
+  Future<void> replaceMowingPlans(List<PreparedMowingPlan> plans) =>
+      _openBox.put(
+        _mowingPlansKey,
+        jsonEncode(plans.map((plan) => plan.toJson()).toList()),
+      );
 
   @override
   Future<List<MeasurementDraft>> readDrafts(String orderId) async {

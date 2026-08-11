@@ -4,6 +4,7 @@ from uuid import UUID
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from pydantic import ValidationError
 
 from zenit_api.auth import AuthenticatedUser, get_current_user
 from zenit_api.main import app
@@ -125,9 +126,36 @@ def test_create_mowing_order_preserves_every_execution_block() -> None:
     assert payload["weather_check_status"] == "pending"
     assert payload["safety_check_status"] == "pending"
     assert payload["requires_operational_approval"] is True
+    assert payload["operational_approval_satisfied"] is False
     assert payload["authorizes_field_work"] is False
     assert payload["eligible_for_field_execution"] is False
+    assert payload["eligible_for_model_training"] is False
     assert payload["eligible_for_official_reporting"] is False
+
+
+def test_mowing_order_rejects_readiness_from_a_different_resource_plan() -> None:
+    with pytest.raises(ValidationError, match="effective resource plan"):
+        PreparedMowingOrderResponse.model_validate(
+            mowing_order().model_dump()
+            | {
+                "resource_plan_count": 1,
+                "latest_resource_plan_id": UUID("70000000-0000-4000-8000-000000000006"),
+                "latest_team_reference": "TEAM-CANDIDATE-01",
+                "latest_equipment_reference": "EQUIPMENT-CANDIDATE-01",
+                "latest_resource_plan_rationale": "Candidate resources",
+                "latest_resource_plan_created_at": datetime(2026, 8, 11, 19, 10, tzinfo=UTC),
+                "resource_plan_state": "candidate_resources_pending_validation",
+                "readiness_assessment_count": 1,
+                "latest_readiness_assessment_id": UUID("70000000-0000-4000-8000-000000000007"),
+                "latest_readiness_resource_plan_id": UUID("70000000-0000-4000-8000-000000000099"),
+                "latest_weather_result": "clear",
+                "latest_weather_source_reference": "MANUAL-WEATHER-01",
+                "latest_safety_result": "inconclusive",
+                "latest_safety_source_reference": "MANUAL-SAFETY-01",
+                "latest_readiness_rationale": "Manual assessment",
+                "latest_readiness_assessed_at": datetime(2026, 8, 11, 19, 20, tzinfo=UTC),
+            }
+        )
 
 
 def test_mowing_order_forbids_actor_and_authorization_fields() -> None:

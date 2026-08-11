@@ -132,7 +132,11 @@ the exact manifested bytes through a separate prepared-media upload boundary.
 The app explicitly uploads accepted manifests and persists each unverified
 receipt so interrupted transfers resume without repeating confirmed photos.
 Uploaded objects remain encrypted, unvalidated, and non-official. The
-app persists event/batch UUIDs, registers
+app also downloads the prepared mowing-planning chain into the encrypted vault
+for offline read-only review. Candidate resources, manual readiness, and a
+planning decision remain explicitly non-executable; no mowing confirmation,
+start, tracking, finish, dispatch, or sync control exists. The app persists
+event/batch UUIDs, registers
 its logical device, sends the exact idempotent batch, and retains local events
 until a persistent accepted/rejected/conflict result arrives. The API has an
 append-only, idempotent prepared-sync foundation with authenticated device
@@ -325,6 +329,12 @@ requires prepared `clear` weather and safety results but never satisfies
 operational approval or authorizes execution. Dual-approval rules remain
 pending official policy validation. See
 `docs/decisions/ADR-0029-prepared-mowing-planning-approval.md`.
+
+The mobile client can cache this prepared mowing-planning chain for offline,
+read-only demonstration. It validates provenance links and every execution
+block before accepting a snapshot; planning approval never becomes operational
+approval. See
+`docs/decisions/ADR-0030-read-only-prepared-mowing-mobile.md`.
 
 The public, read-only management queue is available at:
 

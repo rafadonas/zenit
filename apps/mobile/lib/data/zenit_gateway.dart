@@ -5,12 +5,14 @@ import 'package:http/http.dart' as http;
 
 import '../domain/auth_session.dart';
 import '../domain/mobile_sync.dart';
+import '../domain/prepared_mowing_plan.dart';
 import '../domain/prepared_work_order.dart';
 import '../domain/prepared_photo_draft.dart';
 
 abstract interface class ZenitGateway {
   Future<AuthSession> login(String email, String password);
   Future<List<PreparedWorkOrder>> listPreparedOrders(String accessToken);
+  Future<List<PreparedMowingPlan>> listPreparedMowingPlans(String accessToken);
   Future<void> registerDevice(
     String accessToken,
     String deviceId,
@@ -100,6 +102,45 @@ class HttpZenitGateway implements ZenitGateway {
     return items
         .map(
           (item) => PreparedWorkOrder.fromJson(
+            (item! as Map).cast<String, Object?>(),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  @override
+  Future<List<PreparedMowingPlan>> listPreparedMowingPlans(
+    String accessToken,
+  ) async {
+    final response = await _client.get(
+      _uri('/v1/prepared-mowing-orders', const {'limit': '100'}),
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+      },
+    );
+    final payload = _decodeObject(response);
+    if (response.statusCode != 200) {
+      throw ZenitApiException(
+        _detail(
+          payload,
+          'Não foi possível baixar os planejamentos preparados de roçada.',
+        ),
+        statusCode: response.statusCode,
+      );
+    }
+    final items = payload['items']! as List<Object?>;
+    if (payload['result_count'] != items.length ||
+        payload['limit'] != 100 ||
+        payload['truncated'] is! bool ||
+        payload['warning'] is! String) {
+      throw const ZenitApiException(
+        'A API retornou uma coleção de planejamentos incompatível.',
+      );
+    }
+    return items
+        .map(
+          (item) => PreparedMowingPlan.fromJson(
             (item! as Map).cast<String, Object?>(),
           ),
         )

@@ -9,6 +9,7 @@ import 'domain/auth_session.dart';
 import 'domain/demo_order_lifecycle.dart';
 import 'domain/measurement_draft.dart';
 import 'domain/mobile_sync.dart';
+import 'domain/prepared_mowing_plan.dart';
 import 'domain/prepared_photo_draft.dart';
 import 'domain/prepared_work_order.dart';
 
@@ -37,6 +38,7 @@ class ZenitAppController extends ChangeNotifier {
 
   AuthSession? session;
   List<PreparedWorkOrder> orders = const [];
+  List<PreparedMowingPlan> mowingPlans = const [];
   bool initializing = true;
   bool busy = false;
   String? errorMessage;
@@ -47,6 +49,7 @@ class ZenitAppController extends ChangeNotifier {
     try {
       await vault.initialize();
       orders = await vault.readOrders();
+      mowingPlans = await vault.readMowingPlans();
       session = await sessionStore.readValid(_clock());
       if (session != null) {
         final ownerUserId = await vault.readOwnerUserId();
@@ -62,6 +65,7 @@ class ZenitAppController extends ChangeNotifier {
         }
       } else {
         orders = const [];
+        mowingPlans = const [];
       }
     } catch (error) {
       errorMessage = 'Falha ao abrir o armazenamento seguro: $error';
@@ -74,7 +78,7 @@ class ZenitAppController extends ChangeNotifier {
   Future<bool> login(String email, String password) async {
     return _run(() async {
       final authenticated = await gateway.login(email, password);
-      final downloaded = await gateway.listPreparedOrders(
+      final downloaded = await _downloadPreparedSnapshots(
         authenticated.accessToken,
       );
       final ownerUserId = await vault.readOwnerUserId();
@@ -86,10 +90,12 @@ class ZenitAppController extends ChangeNotifier {
         await deviceIdentityStore.clear();
       }
       await vault.bindOwnerUserId(authenticated.userId);
-      await vault.replaceOrders(downloaded);
+      await vault.replaceOrders(downloaded.orders);
+      await vault.replaceMowingPlans(downloaded.mowingPlans);
       await sessionStore.write(authenticated);
       session = authenticated;
-      orders = downloaded;
+      orders = downloaded.orders;
+      mowingPlans = downloaded.mowingPlans;
     });
   }
 
@@ -98,11 +104,13 @@ class ZenitAppController extends ChangeNotifier {
     if (current == null) return false;
     if (silent) {
       try {
-        final downloaded = await gateway.listPreparedOrders(
+        final downloaded = await _downloadPreparedSnapshots(
           current.accessToken,
         );
-        await vault.replaceOrders(downloaded);
-        orders = downloaded;
+        await vault.replaceOrders(downloaded.orders);
+        await vault.replaceMowingPlans(downloaded.mowingPlans);
+        orders = downloaded.orders;
+        mowingPlans = downloaded.mowingPlans;
         notifyListeners();
         return true;
       } catch (error) {
@@ -113,9 +121,11 @@ class ZenitAppController extends ChangeNotifier {
       }
     }
     return _run(() async {
-      final downloaded = await gateway.listPreparedOrders(current.accessToken);
-      await vault.replaceOrders(downloaded);
-      orders = downloaded;
+      final downloaded = await _downloadPreparedSnapshots(current.accessToken);
+      await vault.replaceOrders(downloaded.orders);
+      await vault.replaceMowingPlans(downloaded.mowingPlans);
+      orders = downloaded.orders;
+      mowingPlans = downloaded.mowingPlans;
     });
   }
 
@@ -129,6 +139,18 @@ class ZenitAppController extends ChangeNotifier {
     await sessionStore.clear();
     session = null;
     orders = const [];
+    mowingPlans = const [];
+  }
+
+  Future<
+    ({List<PreparedWorkOrder> orders, List<PreparedMowingPlan> mowingPlans})
+  >
+  _downloadPreparedSnapshots(String accessToken) async {
+    final downloadedOrders = await gateway.listPreparedOrders(accessToken);
+    final downloadedMowingPlans = await gateway.listPreparedMowingPlans(
+      accessToken,
+    );
+    return (orders: downloadedOrders, mowingPlans: downloadedMowingPlans);
   }
 
   Future<List<MeasurementDraft>> readDrafts(String orderId) =>

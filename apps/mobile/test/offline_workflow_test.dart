@@ -4,12 +4,35 @@ import 'package:zenit_mobile/data/zenit_gateway.dart';
 import 'package:zenit_mobile/domain/auth_session.dart';
 import 'package:zenit_mobile/domain/measurement_draft.dart';
 import 'package:zenit_mobile/domain/mobile_sync.dart';
+import 'package:zenit_mobile/domain/prepared_mowing_plan.dart';
 import 'package:zenit_mobile/domain/prepared_photo_draft.dart';
 import 'package:zenit_mobile/domain/prepared_work_order.dart';
 
 import 'support/fakes.dart';
 
 void main() {
+  test('downloads and retains a read-only mowing planning snapshot', () async {
+    final plan = preparedMowingPlan();
+    final vault = MemoryVault();
+    final controller = ZenitAppController(
+      gateway: FakeGateway(mowingPlans: [plan]),
+      sessionStore: MemorySessionStore(),
+      vault: vault,
+      deviceIdentityStore: MemoryDeviceIdentityStore(),
+      appVersion: 'test',
+      photoCapture: FakePhotoCapture(),
+    );
+    await controller.initialize();
+
+    expect(await controller.login('field@example.test', 'secret'), isTrue);
+    expect(controller.mowingPlans.single.id, plan.id);
+    expect((await vault.readMowingPlans()).single.id, plan.id);
+
+    await controller.logout();
+    expect(controller.mowingPlans, isEmpty);
+    expect((await vault.readMowingPlans()).single.id, plan.id);
+  });
+
   test(
     'downloads an order and stores three local-only prepared drafts',
     () async {
@@ -458,6 +481,11 @@ class _UnauthorizedGateway implements ZenitGateway {
   @override
   Future<List<PreparedWorkOrder>> listPreparedOrders(String accessToken) =>
       throw const ZenitApiException('Expired token', statusCode: 401);
+
+  @override
+  Future<List<PreparedMowingPlan>> listPreparedMowingPlans(
+    String accessToken,
+  ) => throw const ZenitApiException('Expired token', statusCode: 401);
 
   @override
   Future<void> registerDevice(
