@@ -2,6 +2,7 @@
 
 - Status: accepted
 - Date: 2026-08-11
+- Mobile implementation: ADR-0032
 
 ## Context
 

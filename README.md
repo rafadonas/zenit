@@ -133,11 +133,11 @@ The app explicitly uploads accepted manifests and persists each unverified
 receipt so interrupted transfers resume without repeating confirmed photos.
 Uploaded objects remain encrypted, unvalidated, and non-official. The
 app also downloads the prepared mowing-planning chain into the encrypted vault
-for offline read-only review. The API accepts an append-only simulated mowing
-rehearsal sequence for confirmation, start, pause/resume, and finish, but the
-mobile app exposes no controls for it yet. Candidate resources, manual readiness,
-and a planning decision remain explicitly non-executable; no real mowing,
-dispatch, tracking, or operational approval exists. The app persists
+for offline review. The mobile app can prepare and synchronize an explicitly
+simulated mowing rehearsal with confirmation, start at an estimated prepared
+point, balanced pause/resume, and finish. Candidate resources, manual readiness,
+and a planning decision remain explicitly non-executable; the rehearsal has no
+real GPS, mowing, dispatch, tracking, or operational approval. The app persists
 event/batch UUIDs, registers
 its logical device, sends the exact idempotent batch, and retains local events
 until a persistent accepted/rejected/conflict result arrives. The API has an
@@ -342,10 +342,12 @@ remain false. See
 `docs/decisions/ADR-0031-prepared-mowing-demo-lifecycle.md`.
 
 The mobile client can cache this prepared mowing-planning chain for offline,
-read-only demonstration. It validates provenance links and every execution
-block before accepting a snapshot; planning approval never becomes operational
-approval. See
-`docs/decisions/ADR-0030-read-only-prepared-mowing-mobile.md`.
+guarded demonstration. It validates provenance links and every execution block
+before accepting a snapshot; planning approval never becomes operational
+approval. Eligible snapshots can drive only the encrypted simulated rehearsal
+described in ADR-0031, with persistent UUIDs and idempotent sync. See
+`docs/decisions/ADR-0030-read-only-prepared-mowing-mobile.md` and
+`docs/decisions/ADR-0032-mobile-prepared-mowing-demo-orchestration.md`.
 
 The public, read-only management queue is available at:
 

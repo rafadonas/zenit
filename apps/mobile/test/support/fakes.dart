@@ -10,6 +10,7 @@ import 'package:zenit_mobile/domain/auth_session.dart';
 import 'package:zenit_mobile/domain/demo_order_lifecycle.dart';
 import 'package:zenit_mobile/domain/measurement_draft.dart';
 import 'package:zenit_mobile/domain/mobile_sync.dart';
+import 'package:zenit_mobile/domain/mowing_demo_lifecycle.dart';
 import 'package:zenit_mobile/domain/prepared_mowing_plan.dart';
 import 'package:zenit_mobile/domain/prepared_photo_draft.dart';
 import 'package:zenit_mobile/domain/prepared_work_order.dart';
@@ -87,7 +88,7 @@ Map<String, Object?> preparedMowingPlanJson() => {
   'latest_readiness_resource_plan_id': '90000000-0000-4000-8000-000000000004',
   'latest_weather_result': 'clear',
   'latest_weather_source_reference': 'MANUAL-WEATHER-01',
-  'latest_safety_result': 'inconclusive',
+  'latest_safety_result': 'clear',
   'latest_safety_source_reference': 'MANUAL-SAFETY-01',
   'latest_readiness_rationale': 'Manual prepared assessment',
   'latest_readiness_assessed_at': '2026-08-11T12:20:00Z',
@@ -235,6 +236,7 @@ class MemoryVault implements OfflineVault {
   List<PreparedMowingPlan> mowingPlans = const [];
   final Map<String, List<MeasurementDraft>> drafts = {};
   final Map<String, List<DemoLifecycleEvent>> lifecycleEvents = {};
+  final Map<String, List<MowingDemoLifecycleEvent>> mowingLifecycleEvents = {};
   final Map<String, List<PreparedPhotoDraft>> photoDrafts = {};
   String? ownerUserId;
   PendingSyncBatch? pendingBatch;
@@ -249,6 +251,7 @@ class MemoryVault implements OfflineVault {
     mowingPlans = const [];
     drafts.clear();
     lifecycleEvents.clear();
+    mowingLifecycleEvents.clear();
     photoDrafts.clear();
     ownerUserId = null;
     pendingBatch = null;
@@ -270,6 +273,11 @@ class MemoryVault implements OfflineVault {
       lifecycleEvents[orderId] ?? const [];
 
   @override
+  Future<List<MowingDemoLifecycleEvent>> readMowingLifecycleEvents(
+    String mowingOrderId,
+  ) async => mowingLifecycleEvents[mowingOrderId] ?? const [];
+
+  @override
   Future<List<PreparedPhotoDraft>> readPhotoDrafts(String orderId) async =>
       photoDrafts[orderId] ?? const [];
 
@@ -286,6 +294,12 @@ class MemoryVault implements OfflineVault {
   @override
   Future<void> replaceMowingPlans(List<PreparedMowingPlan> values) async =>
       mowingPlans = List.unmodifiable(values);
+
+  @override
+  Future<void> replaceMowingLifecycleEvents(
+    String mowingOrderId,
+    List<MowingDemoLifecycleEvent> values,
+  ) async => mowingLifecycleEvents[mowingOrderId] = List.unmodifiable(values);
 
   @override
   Future<void> replaceLifecycleEvents(
@@ -325,6 +339,9 @@ class MemoryVault implements OfflineVault {
       lifecycleEvents.values
           .expand((values) => values)
           .any((event) => !event.hasPersistentServerResult) ||
+      mowingLifecycleEvents.values
+          .expand((values) => values)
+          .any((event) => !event.hasPersistentServerResult) ||
       photoDrafts.values
           .expand((values) => values)
           .any(
@@ -354,5 +371,25 @@ class MemoryVault implements OfflineVault {
     drafts[batch.orderId] = List.unmodifiable(values);
     lifecycleEvents[batch.orderId] = List.unmodifiable(lifecycleValues);
     photoDrafts[batch.orderId] = List.unmodifiable(photoValues);
+  }
+
+  @override
+  Future<void> savePendingMowingSyncBatch(
+    PendingSyncBatch batch,
+    List<MowingDemoLifecycleEvent> values,
+  ) async {
+    pendingBatch = batch;
+    mowingLifecycleEvents[batch.orderId] = List.unmodifiable(values);
+  }
+
+  @override
+  Future<void> completeMowingSyncBatch(
+    String mowingOrderId,
+    List<MowingDemoLifecycleEvent> values,
+    int nextSyncCursor,
+  ) async {
+    mowingLifecycleEvents[mowingOrderId] = List.unmodifiable(values);
+    syncCursor = nextSyncCursor;
+    pendingBatch = null;
   }
 }

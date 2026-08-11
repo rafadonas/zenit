@@ -74,6 +74,14 @@ class PreparedMowingPlan {
   bool get canTrack => false;
   bool get canFinish => false;
   bool get operationalApprovalSatisfied => false;
+  bool get canRunDemoRehearsal =>
+      sourceReviewState == 'effective' &&
+      resourcePlanId != null &&
+      readinessAssessmentId != null &&
+      planningApprovalId != null &&
+      weatherResult == 'clear' &&
+      safetyResult == 'clear' &&
+      planningDecision == 'approved_for_planning';
 
   factory PreparedMowingPlan.fromJson(JsonMap json) {
     if (json['creation_recommendation'] != 'mowing_review' ||

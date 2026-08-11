@@ -11,13 +11,14 @@ void main() {
     expect(restored.id, plan.id);
     expect(restored.teamReference, 'TEAM-CANDIDATE-01');
     expect(restored.weatherResult, 'clear');
-    expect(restored.safetyResult, 'inconclusive');
+    expect(restored.safetyResult, 'clear');
     expect(restored.planningDecision, 'approved_for_planning');
     expect(restored.canConfirm, isFalse);
     expect(restored.canStart, isFalse);
     expect(restored.canTrack, isFalse);
     expect(restored.canFinish, isFalse);
     expect(restored.operationalApprovalSatisfied, isFalse);
+    expect(restored.canRunDemoRehearsal, isTrue);
   });
 
   for (final field in [

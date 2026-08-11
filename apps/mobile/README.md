@@ -8,11 +8,13 @@ Current P0 slice:
 - access token stored in Android secure storage (the password is never stored);
 - prepared inspection orders downloaded from `GET /v1/work-orders`;
 - prepared mowing-planning snapshots downloaded from
-  `GET /v1/prepared-mowing-orders` for encrypted offline read-only review;
+  `GET /v1/prepared-mowing-orders` for encrypted offline review;
 - order snapshot and three measurement drafts stored in an AES-256 encrypted
   Hive CE vault whose key is protected by Android secure storage;
 - offline demo lifecycle (`confirm`, simulated-location `start`, and `finish`)
   persisted alongside the measurements;
+- separate mowing rehearsal (`confirm`, simulated-point `start`, balanced
+  `pause`/`resume`, and `finish`) persisted and synchronized without real GPS;
 - one camera photo per planned point copied into the encrypted vault with a
   verified local SHA-256; only its prepared manifest enters sync;
 - persistent event and batch UUIDs created before network delivery;
@@ -32,12 +34,17 @@ Photo bytes remain encrypted on the device and, when explicitly uploaded, are
 still prepared and unverified; their ruler presence and quality remain
 unvalidated.
 
-Mowing planning is a separate read-only demonstration surface. Candidate team
+Mowing planning is a separate guarded demonstration surface. Candidate team
 and equipment references, manual weather/safety declarations, and planning
-decisions retain their provenance, but do not satisfy operational approval.
-The app deliberately provides no confirm, start, tracking, finish, dispatch,
-or mowing-sync action for these snapshots. Any promoted execution flag or
-broken plan/readiness/decision link makes the client reject the snapshot.
+decisions retain their provenance, but do not satisfy operational approval. An
+effective snapshot with prepared `clear` weather and safety declarations can
+drive only a simulated rehearsal. Its start reuses the first estimated point
+from the linked prepared inspection order; the app never reads device location.
+Every event is labelled `simulated`, `demo_only`, and
+`mowing_demo_rehearsal_only`, and remains ineligible for execution, training,
+or official reporting. Any promoted flag, broken provenance link, missing
+source point, stale planning approval, or invalid sequence makes the client
+fail closed.
 
 Run checks from this directory with the repository-local Flutter SDK:
 

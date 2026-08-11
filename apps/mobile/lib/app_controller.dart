@@ -9,6 +9,7 @@ import 'domain/auth_session.dart';
 import 'domain/demo_order_lifecycle.dart';
 import 'domain/measurement_draft.dart';
 import 'domain/mobile_sync.dart';
+import 'domain/mowing_demo_lifecycle.dart';
 import 'domain/prepared_mowing_plan.dart';
 import 'domain/prepared_photo_draft.dart';
 import 'domain/prepared_work_order.dart';
@@ -161,6 +162,237 @@ class ZenitAppController extends ChangeNotifier {
 
   Future<List<PreparedPhotoDraft>> readPhotoDrafts(String orderId) =>
       vault.readPhotoDrafts(orderId);
+
+  Future<List<MowingDemoLifecycleEvent>> readMowingLifecycleEvents(
+    String mowingOrderId,
+  ) => vault.readMowingLifecycleEvents(mowingOrderId);
+
+  Future<bool> confirmMowingDemo(PreparedMowingPlan plan) => _run(() async {
+    await _prepareMowingDemoTransition(plan);
+    final events = await vault.readMowingLifecycleEvents(plan.id);
+    if (events.isNotEmpty) throw const InvalidMowingDemoLifecycleError();
+    await vault.replaceMowingLifecycleEvents(plan.id, [
+      _newMowingDemoEvent(plan, MowingDemoOperation.confirm),
+    ]);
+  });
+
+  Future<bool> startMowingDemo(PreparedMowingPlan plan) => _run(() async {
+    final sourceOrder = await _prepareMowingDemoTransition(plan);
+    final events = await vault.readMowingLifecycleEvents(plan.id);
+    if (events.length != 1 ||
+        events.single.operation != MowingDemoOperation.confirm) {
+      throw const InvalidMowingDemoLifecycleError();
+    }
+    final demoPoint = sourceOrder.points.first;
+    await vault.replaceMowingLifecycleEvents(plan.id, [
+      ...events,
+      _newMowingDemoEvent(
+        plan,
+        MowingDemoOperation.start,
+        notBefore: events.last.occurredAt,
+        simulatedLatitude: demoPoint.latitude,
+        simulatedLongitude: demoPoint.longitude,
+      ),
+    ]);
+  });
+
+  Future<bool> pauseMowingDemo(PreparedMowingPlan plan) =>
+      _appendMowingDemoTransition(plan, MowingDemoOperation.pause, const {
+        MowingDemoOperation.start,
+        MowingDemoOperation.resume,
+      });
+
+  Future<bool> resumeMowingDemo(PreparedMowingPlan plan) =>
+      _appendMowingDemoTransition(plan, MowingDemoOperation.resume, const {
+        MowingDemoOperation.pause,
+      });
+
+  Future<bool> finishMowingDemo(PreparedMowingPlan plan) =>
+      _appendMowingDemoTransition(plan, MowingDemoOperation.finish, const {
+        MowingDemoOperation.start,
+        MowingDemoOperation.resume,
+      });
+
+  Future<bool> _appendMowingDemoTransition(
+    PreparedMowingPlan plan,
+    MowingDemoOperation operation,
+    Set<MowingDemoOperation> allowedPrevious,
+  ) => _run(() async {
+    await _prepareMowingDemoTransition(plan);
+    final events = await vault.readMowingLifecycleEvents(plan.id);
+    if (events.isEmpty || !allowedPrevious.contains(events.last.operation)) {
+      throw const InvalidMowingDemoLifecycleError();
+    }
+    await vault.replaceMowingLifecycleEvents(plan.id, [
+      ...events,
+      _newMowingDemoEvent(plan, operation, notBefore: events.last.occurredAt),
+    ]);
+  });
+
+  Future<PreparedWorkOrder> _prepareMowingDemoTransition(
+    PreparedMowingPlan plan,
+  ) async {
+    if (!plan.canRunDemoRehearsal) {
+      throw const MowingDemoNotEligibleError();
+    }
+    if (await vault.readPendingSyncBatch() != null) {
+      throw const PendingBatchEditError();
+    }
+    final matchingOrders = orders.where(
+      (order) => order.id == plan.sourceInspectionWorkOrderId,
+    );
+    if (matchingOrders.length != 1) {
+      throw const MowingDemoSourcePointError();
+    }
+    final events = await vault.readMowingLifecycleEvents(plan.id);
+    if (events.any((event) => event.syncState != DraftSyncState.localOnly)) {
+      throw const PersistedMowingDemoEditError();
+    }
+    return matchingOrders.single;
+  }
+
+  MowingDemoLifecycleEvent _newMowingDemoEvent(
+    PreparedMowingPlan plan,
+    MowingDemoOperation operation, {
+    DateTime? notBefore,
+    double? simulatedLatitude,
+    double? simulatedLongitude,
+  }) {
+    final planningApprovalId = plan.planningApprovalId;
+    if (planningApprovalId == null) throw const MowingDemoNotEligibleError();
+    final occurredAt = _clock().toUtc();
+    if (notBefore != null && occurredAt.isBefore(notBefore)) {
+      throw const InvalidMowingDemoTimeError();
+    }
+    return MowingDemoLifecycleEvent(
+      eventId: _uuidFactory(),
+      mowingOrderId: plan.id,
+      sourcePlanningApprovalId: planningApprovalId,
+      operation: operation,
+      occurredAt: occurredAt,
+      simulatedLatitude: simulatedLatitude,
+      simulatedLongitude: simulatedLongitude,
+    );
+  }
+
+  Future<bool> syncMowingDemo(PreparedMowingPlan plan) async {
+    final current = session;
+    if (current == null) return false;
+    return _run(() async {
+      var events = await vault.readMowingLifecycleEvents(plan.id);
+      if (!_isCompleteMowingDemoSequence(events) ||
+          events.any(
+            (event) =>
+                event.mowingOrderId != plan.id ||
+                event.sourcePlanningApprovalId != plan.planningApprovalId,
+          )) {
+        throw const IncompleteMowingDemoLifecycleError();
+      }
+      var pendingBatch = await vault.readPendingSyncBatch();
+      if (pendingBatch == null) {
+        if (events.any(
+          (event) => event.syncState != DraftSyncState.localOnly,
+        )) {
+          throw const PersistedMowingDemoEditError();
+        }
+        pendingBatch = PendingSyncBatch(
+          batchId: _uuidFactory(),
+          deviceId: await deviceIdentityStore.readOrCreate(),
+          orderId: plan.id,
+          baseSyncCursor: await vault.readSyncCursor(),
+          eventIds: events.map((event) => event.eventId).toList(),
+        );
+        events = events
+            .map(
+              (event) => event.copyWith(
+                syncState: DraftSyncState.pending,
+                clearResult: true,
+              ),
+            )
+            .toList();
+        await vault.savePendingMowingSyncBatch(pendingBatch, events);
+      } else if (pendingBatch.orderId != plan.id) {
+        throw const AnotherOrderPendingError();
+      }
+      final eventIds = events.map((event) => event.eventId).toList();
+      if (pendingBatch.eventIds.length != eventIds.length ||
+          pendingBatch.eventIds.toSet().length != eventIds.length ||
+          !eventIds.toSet().containsAll(pendingBatch.eventIds)) {
+        throw const CorruptedPendingBatchError();
+      }
+      await gateway.registerDevice(
+        current.accessToken,
+        pendingBatch.deviceId,
+        appVersion,
+      );
+      final result = await gateway.syncBatch(
+        current.accessToken,
+        pendingBatch,
+        events.map((event) => event.toSyncEventJson()).toList(),
+      );
+      final coveredEventIds = {
+        ...result.acceptedEventIds,
+        ...result.rejectedEvents.keys,
+        ...result.conflictingEvents.keys,
+      };
+      if (coveredEventIds.length != pendingBatch.eventIds.length ||
+          !coveredEventIds.containsAll(pendingBatch.eventIds)) {
+        throw const ZenitApiException(
+          'A API não confirmou todos os eventos do lote.',
+        );
+      }
+      await vault.completeMowingSyncBatch(
+        plan.id,
+        events
+            .map((event) => _completeMowingLifecycleEvent(event, result))
+            .toList(),
+        result.nextSyncCursor,
+      );
+    });
+  }
+
+  bool _isCompleteMowingDemoSequence(List<MowingDemoLifecycleEvent> events) {
+    if (events.length < 3 ||
+        events.first.operation != MowingDemoOperation.confirm ||
+        events[1].operation != MowingDemoOperation.start ||
+        events.last.operation != MowingDemoOperation.finish) {
+      return false;
+    }
+    for (var index = 2; index < events.length - 1; index++) {
+      final expected = index.isEven
+          ? MowingDemoOperation.pause
+          : MowingDemoOperation.resume;
+      if (events[index].operation != expected) return false;
+    }
+    return events.length.isOdd;
+  }
+
+  MowingDemoLifecycleEvent _completeMowingLifecycleEvent(
+    MowingDemoLifecycleEvent event,
+    MobileSyncResult result,
+  ) {
+    if (result.acceptedEventIds.contains(event.eventId)) {
+      return event.copyWith(
+        syncState: DraftSyncState.acknowledged,
+        syncResultCode: 'persisted',
+        syncResultMessage: 'Ensaio simulado persistido.',
+      );
+    }
+    final rejection = result.rejectedEvents[event.eventId];
+    if (rejection != null) {
+      return event.copyWith(
+        syncState: DraftSyncState.rejected,
+        syncResultCode: rejection.code,
+        syncResultMessage: rejection.message,
+      );
+    }
+    final conflict = result.conflictingEvents[event.eventId]!;
+    return event.copyWith(
+      syncState: DraftSyncState.conflict,
+      syncResultCode: conflict.code,
+      syncResultMessage: conflict.message,
+    );
+  }
 
   Future<bool> capturePreparedPhoto(
     PreparedWorkOrder order,
@@ -659,4 +891,40 @@ class PhotoCaptureCancelledError extends MobileWorkflowException {
 class IncompletePhotoBatchError extends MobileWorkflowException {
   const IncompletePhotoBatchError()
     : super('Capture uma foto preparada em cada um dos três pontos.');
+}
+
+class MowingDemoNotEligibleError extends MobileWorkflowException {
+  const MowingDemoNotEligibleError()
+    : super(
+        'O ensaio exige planejamento efetivo e declarações preparadas de clima e segurança livres.',
+      );
+}
+
+class MowingDemoSourcePointError extends MobileWorkflowException {
+  const MowingDemoSourcePointError()
+    : super(
+        'O ponto estimado da inspeção de origem não está disponível neste aparelho.',
+      );
+}
+
+class InvalidMowingDemoLifecycleError extends MobileWorkflowException {
+  const InvalidMowingDemoLifecycleError()
+    : super(
+        'Use confirmar, iniciar, pausar/retomar em pares e finalizar o ensaio.',
+      );
+}
+
+class IncompleteMowingDemoLifecycleError extends MobileWorkflowException {
+  const IncompleteMowingDemoLifecycleError()
+    : super('Finalize uma sequência válida antes de sincronizar o ensaio.');
+}
+
+class PersistedMowingDemoEditError extends MobileWorkflowException {
+  const PersistedMowingDemoEditError()
+    : super('Um evento do ensaio já tem resultado persistente e é imutável.');
+}
+
+class InvalidMowingDemoTimeError extends MobileWorkflowException {
+  const InvalidMowingDemoTimeError()
+    : super('O relógio do aparelho retrocedeu durante o ensaio.');
 }

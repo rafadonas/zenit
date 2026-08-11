@@ -26,11 +26,14 @@ void main() {
     expect(find.byType(TextField), findsNWidgets(2));
   });
 
-  testWidgets('shows mowing planning as read-only and non-executable', (
+  testWidgets('shows a clearly simulated non-operational mowing rehearsal', (
     tester,
   ) async {
     final controller = ZenitAppController(
-      gateway: FakeGateway(mowingPlans: [preparedMowingPlan()]),
+      gateway: FakeGateway(
+        orders: [preparedOrder()],
+        mowingPlans: [preparedMowingPlan()],
+      ),
       sessionStore: MemorySessionStore()..value = validSession(),
       vault: MemoryVault(),
       deviceIdentityStore: MemoryDeviceIdentityStore(),
@@ -46,19 +49,23 @@ void main() {
     await tester.tap(find.textContaining('NÃO EXECUTÁVEL'));
     await tester.pumpAndSettle();
 
-    expect(find.text('DEMONSTRAÇÃO — NÃO EXECUTÁVEL'), findsOneWidget);
+    expect(find.text('ENSAIO SIMULADO — NÃO É EXECUÇÃO'), findsOneWidget);
     expect(
       find.textContaining(
-        'Confirmar, iniciar, rastrear e concluir permanecem bloqueados.',
+        'Não há despacho, GPS real, rastreamento, serviço de campo',
       ),
       findsOneWidget,
     );
     await tester.scrollUntilVisible(
-      find.text('Não satisfeita'),
+      find.text('1. Confirmar ensaio'),
       300,
       scrollable: find.byType(Scrollable).last,
     );
-    expect(find.text('Não satisfeita'), findsOneWidget);
+    expect(find.text('1. Confirmar ensaio'), findsOneWidget);
+    expect(find.text('2. Iniciar (ponto simulado)'), findsOneWidget);
+    expect(find.text('Pausar ensaio'), findsOneWidget);
+    expect(find.text('Retomar ensaio'), findsOneWidget);
+    expect(find.text('3. Finalizar ensaio'), findsOneWidget);
     expect(find.byType(FilledButton), findsNothing);
   });
 }

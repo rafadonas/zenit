@@ -7,6 +7,7 @@ import 'data/secure_session_store.dart';
 import 'data/zenit_gateway.dart';
 import 'domain/demo_order_lifecycle.dart';
 import 'domain/measurement_draft.dart';
+import 'domain/mowing_demo_lifecycle.dart';
 import 'domain/prepared_mowing_plan.dart';
 import 'domain/prepared_photo_draft.dart';
 import 'domain/prepared_work_order.dart';
@@ -267,7 +268,10 @@ class OrdersPage extends StatelessWidget {
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => PreparedMowingPlanPage(plan: plan),
+                    builder: (_) => PreparedMowingPlanPage(
+                      controller: controller,
+                      plan: plan,
+                    ),
                   ),
                 ),
               ),
@@ -278,105 +282,317 @@ class OrdersPage extends StatelessWidget {
   );
 }
 
-class PreparedMowingPlanPage extends StatelessWidget {
-  const PreparedMowingPlanPage({super.key, required this.plan});
+class PreparedMowingPlanPage extends StatefulWidget {
+  const PreparedMowingPlanPage({
+    super.key,
+    required this.controller,
+    required this.plan,
+  });
 
+  final ZenitAppController controller;
   final PreparedMowingPlan plan;
+
+  @override
+  State<PreparedMowingPlanPage> createState() => _PreparedMowingPlanPageState();
+}
+
+class _PreparedMowingPlanPageState extends State<PreparedMowingPlanPage> {
+  bool loading = true;
+  bool syncing = false;
+  String? confirmation;
+  List<MowingDemoLifecycleEvent> events = const [];
+
+  PreparedMowingPlan get plan => widget.plan;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final loaded = await widget.controller.readMowingLifecycleEvents(plan.id);
+    if (!mounted) return;
+    setState(() {
+      events = loaded;
+      loading = false;
+    });
+  }
+
+  Future<void> _transition(
+    Future<bool> Function(PreparedMowingPlan) action,
+  ) async {
+    final changed = await action(plan);
+    if (!mounted) return;
+    if (changed) await _load();
+    if (!mounted) return;
+    setState(
+      () => confirmation = changed
+          ? 'Evento de ensaio simulado criptografado no aparelho.'
+          : widget.controller.errorMessage,
+    );
+  }
+
+  Future<void> _sync() async {
+    setState(() => syncing = true);
+    final synced = await widget.controller.syncMowingDemo(plan);
+    if (!mounted) return;
+    await _load();
+    if (!mounted) return;
+    final acknowledged = events
+        .where((event) => event.syncState == DraftSyncState.acknowledged)
+        .length;
+    final rejected = events
+        .where((event) => event.syncState == DraftSyncState.rejected)
+        .length;
+    final conflicts = events
+        .where((event) => event.syncState == DraftSyncState.conflict)
+        .length;
+    setState(() {
+      syncing = false;
+      confirmation = synced
+          ? 'Ensaio persistido: $acknowledged aceitos, $rejected rejeitados, $conflicts conflitos.'
+          : widget.controller.errorMessage;
+    });
+  }
 
   @override
   Widget build(BuildContext context) => Scaffold(
     appBar: AppBar(title: const Text('Planejamento de roçada')),
-    body: ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Card(
-          color: Theme.of(context).colorScheme.errorContainer,
-          child: const Padding(
-            padding: EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.block),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'DEMONSTRAÇÃO — NÃO EXECUTÁVEL',
-                        style: TextStyle(fontWeight: FontWeight.bold),
+    body: loading
+        ? const Center(child: CircularProgressIndicator())
+        : ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Card(
+                color: Theme.of(context).colorScheme.errorContainer,
+                child: const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.block),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'ENSAIO SIMULADO — NÃO É EXECUÇÃO',
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        ],
                       ),
+                      SizedBox(height: 8),
+                      Text(
+                        'Os controles registram apenas um ensaio. Não há despacho, GPS real, rastreamento, serviço de campo ou aprovação operacional.',
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                '${plan.roadCode} · segmento ${plan.segmentIndex}',
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 4),
+              Text('Zona ${plan.zoneType} · localização simulada'),
+              const SizedBox(height: 16),
+              _ReadOnlyValue(
+                label: 'Justificativa',
+                value: plan.planningRationale,
+              ),
+              _ReadOnlyValue(
+                label: 'Equipe candidata',
+                value: plan.teamReference ?? 'Não planejada',
+              ),
+              _ReadOnlyValue(
+                label: 'Equipamento candidato',
+                value: plan.equipmentReference ?? 'Não planejado',
+              ),
+              _ReadOnlyValue(
+                label: 'Clima (declaração manual)',
+                value: _preparedMowingLabel(plan.weatherResult),
+              ),
+              _ReadOnlyValue(
+                label: 'Fonte do clima',
+                value: plan.weatherSourceReference ?? 'Não avaliada',
+              ),
+              _ReadOnlyValue(
+                label: 'Segurança (declaração manual)',
+                value: _preparedMowingLabel(plan.safetyResult),
+              ),
+              _ReadOnlyValue(
+                label: 'Fonte de segurança',
+                value: plan.safetySourceReference ?? 'Não avaliada',
+              ),
+              _ReadOnlyValue(
+                label: 'Decisão de planejamento',
+                value: _preparedMowingLabel(plan.planningDecision),
+              ),
+              _ReadOnlyValue(
+                label: 'Justificativa da decisão',
+                value:
+                    plan.planningDecisionRationale ?? 'Sem decisão registrada',
+              ),
+              _ReadOnlyValue(
+                label: 'Aprovação operacional',
+                value: 'Não satisfeita',
+              ),
+              _ReadOnlyValue(
+                label: 'Proveniência',
+                value:
+                    'Revisão ${plan.sourceReviewState} · política ${plan.creationPolicyVersion}',
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Ciclo do ensaio offline',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              if (!plan.canRunDemoRehearsal)
+                const Text(
+                  'Bloqueado: exige revisão efetiva, clima e segurança declarados livres e aprovação somente para planejamento.',
+                )
+              else ...[
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    OutlinedButton(
+                      onPressed:
+                          events.isEmpty && !syncing && !widget.controller.busy
+                          ? () =>
+                                _transition(widget.controller.confirmMowingDemo)
+                          : null,
+                      child: const Text('1. Confirmar ensaio'),
+                    ),
+                    OutlinedButton(
+                      onPressed:
+                          events.length == 1 &&
+                              !syncing &&
+                              !widget.controller.busy
+                          ? () => _transition(widget.controller.startMowingDemo)
+                          : null,
+                      child: const Text('2. Iniciar (ponto simulado)'),
+                    ),
+                    OutlinedButton(
+                      onPressed:
+                          events.isNotEmpty &&
+                              const {
+                                MowingDemoOperation.start,
+                                MowingDemoOperation.resume,
+                              }.contains(events.last.operation) &&
+                              !syncing &&
+                              !widget.controller.busy
+                          ? () => _transition(widget.controller.pauseMowingDemo)
+                          : null,
+                      child: const Text('Pausar ensaio'),
+                    ),
+                    OutlinedButton(
+                      onPressed:
+                          events.isNotEmpty &&
+                              events.last.operation ==
+                                  MowingDemoOperation.pause &&
+                              !syncing &&
+                              !widget.controller.busy
+                          ? () =>
+                                _transition(widget.controller.resumeMowingDemo)
+                          : null,
+                      child: const Text('Retomar ensaio'),
+                    ),
+                    OutlinedButton(
+                      onPressed:
+                          events.isNotEmpty &&
+                              const {
+                                MowingDemoOperation.start,
+                                MowingDemoOperation.resume,
+                              }.contains(events.last.operation) &&
+                              !syncing &&
+                              !widget.controller.busy
+                          ? () =>
+                                _transition(widget.controller.finishMowingDemo)
+                          : null,
+                      child: const Text('3. Finalizar ensaio'),
                     ),
                   ],
                 ),
-                SizedBox(height: 8),
-                Text(
-                  'Confirmar, iniciar, rastrear e concluir permanecem bloqueados. Uma decisão de planejamento não substitui aprovação operacional.',
-                ),
+                if (events.any(
+                  (event) => event.operation == MowingDemoOperation.start,
+                )) ...[
+                  const SizedBox(height: 8),
+                  Builder(
+                    builder: (context) {
+                      final start = events.firstWhere(
+                        (event) => event.operation == MowingDemoOperation.start,
+                      );
+                      return Text(
+                        'Ponto simulado: ${start.simulatedLatitude}, ${start.simulatedLongitude} · prepared_point_demo_v1',
+                      );
+                    },
+                  ),
+                ],
+                if (events.isNotEmpty &&
+                    events.last.operation == MowingDemoOperation.finish) ...[
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    onPressed:
+                        syncing ||
+                            widget.controller.busy ||
+                            events.every(
+                              (event) => event.hasPersistentServerResult,
+                            )
+                        ? null
+                        : _sync,
+                    icon: const Icon(Icons.sync),
+                    label: const Text('Sincronizar ensaio simulado'),
+                  ),
+                ],
+                for (final event in events)
+                  ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(_syncIcon(event.syncState)),
+                    title: Text(
+                      '${_mowingOperationLabel(event.operation)}: ${_syncLabel(event.syncState)}',
+                    ),
+                    subtitle: event.syncResultMessage == null
+                        ? null
+                        : Text(event.syncResultMessage!),
+                  ),
               ],
-            ),
+              if (confirmation case final message?) ...[
+                const SizedBox(height: 8),
+                Text(message),
+              ],
+              const SizedBox(height: 16),
+              const Text(
+                'Todos os eventos são simulados, inelegíveis para treinamento e relatório oficial, e nunca autorizam roçada.',
+              ),
+            ],
           ),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          '${plan.roadCode} · segmento ${plan.segmentIndex}',
-          style: Theme.of(context).textTheme.headlineSmall,
-        ),
-        const SizedBox(height: 4),
-        Text('Zona ${plan.zoneType} · localização simulada'),
-        const SizedBox(height: 16),
-        _ReadOnlyValue(label: 'Justificativa', value: plan.planningRationale),
-        _ReadOnlyValue(
-          label: 'Equipe candidata',
-          value: plan.teamReference ?? 'Não planejada',
-        ),
-        _ReadOnlyValue(
-          label: 'Equipamento candidato',
-          value: plan.equipmentReference ?? 'Não planejado',
-        ),
-        _ReadOnlyValue(
-          label: 'Clima (declaração manual)',
-          value: _preparedLabel(plan.weatherResult),
-        ),
-        _ReadOnlyValue(
-          label: 'Fonte do clima',
-          value: plan.weatherSourceReference ?? 'Não avaliada',
-        ),
-        _ReadOnlyValue(
-          label: 'Segurança (declaração manual)',
-          value: _preparedLabel(plan.safetyResult),
-        ),
-        _ReadOnlyValue(
-          label: 'Fonte de segurança',
-          value: plan.safetySourceReference ?? 'Não avaliada',
-        ),
-        _ReadOnlyValue(
-          label: 'Decisão de planejamento',
-          value: _preparedLabel(plan.planningDecision),
-        ),
-        _ReadOnlyValue(
-          label: 'Justificativa da decisão',
-          value: plan.planningDecisionRationale ?? 'Sem decisão registrada',
-        ),
-        _ReadOnlyValue(label: 'Aprovação operacional', value: 'Não satisfeita'),
-        _ReadOnlyValue(
-          label: 'Proveniência',
-          value:
-              'Revisão ${plan.sourceReviewState} · política ${plan.creationPolicyVersion}',
-        ),
-      ],
-    ),
   );
-
-  static String _preparedLabel(String? value) => switch (value) {
-    'clear' => 'Declarado livre — validação pendente',
-    'blocked' => 'Declarado bloqueado',
-    'inconclusive' => 'Inconclusivo',
-    'approved_for_planning' => 'Aprovado somente para planejamento',
-    'changes_requested' => 'Alterações solicitadas',
-    'rejected' => 'Rejeitado',
-    _ => 'Não registrado',
-  };
 }
+
+String _preparedMowingLabel(String? value) => switch (value) {
+  'clear' => 'Declarado livre — validação pendente',
+  'blocked' => 'Declarado bloqueado',
+  'inconclusive' => 'Inconclusivo',
+  'approved_for_planning' => 'Aprovado somente para planejamento',
+  'changes_requested' => 'Alterações solicitadas',
+  'rejected' => 'Rejeitado',
+  _ => 'Não registrado',
+};
+
+String _mowingOperationLabel(MowingDemoOperation operation) =>
+    switch (operation) {
+      MowingDemoOperation.confirm => 'Confirmação do ensaio',
+      MowingDemoOperation.start => 'Início simulado',
+      MowingDemoOperation.pause => 'Pausa do ensaio',
+      MowingDemoOperation.resume => 'Retomada do ensaio',
+      MowingDemoOperation.finish => 'Fim do ensaio',
+    };
 
 class _ReadOnlyValue extends StatelessWidget {
   const _ReadOnlyValue({required this.label, required this.value});

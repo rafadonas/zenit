@@ -6,6 +6,7 @@ import 'package:hive_ce_flutter/hive_flutter.dart';
 import '../domain/measurement_draft.dart';
 import '../domain/demo_order_lifecycle.dart';
 import '../domain/mobile_sync.dart';
+import '../domain/mowing_demo_lifecycle.dart';
 import '../domain/prepared_mowing_plan.dart';
 import '../domain/prepared_photo_draft.dart';
 import '../domain/prepared_work_order.dart';
@@ -16,6 +17,13 @@ abstract interface class OfflineVault {
   Future<void> replaceOrders(List<PreparedWorkOrder> orders);
   Future<List<PreparedMowingPlan>> readMowingPlans();
   Future<void> replaceMowingPlans(List<PreparedMowingPlan> plans);
+  Future<List<MowingDemoLifecycleEvent>> readMowingLifecycleEvents(
+    String mowingOrderId,
+  );
+  Future<void> replaceMowingLifecycleEvents(
+    String mowingOrderId,
+    List<MowingDemoLifecycleEvent> events,
+  );
   Future<List<MeasurementDraft>> readDrafts(String orderId);
   Future<void> replaceDrafts(String orderId, List<MeasurementDraft> drafts);
   Future<List<DemoLifecycleEvent>> readLifecycleEvents(String orderId);
@@ -44,6 +52,15 @@ abstract interface class OfflineVault {
     List<MeasurementDraft> drafts,
     List<DemoLifecycleEvent> lifecycleEvents,
     List<PreparedPhotoDraft> photoDrafts,
+    int nextSyncCursor,
+  );
+  Future<void> savePendingMowingSyncBatch(
+    PendingSyncBatch batch,
+    List<MowingDemoLifecycleEvent> lifecycleEvents,
+  );
+  Future<void> completeMowingSyncBatch(
+    String mowingOrderId,
+    List<MowingDemoLifecycleEvent> lifecycleEvents,
     int nextSyncCursor,
   );
   Future<void> clearUserData();
@@ -156,11 +173,61 @@ class HiveOfflineVault implements OfflineVault {
   }
 
   @override
-  Future<void> replaceMowingPlans(List<PreparedMowingPlan> plans) =>
-      _openBox.put(
-        _mowingPlansKey,
-        jsonEncode(plans.map((plan) => plan.toJson()).toList()),
-      );
+  Future<void> replaceMowingPlans(List<PreparedMowingPlan> plans) async {
+    final retainedIds = <String>{};
+    final pending = await readPendingSyncBatch();
+    if (pending != null) retainedIds.add(pending.orderId);
+    for (final key in _openBox.keys.whereType<String>()) {
+      if (!key.startsWith('mowing_demo_lifecycle:')) continue;
+      final orderId = key.substring('mowing_demo_lifecycle:'.length);
+      final events = await readMowingLifecycleEvents(orderId);
+      if (events.any((event) => !event.hasPersistentServerResult)) {
+        retainedIds.add(orderId);
+      }
+    }
+    final existing = await readMowingPlans();
+    final merged = <String, PreparedMowingPlan>{
+      for (final plan in existing)
+        if (retainedIds.contains(plan.id)) plan.id: plan,
+      for (final plan in plans) plan.id: plan,
+    };
+    final allowedIds = merged.keys.toSet();
+    final obsoleteKeys = _openBox.keys.whereType<String>().where(
+      (key) =>
+          key.startsWith('mowing_demo_lifecycle:') &&
+          !allowedIds.contains(key.substring('mowing_demo_lifecycle:'.length)),
+    );
+    await _openBox.deleteAll(obsoleteKeys);
+    await _openBox.put(
+      _mowingPlansKey,
+      jsonEncode(merged.values.map((plan) => plan.toJson()).toList()),
+    );
+  }
+
+  @override
+  Future<List<MowingDemoLifecycleEvent>> readMowingLifecycleEvents(
+    String mowingOrderId,
+  ) async {
+    final encoded = _openBox.get(_mowingLifecycleKey(mowingOrderId));
+    if (encoded == null) return const [];
+    final items = jsonDecode(encoded) as List<Object?>;
+    return items
+        .map(
+          (item) => MowingDemoLifecycleEvent.fromJson(
+            (item! as Map).cast<String, Object?>(),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  @override
+  Future<void> replaceMowingLifecycleEvents(
+    String mowingOrderId,
+    List<MowingDemoLifecycleEvent> events,
+  ) => _openBox.put(
+    _mowingLifecycleKey(mowingOrderId),
+    jsonEncode(events.map((event) => event.toJson()).toList()),
+  );
 
   @override
   Future<List<MeasurementDraft>> readDrafts(String orderId) async {
@@ -262,6 +329,12 @@ class HiveOfflineVault implements OfflineVault {
       final events = await readLifecycleEvents(orderId);
       if (events.any((event) => !event.hasPersistentServerResult)) return true;
     }
+    for (final key in _openBox.keys.whereType<String>()) {
+      if (!key.startsWith('mowing_demo_lifecycle:')) continue;
+      final orderId = key.substring('mowing_demo_lifecycle:'.length);
+      final events = await readMowingLifecycleEvents(orderId);
+      if (events.any((event) => !event.hasPersistentServerResult)) return true;
+    }
     return false;
   }
 
@@ -323,9 +396,37 @@ class HiveOfflineVault implements OfflineVault {
   }
 
   @override
+  Future<void> savePendingMowingSyncBatch(
+    PendingSyncBatch batch,
+    List<MowingDemoLifecycleEvent> lifecycleEvents,
+  ) => _openBox.putAll({
+    _mowingLifecycleKey(batch.orderId): jsonEncode(
+      lifecycleEvents.map((event) => event.toJson()).toList(),
+    ),
+    _pendingBatchKey: jsonEncode(batch.toJson()),
+  });
+
+  @override
+  Future<void> completeMowingSyncBatch(
+    String mowingOrderId,
+    List<MowingDemoLifecycleEvent> lifecycleEvents,
+    int nextSyncCursor,
+  ) async {
+    await _openBox.putAll({
+      _mowingLifecycleKey(mowingOrderId): jsonEncode(
+        lifecycleEvents.map((event) => event.toJson()).toList(),
+      ),
+      _syncCursorKey: nextSyncCursor.toString(),
+    });
+    await _openBox.delete(_pendingBatchKey);
+  }
+
+  @override
   Future<void> clearUserData() => _openBox.clear();
 
   static String _draftKey(String orderId) => 'measurement_drafts:$orderId';
   static String _lifecycleKey(String orderId) => 'demo_lifecycle:$orderId';
   static String _photoKey(String orderId) => 'prepared_photos:$orderId';
+  static String _mowingLifecycleKey(String orderId) =>
+      'mowing_demo_lifecycle:$orderId';
 }

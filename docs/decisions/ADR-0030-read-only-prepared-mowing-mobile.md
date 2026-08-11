@@ -2,6 +2,7 @@
 
 - Status: accepted
 - Date: 2026-08-11
+- Superseded in part by: ADR-0032 (mobile rehearsal controls only)
 
 ## Context
 

@@ -4,6 +4,7 @@ import 'package:zenit_mobile/data/zenit_gateway.dart';
 import 'package:zenit_mobile/domain/auth_session.dart';
 import 'package:zenit_mobile/domain/measurement_draft.dart';
 import 'package:zenit_mobile/domain/mobile_sync.dart';
+import 'package:zenit_mobile/domain/mowing_demo_lifecycle.dart';
 import 'package:zenit_mobile/domain/prepared_mowing_plan.dart';
 import 'package:zenit_mobile/domain/prepared_photo_draft.dart';
 import 'package:zenit_mobile/domain/prepared_work_order.dart';
@@ -11,6 +12,118 @@ import 'package:zenit_mobile/domain/prepared_work_order.dart';
 import 'support/fakes.dart';
 
 void main() {
+  test(
+    'mowing rehearsal persists balanced offline events and retries IDs',
+    () async {
+      final order = preparedOrder();
+      final plan = preparedMowingPlan();
+      final vault = MemoryVault();
+      final gateway = FakeGateway(
+        orders: [order],
+        mowingPlans: [plan],
+        syncFailure: const ZenitApiException('offline'),
+      );
+      final controller = ZenitAppController(
+        gateway: gateway,
+        sessionStore: MemorySessionStore(),
+        vault: vault,
+        deviceIdentityStore: MemoryDeviceIdentityStore(),
+        appVersion: 'test',
+        uuidFactory: _uuidFactory(),
+        clock: () => DateTime.utc(2026, 8, 11, 14),
+      );
+      await controller.initialize();
+      await controller.login('field@example.test', 'secret');
+
+      expect(await controller.confirmMowingDemo(plan), isTrue);
+      expect(await controller.startMowingDemo(plan), isTrue);
+      expect(await controller.pauseMowingDemo(plan), isTrue);
+      expect(await controller.resumeMowingDemo(plan), isTrue);
+      expect(await controller.finishMowingDemo(plan), isTrue);
+      expect(await controller.syncMowingDemo(plan), isFalse);
+
+      final firstBatch = vault.pendingBatch!;
+      final pendingEvents = await vault.readMowingLifecycleEvents(plan.id);
+      expect(firstBatch.eventIds, hasLength(5));
+      expect(pendingEvents.map((event) => event.operation), [
+        MowingDemoOperation.confirm,
+        MowingDemoOperation.start,
+        MowingDemoOperation.pause,
+        MowingDemoOperation.resume,
+        MowingDemoOperation.finish,
+      ]);
+      expect(pendingEvents[1].simulatedLatitude, order.points.first.latitude);
+      expect(pendingEvents[1].simulatedLongitude, order.points.first.longitude);
+      expect(
+        pendingEvents.every(
+          (event) => event.syncState == DraftSyncState.pending,
+        ),
+        isTrue,
+      );
+      expect(await vault.hasUnacknowledgedEvents(), isTrue);
+
+      gateway.syncFailure = null;
+      expect(await controller.syncMowingDemo(plan), isTrue);
+      expect(gateway.lastBatch!.batchId, firstBatch.batchId);
+      expect(gateway.lastBatch!.eventIds, firstBatch.eventIds);
+      expect(gateway.lastEvents!.map((event) => event['operation']), [
+        'confirm',
+        'start',
+        'pause',
+        'resume',
+        'finish',
+      ]);
+      final payloads = gateway.lastEvents!.map(
+        (event) => (event['payload']! as Map).cast<String, Object?>(),
+      );
+      expect(
+        payloads.every(
+          (payload) =>
+              payload['data_status'] == 'simulated' &&
+              payload['rehearsal_scope'] == 'mowing_demo_rehearsal_only' &&
+              payload['operational_approval_satisfied'] == false &&
+              payload['authorizes_field_work'] == false &&
+              payload['eligible_for_field_execution'] == false &&
+              payload['eligible_for_model_training'] == false &&
+              payload['eligible_for_official_reporting'] == false,
+        ),
+        isTrue,
+      );
+      expect(vault.pendingBatch, isNull);
+      expect(vault.syncCursor, 1);
+      expect(
+        (await vault.readMowingLifecycleEvents(
+          plan.id,
+        )).every((event) => event.syncState == DraftSyncState.acknowledged),
+        isTrue,
+      );
+    },
+  );
+
+  test(
+    'mowing rehearsal fails closed without effective safe planning',
+    () async {
+      final blockedPlan = PreparedMowingPlan.fromJson(
+        preparedMowingPlanJson()..['latest_safety_result'] = 'inconclusive',
+      );
+      final controller = ZenitAppController(
+        gateway: FakeGateway(
+          orders: [preparedOrder()],
+          mowingPlans: [blockedPlan],
+        ),
+        sessionStore: MemorySessionStore(),
+        vault: MemoryVault(),
+        deviceIdentityStore: MemoryDeviceIdentityStore(),
+        appVersion: 'test',
+      );
+      await controller.initialize();
+      await controller.login('field@example.test', 'secret');
+
+      expect(await controller.confirmMowingDemo(blockedPlan), isFalse);
+      expect(controller.errorMessage, contains('clima e segurança'));
+    },
+  );
+
   test('downloads and retains a read-only mowing planning snapshot', () async {
     final plan = preparedMowingPlan();
     final vault = MemoryVault();
