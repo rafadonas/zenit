@@ -22,6 +22,11 @@ const value = {
     resource_plan_count: 0, latest_resource_plan_id: null,
     latest_team_reference: null, latest_equipment_reference: null,
     latest_resource_plan_rationale: null, latest_resource_plan_created_at: null,
+    readiness_assessment_count: 0, latest_readiness_assessment_id: null,
+    latest_readiness_resource_plan_id: null, latest_weather_result: null,
+    latest_weather_source_reference: null, latest_safety_result: null,
+    latest_safety_source_reference: null, latest_readiness_rationale: null,
+    latest_readiness_assessed_at: null,
   }], result_count: 1, limit: 50, truncated: false,
   warning: "Requires human review and never authorizes mowing.",
 };

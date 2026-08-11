@@ -150,8 +150,8 @@ credentials.
 ## Database migrations and ingestion
 
 Apply migrations in numeric order before importing sources. The current local
-development database must have migrations `0001` through `0025` applied. On the first
-startup of a new Compose volume, Postgres applies these twenty-five up migrations in
+development database must have migrations `0001` through `0026` applied. On the first
+startup of a new Compose volume, Postgres applies these twenty-six up migrations in
 order through `/docker-entrypoint-initdb.d`; existing volumes are never modified
 by that initialization mechanism. The explicit commands below remain useful
 for non-Compose environments and controlled upgrades of existing databases.
@@ -207,6 +207,8 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0024_prepared_mowing_order.sql
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0025_prepared_mowing_resource_plan.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
+  < infra/migrations/0026_prepared_mowing_readiness_assessment.sql
 ```
 
 Migration `0008` starts the Sprint 4 management foundation with immutable,
@@ -310,6 +312,11 @@ Migration `0025` adds append-only candidate resource plans for prepared mowing
 orders. Team and equipment references remain unverified placeholders pending
 external validation; assignment stays `unassigned` and field execution remains
 blocked. See `docs/decisions/ADR-0027-prepared-mowing-resource-plan.md`.
+
+Migration `0026` adds append-only manual weather and safety assessments tied to
+the effective candidate resource plan. Declared sources are mandatory and all
+results remain prepared, pending validation, and non-authorizing. See
+`docs/decisions/ADR-0028-prepared-mowing-readiness-assessment.md`.
 
 The public, read-only management queue is available at:
 
@@ -594,6 +601,20 @@ Content-Type: application/json
 
 The API and dashboard identify these values as prepared placeholders. They do
 not confirm availability, create assignments, or change any execution gate.
+
+Record or correct the manual readiness assessment:
+
+```text
+POST /v1/prepared-mowing-orders/{mowing_order_id}/readiness-assessments
+Authorization: Bearer <access-token>
+Idempotency-Key: <client-generated-stable-key>
+Content-Type: application/json
+
+{"resource_plan_id":"<effective-plan-uuid>","weather_result":"inconclusive","weather_source_reference":"manual source pending validation","safety_result":"inconclusive","safety_source_reference":"manual checklist pending validation","assessment_rationale":"Record prepared context without clearance"}
+```
+
+Even two `clear` results are manual prepared statements only. They do not
+authorize work, schedule a crew, or make the order field-executable.
 
 Use `zenit-import` for one immutable raw file at a time. Full examples are in
 `docs/architecture/source-ingestion.md`.

@@ -1,0 +1,9 @@
+BEGIN;
+DROP TRIGGER IF EXISTS prepared_mowing_readiness_immutable ON prepared_mowing_readiness_assessment;
+DROP TRIGGER IF EXISTS prepared_mowing_readiness_policy_immutable ON prepared_mowing_readiness_policy;
+DROP FUNCTION IF EXISTS prevent_prepared_mowing_readiness_mutation();
+DROP TRIGGER IF EXISTS prepared_mowing_readiness_guard ON prepared_mowing_readiness_assessment;
+DROP FUNCTION IF EXISTS validate_prepared_mowing_readiness_assessment();
+DROP TABLE IF EXISTS prepared_mowing_readiness_assessment;
+DROP TABLE IF EXISTS prepared_mowing_readiness_policy;
+COMMIT;

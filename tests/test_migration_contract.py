@@ -44,6 +44,9 @@ PREPARED_MOWING_ORDER_MIGRATION = Path(
 PREPARED_MOWING_RESOURCE_PLAN_MIGRATION = Path(
     "infra/migrations/0025_prepared_mowing_resource_plan.sql"
 )
+PREPARED_MOWING_READINESS_MIGRATION = Path(
+    "infra/migrations/0026_prepared_mowing_readiness_assessment.sql"
+)
 
 
 class MigrationContractTests(unittest.TestCase):
@@ -146,7 +149,7 @@ class MigrationContractTests(unittest.TestCase):
         mounts = [
             line.strip() for line in compose.splitlines() if "/docker-entrypoint-initdb.d/" in line
         ]
-        self.assertEqual(len(mounts), 25)
+        self.assertEqual(len(mounts), 26)
         for version, mount in enumerate(mounts, start=1):
             prefix = f"{version:04d}"
             self.assertIn(f"infra/migrations/{prefix}_", mount)
@@ -354,6 +357,19 @@ class MigrationContractTests(unittest.TestCase):
         self.assertIn("equipment_assignment_status = 'unassigned'", sql)
         self.assertIn("CHECK (NOT authorizes_field_work)", sql)
         self.assertIn("prepared_mowing_resource_plan_immutable", sql)
+
+    def test_mowing_readiness_is_manual_versioned_and_non_authorizing(self) -> None:
+        sql = PREPARED_MOWING_READINESS_MIGRATION.read_text(encoding="utf-8")
+        self.assertIn("prepared-mowing-readiness-v1", sql)
+        self.assertIn("prepared_manual_pending_validation", sql)
+        self.assertIn("weather_result IN ('clear', 'blocked', 'inconclusive')", sql)
+        self.assertIn("safety_result IN ('clear', 'blocked', 'inconclusive')", sql)
+        self.assertIn("prepared-post-inspection-review:", sql)
+        self.assertIn("prepared-mowing-resource-plan:", sql)
+        self.assertIn("prepared-mowing-readiness:", sql)
+        self.assertIn("requires the effective resource plan", sql)
+        self.assertIn("CHECK (NOT authorizes_field_work)", sql)
+        self.assertIn("prepared_mowing_readiness_immutable", sql)
 
 
 if __name__ == "__main__":

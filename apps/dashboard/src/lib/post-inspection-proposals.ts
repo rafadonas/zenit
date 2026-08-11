@@ -34,6 +34,15 @@ export interface PreparedPostInspectionProposal {
   latest_equipment_reference: string | null;
   latest_resource_plan_rationale: string | null;
   latest_resource_plan_created_at: string | null;
+  readiness_assessment_count: number;
+  latest_readiness_assessment_id: string | null;
+  latest_readiness_resource_plan_id: string | null;
+  latest_weather_result: "clear" | "blocked" | "inconclusive" | null;
+  latest_weather_source_reference: string | null;
+  latest_safety_result: "clear" | "blocked" | "inconclusive" | null;
+  latest_safety_source_reference: string | null;
+  latest_readiness_rationale: string | null;
+  latest_readiness_assessed_at: string | null;
 }
 
 export interface PreparedProposalCollection {
@@ -89,10 +98,25 @@ function isProposal(value: unknown): value is PreparedPostInspectionProposal {
     : typeof value.resource_plan_count === "number" && value.resource_plan_count > 0 &&
       value.prepared_mowing_order_id !== null &&
       resourceMetadata.every((item) => typeof item === "string");
+  const readinessMetadata = [
+    value.latest_readiness_assessment_id, value.latest_readiness_resource_plan_id,
+    value.latest_weather_source_reference, value.latest_safety_source_reference,
+    value.latest_readiness_rationale, value.latest_readiness_assessed_at,
+  ];
+  const readinessConsistent = value.readiness_assessment_count === 0
+    ? readinessMetadata.every((item) => item === null) &&
+      value.latest_weather_result === null && value.latest_safety_result === null
+    : typeof value.readiness_assessment_count === "number" &&
+      value.readiness_assessment_count > 0 &&
+      readinessMetadata.every((item) => typeof item === "string") &&
+      value.latest_readiness_resource_plan_id === value.latest_resource_plan_id &&
+      ["clear", "blocked", "inconclusive"].includes(String(value.latest_weather_result)) &&
+      ["clear", "blocked", "inconclusive"].includes(String(value.latest_safety_result));
   return [10, 30].includes(threshold) && value.threshold_exceeded === exceeded &&
     typeof value.review_count === "number" && Number.isInteger(value.review_count) &&
-    reviewConsistent && mowingOrderConsistent && resourcePlanConsistent &&
+    reviewConsistent && mowingOrderConsistent && resourcePlanConsistent && readinessConsistent &&
     Number.isInteger(value.resource_plan_count) &&
+    Number.isInteger(value.readiness_assessment_count) &&
     value.recommendation === (exceeded ? "mowing_review" : "monitor") &&
     typeof value.proposal_id === "string" &&
     typeof value.summary_id === "string" && typeof value.work_order_id === "string" &&

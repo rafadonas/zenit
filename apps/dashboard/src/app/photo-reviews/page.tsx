@@ -22,6 +22,7 @@ interface PageProps {
   searchParams: Promise<{
     review?: string; summary?: string; export?: string; proposal?: string;
     proposal_review?: string; mowing_order?: string; resource_plan?: string;
+    readiness?: string;
   }>;
 }
 
@@ -74,7 +75,14 @@ async function loadProposals(): Promise<PreparedProposalCollection | null> {
 function message(
   review?: string, summary?: string, exportStatus?: string, proposal?: string,
   proposalReview?: string, mowingOrder?: string, resourcePlan?: string,
+  readiness?: string,
 ): string | null {
+  if (readiness === "recorded") return "Avaliação manual de clima e segurança registrada; validação operacional continua pendente.";
+  if (readiness === "forbidden") return "Seu usuário não pode avaliar esta ordem.";
+  if (readiness === "missing") return "A ordem de roçada preparada não foi encontrada.";
+  if (readiness === "conflict") return "A ordem ou o plano de recursos mudou, ou a correção entrou em conflito.";
+  if (readiness === "invalid") return "Preencha resultados, fontes e justificativa da avaliação.";
+  if (readiness === "service-unavailable") return "O serviço de avaliação não está disponível agora.";
   if (resourcePlan === "recorded") return "Referências candidatas de equipe e equipamento registradas, ainda não atribuídas.";
   if (resourcePlan === "forbidden") return "Seu usuário não pode planejar recursos para esta rodovia.";
   if (resourcePlan === "missing") return "A ordem de roçada preparada não foi encontrada.";
@@ -134,7 +142,7 @@ export default async function PhotoReviewsPage({ searchParams }: PageProps) {
   ]);
   const operationMessage = message(
     query.review, query.summary, query.export, query.proposal, query.proposal_review,
-    query.mowing_order, query.resource_plan,
+    query.mowing_order, query.resource_plan, query.readiness,
   );
   const summaryByOrder = new Map<string, PreparedInspectionSummary>(
     summaries?.items.map((summary) => [summary.work_order_id, summary]) ?? [],
@@ -213,6 +221,18 @@ export default async function PhotoReviewsPage({ searchParams }: PageProps) {
                     <label htmlFor={`resource-rationale-${proposal.proposal_id}`}>Justificativa do plano de recursos</label><textarea defaultValue="Registrar candidatos preparados sem atribuir recursos operacionais" id={`resource-rationale-${proposal.proposal_id}`} maxLength={2000} name="planning_rationale" required rows={2} />
                     <button className="secondary-button" type="submit">{proposal.latest_resource_plan_id ? "Corrigir plano de recursos" : "Registrar recursos candidatos"}</button><small>O registro é append-only, não confirma disponibilidade e não atribui equipe ou equipamento.</small>
                   </form>
+                  {proposal.latest_resource_plan_id ? <>
+                    {proposal.latest_readiness_assessment_id ? <div className="post-inspection-proposal"><div><strong>Avaliação manual preparada</strong><span>Clima: {proposal.latest_weather_result} · Segurança: {proposal.latest_safety_result}</span></div><span className="status-pill review">Validação pendente</span><small>Fontes declaradas: {proposal.latest_weather_source_reference} · {proposal.latest_safety_source_reference}. Mesmo “clear” não libera execução.</small></div> : null}
+                    <form action={`/api/prepared-mowing-orders/${proposal.prepared_mowing_order_id}/readiness-assessments`} className="prepared-summary-form" method="post">
+                      <input name="csrf_token" type="hidden" value={session.csrfToken} /><input name="idempotency_key" type="hidden" value={randomUUID()} /><input name="resource_plan_id" type="hidden" value={proposal.latest_resource_plan_id} />{proposal.latest_readiness_assessment_id ? <input name="supersedes_assessment_id" type="hidden" value={proposal.latest_readiness_assessment_id} /> : null}
+                      <label htmlFor={`weather-result-${proposal.proposal_id}`}>Resultado manual de clima</label><select id={`weather-result-${proposal.proposal_id}`} name="weather_result"><option value="inconclusive">Inconclusivo</option><option value="clear">Sem bloqueio identificado</option><option value="blocked">Bloqueado</option></select>
+                      <label htmlFor={`weather-source-${proposal.proposal_id}`}>Fonte declarada de clima</label><input id={`weather-source-${proposal.proposal_id}`} maxLength={500} name="weather_source_reference" placeholder="Consulta manual e horário — validar externamente" required />
+                      <label htmlFor={`safety-result-${proposal.proposal_id}`}>Resultado manual de segurança</label><select id={`safety-result-${proposal.proposal_id}`} name="safety_result"><option value="inconclusive">Inconclusivo</option><option value="clear">Sem bloqueio identificado</option><option value="blocked">Bloqueado</option></select>
+                      <label htmlFor={`safety-source-${proposal.proposal_id}`}>Fonte declarada de segurança</label><input id={`safety-source-${proposal.proposal_id}`} maxLength={500} name="safety_source_reference" placeholder="Checklist ou referência — validar externamente" required />
+                      <label htmlFor={`readiness-rationale-${proposal.proposal_id}`}>Justificativa da avaliação</label><textarea defaultValue="Registrar avaliação manual preparada sem liberar execução" id={`readiness-rationale-${proposal.proposal_id}`} maxLength={2000} name="assessment_rationale" required rows={2} />
+                      <button className="secondary-button" type="submit">{proposal.latest_readiness_assessment_id ? "Corrigir avaliação" : "Registrar avaliação manual"}</button><small>Resultados são declarações preparadas pendentes de validação e nunca substituem aprovação operacional.</small>
+                    </form>
+                  </> : null}
                 </> : effectiveProposalRecommendation === "mowing_review" && proposal.latest_review_id ? <form action="/api/prepared-mowing-orders" className="prepared-summary-form" method="post">
                   <input name="csrf_token" type="hidden" value={session.csrfToken} /><input name="idempotency_key" type="hidden" value={randomUUID()} /><input name="source_review_id" type="hidden" value={proposal.latest_review_id} />
                   <label htmlFor={`mowing-rationale-${proposal.proposal_id}`}>Justificativa do planejamento de roçada</label><textarea defaultValue="Preparar ordem de roçada sem liberar execução operacional" id={`mowing-rationale-${proposal.proposal_id}`} maxLength={2000} name="planning_rationale" required rows={2} />

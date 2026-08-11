@@ -78,6 +78,18 @@ export interface PreparedMowingResourcePlanSubmission {
   supersedesPlanId?: string;
 }
 
+export interface PreparedMowingReadinessSubmission {
+  csrfToken: string;
+  idempotencyKey: string;
+  resourcePlanId: string;
+  weatherResult: "clear" | "blocked" | "inconclusive";
+  weatherSourceReference: string;
+  safetyResult: "clear" | "blocked" | "inconclusive";
+  safetySourceReference: string;
+  assessmentRationale: string;
+  supersedesAssessmentId?: string;
+}
+
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CSRF_PATTERN = /^[0-9a-f]{64}$/;
 
@@ -354,5 +366,41 @@ export function parsePreparedMowingResourcePlanSubmission(
   return {
     csrfToken, idempotencyKey, teamReference, equipmentReference, planningRationale,
     ...(supersedesPlanId ? { supersedesPlanId } : {}),
+  };
+}
+
+export function parsePreparedMowingReadinessSubmission(
+  form: FormData,
+): PreparedMowingReadinessSubmission | null {
+  const csrfToken = formString(form, "csrf_token");
+  const idempotencyKey = formString(form, "idempotency_key");
+  const resourcePlanId = formString(form, "resource_plan_id");
+  const weatherResult = formString(form, "weather_result");
+  const weatherSourceReference = formString(form, "weather_source_reference");
+  const safetyResult = formString(form, "safety_result");
+  const safetySourceReference = formString(form, "safety_source_reference");
+  const assessmentRationale = formString(form, "assessment_rationale");
+  const supersedesAssessmentId = formString(form, "supersedes_assessment_id");
+  const results = ["clear", "blocked", "inconclusive"];
+  if (
+    csrfToken === null || !CSRF_PATTERN.test(csrfToken) ||
+    idempotencyKey === null || !UUID_PATTERN.test(idempotencyKey) ||
+    resourcePlanId === null || !UUID_PATTERN.test(resourcePlanId) ||
+    !results.includes(weatherResult ?? "") || !results.includes(safetyResult ?? "") ||
+    weatherSourceReference === null || weatherSourceReference.length < 1 ||
+    weatherSourceReference.length > 500 || safetySourceReference === null ||
+    safetySourceReference.length < 1 || safetySourceReference.length > 500 ||
+    assessmentRationale === null || assessmentRationale.length < 1 ||
+    assessmentRationale.length > 2000 ||
+    (supersedesAssessmentId !== null && supersedesAssessmentId !== "" &&
+      !UUID_PATTERN.test(supersedesAssessmentId))
+  ) return null;
+  return {
+    csrfToken, idempotencyKey, resourcePlanId,
+    weatherResult: weatherResult as PreparedMowingReadinessSubmission["weatherResult"],
+    weatherSourceReference,
+    safetyResult: safetyResult as PreparedMowingReadinessSubmission["safetyResult"],
+    safetySourceReference, assessmentRationale,
+    ...(supersedesAssessmentId ? { supersedesAssessmentId } : {}),
   };
 }

@@ -7,6 +7,7 @@ import {
   parsePreparedInspectionOrderSubmission,
   parsePreparedMowingOrderSubmission,
   parsePreparedMowingResourcePlanSubmission,
+  parsePreparedMowingReadinessSubmission,
   parsePhotoReviewSubmission,
   parsePreparedProposalSubmission,
   parsePreparedProposalReviewSubmission,
@@ -212,5 +213,24 @@ describe("dashboard session security", () => {
     });
     form.set("equipment_reference", " ");
     expect(parsePreparedMowingResourcePlanSubmission(form)).toBeNull();
+  });
+
+  it("requires declared sources for manual readiness assessments", () => {
+    const form = new FormData();
+    form.set("csrf_token", csrfToken);
+    form.set("idempotency_key", "10000000-0000-4000-8000-000000000001");
+    form.set("resource_plan_id", "20000000-0000-4000-8000-000000000001");
+    form.set("weather_result", "clear");
+    form.set("weather_source_reference", "Consulta manual");
+    form.set("safety_result", "inconclusive");
+    form.set("safety_source_reference", "Checklist incompleto");
+    form.set("assessment_rationale", "Avaliação preparada");
+    form.set("authorizes_field_work", "true");
+    expect(parsePreparedMowingReadinessSubmission(form)).toMatchObject({
+      weatherResult: "clear", weatherSourceReference: "Consulta manual",
+      safetyResult: "inconclusive", safetySourceReference: "Checklist incompleto",
+    });
+    form.set("weather_source_reference", " ");
+    expect(parsePreparedMowingReadinessSubmission(form)).toBeNull();
   });
 });

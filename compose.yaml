@@ -36,6 +36,7 @@ services:
       - ./infra/migrations/0023_prepared_post_inspection_review.sql:/docker-entrypoint-initdb.d/0023.sql:ro
       - ./infra/migrations/0024_prepared_mowing_order.sql:/docker-entrypoint-initdb.d/0024.sql:ro
       - ./infra/migrations/0025_prepared_mowing_resource_plan.sql:/docker-entrypoint-initdb.d/0025.sql:ro
+      - ./infra/migrations/0026_prepared_mowing_readiness_assessment.sql:/docker-entrypoint-initdb.d/0026.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -81,6 +82,7 @@ services:
       PREPARED_POST_INSPECTION_POLICY_VERSION: ${PREPARED_POST_INSPECTION_POLICY_VERSION:-prepared-post-inspection-v1}
       PREPARED_MOWING_ORDER_POLICY_VERSION: ${PREPARED_MOWING_ORDER_POLICY_VERSION:-prepared-mowing-order-v1}
       PREPARED_MOWING_RESOURCE_POLICY_VERSION: ${PREPARED_MOWING_RESOURCE_POLICY_VERSION:-prepared-mowing-resource-plan-v1}
+      PREPARED_MOWING_READINESS_POLICY_VERSION: ${PREPARED_MOWING_READINESS_POLICY_VERSION:-prepared-mowing-readiness-v1}
       OBJECT_STORAGE_ENDPOINT: ${OBJECT_STORAGE_ENDPOINT:-http://minio:9000}
       OBJECT_STORAGE_ACCESS_KEY: ${OBJECT_STORAGE_ACCESS_KEY:-zenit}
       OBJECT_STORAGE_SECRET_KEY: ${OBJECT_STORAGE_SECRET_KEY:-change_me}

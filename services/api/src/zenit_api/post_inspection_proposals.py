@@ -70,6 +70,15 @@ class PreparedProposalResponse(BaseModel):
     latest_equipment_reference: str | None = None
     latest_resource_plan_rationale: str | None = None
     latest_resource_plan_created_at: datetime | None = None
+    readiness_assessment_count: int = Field(default=0, ge=0)
+    latest_readiness_assessment_id: UUID | None = None
+    latest_readiness_resource_plan_id: UUID | None = None
+    latest_weather_result: Literal["clear", "blocked", "inconclusive"] | None = None
+    latest_weather_source_reference: str | None = None
+    latest_safety_result: Literal["clear", "blocked", "inconclusive"] | None = None
+    latest_safety_source_reference: str | None = None
+    latest_readiness_rationale: str | None = None
+    latest_readiness_assessed_at: datetime | None = None
 
     @model_validator(mode="after")
     def validate_review_state(self) -> PreparedProposalResponse:
@@ -118,6 +127,20 @@ class PreparedProposalResponse(BaseModel):
             value is None for value in resource_metadata
         ):
             raise ValueError("resource plan requires a current prepared mowing order")
+        readiness_metadata = (
+            self.latest_readiness_assessment_id, self.latest_readiness_resource_plan_id,
+            self.latest_weather_result, self.latest_weather_source_reference,
+            self.latest_safety_result, self.latest_safety_source_reference,
+            self.latest_readiness_rationale, self.latest_readiness_assessed_at,
+        )
+        if self.readiness_assessment_count == 0:
+            if any(value is not None for value in readiness_metadata):
+                raise ValueError("unassessed mowing order cannot expose readiness metadata")
+        elif (
+            any(value is None for value in readiness_metadata)
+            or self.latest_readiness_resource_plan_id != self.latest_resource_plan_id
+        ):
+            raise ValueError("readiness assessment requires the effective resource plan")
         return self
 
 
@@ -486,7 +509,12 @@ class PostgresPreparedProposalRepository:
                    latest.adjusted_recommendation, latest.rationale, latest.reviewed_at,
                    mowing.id, COALESCE(plan_total.plan_count, 0), latest_plan.id,
                    latest_plan.team_reference, latest_plan.equipment_reference,
-                   latest_plan.planning_rationale, latest_plan.created_at
+                   latest_plan.planning_rationale, latest_plan.created_at,
+                   COALESCE(readiness_total.assessment_count, 0), latest_readiness.id,
+                   latest_readiness.resource_plan_id, latest_readiness.weather_result,
+                   latest_readiness.weather_source_reference, latest_readiness.safety_result,
+                   latest_readiness.safety_source_reference,
+                   latest_readiness.assessment_rationale, latest_readiness.assessed_at
             FROM prepared_post_inspection_proposal proposal
             JOIN prepared_post_inspection_policy policy ON policy.id = proposal.policy_id
             JOIN prepared_inspection_summary summary ON summary.id = proposal.summary_id
@@ -526,6 +554,23 @@ class PostgresPreparedProposalRepository:
                       WHERE newer.supersedes_plan_id = plan.id)
                 ORDER BY plan.created_at DESC LIMIT 1
             ) latest_plan ON true
+            LEFT JOIN LATERAL (
+                SELECT count(*) AS assessment_count
+                FROM prepared_mowing_readiness_assessment assessment
+                WHERE assessment.resource_plan_id = latest_plan.id
+            ) readiness_total ON true
+            LEFT JOIN LATERAL (
+                SELECT assessment.id, assessment.resource_plan_id,
+                       assessment.weather_result, assessment.weather_source_reference,
+                       assessment.safety_result, assessment.safety_source_reference,
+                       assessment.assessment_rationale, assessment.assessed_at
+                FROM prepared_mowing_readiness_assessment assessment
+                WHERE assessment.resource_plan_id = latest_plan.id
+                  AND NOT EXISTS (
+                      SELECT 1 FROM prepared_mowing_readiness_assessment newer
+                      WHERE newer.supersedes_assessment_id = assessment.id)
+                ORDER BY assessment.assessed_at DESC LIMIT 1
+            ) latest_readiness ON true
             WHERE proposal.location_status = 'simulated' AND proposal.data_status = 'prepared'
               AND NOT proposal.eligible_for_official_reporting
               AND NOT proposal.authorizes_field_work AND {where_clause}"""
@@ -551,6 +596,11 @@ class PostgresPreparedProposalRepository:
             resource_plan_count=row[20], latest_resource_plan_id=row[21],
             latest_team_reference=row[22], latest_equipment_reference=row[23],
             latest_resource_plan_rationale=row[24], latest_resource_plan_created_at=row[25],
+            readiness_assessment_count=row[26], latest_readiness_assessment_id=row[27],
+            latest_readiness_resource_plan_id=row[28], latest_weather_result=row[29],
+            latest_weather_source_reference=row[30], latest_safety_result=row[31],
+            latest_safety_source_reference=row[32], latest_readiness_rationale=row[33],
+            latest_readiness_assessed_at=row[34],
         )
 
 
