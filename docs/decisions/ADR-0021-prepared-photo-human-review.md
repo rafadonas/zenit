@@ -27,7 +27,10 @@ Record decision, image-quality status, ruler-visibility status, rationale,
 reviewer identity, policy version, timestamp, and optional supersession. An
 accepted decision requires both accepted image quality and a visible ruler.
 Rejected and inconclusive decisions require a rationale. Corrections append a
-new review that supersedes a review of the same photo.
+new review that supersedes the single effective leaf for the same photo;
+parallel root reviews are rejected.
+Serialize inserts with a transaction-scoped advisory lock per photo so
+concurrent first reviews and corrections cannot bypass the linear-chain guard.
 
 Fix every outcome, including acceptance, to `prepared` and ineligible for field
 evidence, model training, official reporting, and field authorization. A visible

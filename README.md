@@ -150,8 +150,8 @@ credentials.
 ## Database migrations and ingestion
 
 Apply migrations in numeric order before importing sources. The current local
-development database must have migrations `0001` through `0017` applied. On the first
-startup of a new Compose volume, Postgres applies these seventeen up migrations in
+development database must have migrations `0001` through `0020` applied. On the first
+startup of a new Compose volume, Postgres applies these twenty up migrations in
 order through `/docker-entrypoint-initdb.d`; existing volumes are never modified
 by that initialization mechanism. The explicit commands below remain useful
 for non-Compose environments and controlled upgrades of existing databases.
@@ -191,6 +191,12 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0016_prepared_photo_access_audit.sql
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0017_prepared_photo_human_review.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
+  < infra/migrations/0018_prepared_inspection_summary.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
+  < infra/migrations/0019_linear_prepared_photo_review_chain.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
+  < infra/migrations/0020_serialize_prepared_photo_reviews.sql
 ```
 
 Migration `0008` starts the Sprint 4 management foundation with immutable,
@@ -252,6 +258,19 @@ idempotent human decisions for image quality and ruler visibility. Even an
 accepted review remains prepared and ineligible for field evidence, model
 training, official reporting, or field authorization. See
 `docs/decisions/ADR-0021-prepared-photo-human-review.md`.
+
+Migration `0018` adds a versioned, immutable prepared inspection summary. It
+requires a finished simulated lifecycle, exactly three measurements, and three
+effectively accepted photo reviews, then preserves historical N1/N2/N3 counts.
+Every summary remains simulated-location, prepared, non-operational, excluded
+from training and official reports. See
+`docs/decisions/ADR-0022-prepared-inspection-summary.md`.
+
+Migration `0019` makes each prepared photo's review history a single linear
+chain. After the first review, every correction must supersede the effective
+leaf, preventing parallel outcomes from satisfying summary evidence gates.
+Migration `0020` serializes concurrent review inserts per photo before checking
+that chain, closing the race between simultaneous first reviews or corrections.
 
 The public, read-only management queue is available at:
 
@@ -428,6 +447,21 @@ The authenticated dashboard exposes this workflow at `/photo-reviews`. Its
 server-side proxies keep the bearer token in the `httpOnly` session cookie,
 enforce origin and CSRF checks on writes, accept only JPEG/PNG responses, and
 preserve `no-store`, `nosniff`, prepared, and non-official response boundaries.
+
+Generate the immutable prepared return summary after all evidence gates pass:
+
+```text
+POST /v1/work-orders/{work_order_id}/prepared-summary
+Authorization: Bearer <access-token>
+Idempotency-Key: <client-generated-stable-key>
+Content-Type: application/json
+
+{"generation_rationale":"Consolidate the prepared demo return"}
+```
+
+The response reports minimum, maximum, mean, and N1/N2/N3 counts. These are
+aggregates of prepared typed measurements, not values inferred from photos and
+not an official operational report.
 
 Use `zenit-import` for one immutable raw file at a time. Full examples are in
 `docs/architecture/source-ingestion.md`.
