@@ -4,6 +4,7 @@ import 'package:zenit_mobile/data/zenit_gateway.dart';
 import 'package:zenit_mobile/domain/auth_session.dart';
 import 'package:zenit_mobile/domain/measurement_draft.dart';
 import 'package:zenit_mobile/domain/mobile_sync.dart';
+import 'package:zenit_mobile/domain/prepared_photo_draft.dart';
 import 'package:zenit_mobile/domain/prepared_work_order.dart';
 
 import 'support/fakes.dart';
@@ -233,6 +234,60 @@ void main() {
     expect(controller.errorMessage, contains('não pode ser sobrescrita'));
   });
 
+  test(
+    'uploads only acknowledged manifests and resumes after failure',
+    () async {
+      final order = preparedOrder();
+      final vault = MemoryVault();
+      final gateway = FakeGateway(orders: [order]);
+      final controller = ZenitAppController(
+        gateway: gateway,
+        sessionStore: MemorySessionStore(),
+        vault: vault,
+        deviceIdentityStore: MemoryDeviceIdentityStore(),
+        appVersion: 'test',
+        photoCapture: FakePhotoCapture(),
+        uuidFactory: _uuidFactory(),
+      );
+      await controller.initialize();
+      await controller.login('field@example.test', 'secret');
+      await _startDemo(controller, order);
+      await controller.saveThreeDrafts(order, [8, 22, 35]);
+      await _capturePhotos(controller, order);
+      await controller.finishDemoOrder(order);
+
+      expect(await controller.uploadPreparedPhotos(order), isFalse);
+      expect(gateway.uploadCalls, 0);
+      expect(await controller.syncPreparedDrafts(order), isTrue);
+
+      gateway.uploadFailure = const ZenitApiException('offline');
+      gateway.uploadFailureAtCall = 2;
+      expect(await controller.uploadPreparedPhotos(order), isFalse);
+      expect(gateway.uploadCalls, 2);
+      expect(
+        (await vault.readPhotoDrafts(
+          order.id,
+        )).where((photo) => photo.isUploaded).map((photo) => photo.sequence),
+        [1],
+      );
+
+      gateway.uploadFailure = null;
+      expect(await controller.uploadPreparedPhotos(order), isTrue);
+      expect(gateway.uploadCalls, 4);
+      final uploaded = await vault.readPhotoDrafts(order.id);
+      expect(uploaded.every((photo) => photo.isUploaded), isTrue);
+      expect(
+        uploaded.every(
+          (photo) => photo.toJson()['eligible_for_official_reporting'] == false,
+        ),
+        isTrue,
+      );
+
+      expect(await controller.uploadPreparedPhotos(order), isTrue);
+      expect(gateway.uploadCalls, 4);
+    },
+  );
+
   test('demo cannot finish without one photo per planned point', () async {
     final order = preparedOrder();
     final controller = ZenitAppController(
@@ -416,5 +471,12 @@ class _UnauthorizedGateway implements ZenitGateway {
     String accessToken,
     PendingSyncBatch batch,
     List<Map<String, Object?>> events,
+  ) => throw UnimplementedError();
+
+  @override
+  Future<void> uploadPreparedPhoto(
+    String accessToken,
+    String deviceId,
+    PreparedPhotoDraft photo,
   ) => throw UnimplementedError();
 }

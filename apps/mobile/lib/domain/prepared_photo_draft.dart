@@ -5,6 +5,19 @@ import 'package:crypto/crypto.dart';
 
 import 'measurement_draft.dart';
 
+enum PhotoUploadState {
+  notUploaded('not_uploaded'),
+  uploadedUnverified('uploaded_unverified');
+
+  const PhotoUploadState(this.wireValue);
+  final String wireValue;
+
+  static PhotoUploadState fromWire(String value) => values.firstWhere(
+    (state) => state.wireValue == value,
+    orElse: () => throw const FormatException('Unknown photo upload state'),
+  );
+}
+
 class PreparedPhotoDraft {
   const PreparedPhotoDraft({
     required this.eventId,
@@ -19,6 +32,7 @@ class PreparedPhotoDraft {
     this.syncState = DraftSyncState.localOnly,
     this.syncResultCode,
     this.syncResultMessage,
+    this.uploadState = PhotoUploadState.notUploaded,
   });
 
   final String eventId;
@@ -33,6 +47,9 @@ class PreparedPhotoDraft {
   final DraftSyncState syncState;
   final String? syncResultCode;
   final String? syncResultMessage;
+  final PhotoUploadState uploadState;
+
+  bool get isUploaded => uploadState == PhotoUploadState.uploadedUnverified;
 
   bool get hasPersistentServerResult =>
       syncState == DraftSyncState.acknowledged ||
@@ -44,6 +61,7 @@ class PreparedPhotoDraft {
     String? syncResultCode,
     String? syncResultMessage,
     bool clearResult = false,
+    PhotoUploadState? uploadState,
   }) => PreparedPhotoDraft(
     eventId: eventId,
     photoId: photoId,
@@ -59,6 +77,7 @@ class PreparedPhotoDraft {
     syncResultMessage: clearResult
         ? null
         : syncResultMessage ?? this.syncResultMessage,
+    uploadState: uploadState ?? this.uploadState,
   );
 
   Map<String, Object?> toSyncEventJson() => {
@@ -92,7 +111,7 @@ class PreparedPhotoDraft {
     'checksum_sha256': checksumSha256,
     'media_type': mediaType,
     'content_base64': base64Encode(bytes),
-    'content_status': 'not_uploaded',
+    'content_status': uploadState.wireValue,
     'ruler_status': 'not_validated',
     'data_status': 'prepared',
     'eligible_for_official_reporting': false,
@@ -102,7 +121,12 @@ class PreparedPhotoDraft {
   };
 
   factory PreparedPhotoDraft.fromJson(Map<String, Object?> json) {
-    if (json['content_status'] != 'not_uploaded' ||
+    final uploadState = PhotoUploadState.fromWire(
+      json['content_status']! as String,
+    );
+    final syncState = DraftSyncState.fromWire(json['sync_state']! as String);
+    if ((uploadState == PhotoUploadState.uploadedUnverified &&
+            syncState != DraftSyncState.acknowledged) ||
         json['ruler_status'] != 'not_validated' ||
         json['data_status'] != 'prepared' ||
         json['eligible_for_official_reporting'] != false) {
@@ -126,9 +150,10 @@ class PreparedPhotoDraft {
       checksumSha256: checksum,
       mediaType: json['media_type']! as String,
       bytes: bytes,
-      syncState: DraftSyncState.fromWire(json['sync_state']! as String),
+      syncState: syncState,
       syncResultCode: json['sync_result_code'] as String?,
       syncResultMessage: json['sync_result_message'] as String?,
+      uploadState: uploadState,
     );
   }
 }

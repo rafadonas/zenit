@@ -1,11 +1,14 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:zenit_mobile/data/zenit_gateway.dart';
 import 'package:zenit_mobile/domain/measurement_draft.dart';
 import 'package:zenit_mobile/domain/mobile_sync.dart';
+import 'package:zenit_mobile/domain/prepared_photo_draft.dart';
 
 import 'support/fakes.dart';
 
@@ -144,4 +147,55 @@ void main() {
       expect(call, 2);
     },
   );
+
+  test('uploads exact prepared photo bytes and validates receipt', () async {
+    final bytes = Uint8List.fromList([0xff, 0xd8, 0xff, 0xd9]);
+    final checksum = sha256.convert(bytes).toString();
+    final photo = PreparedPhotoDraft(
+      eventId: '66666666-6666-4666-8666-666666666666',
+      photoId: '88888888-8888-4888-8888-888888888888',
+      orderId: '11111111-1111-4111-8111-111111111111',
+      plannedPointId: '22222222-2222-4222-8222-222222222221',
+      sequence: 1,
+      capturedAt: DateTime.utc(2026, 8, 9),
+      checksumSha256: checksum,
+      mediaType: 'image/jpeg',
+      bytes: bytes,
+      syncState: DraftSyncState.acknowledged,
+    );
+    final gateway = HttpZenitGateway(
+      baseUrl: 'https://api.example.test',
+      client: MockClient((request) async {
+        expect(request.url.path, '/v1/media/${photo.photoId}');
+        expect(request.headers['Authorization'], 'Bearer signed-token');
+        expect(request.headers['X-Zenit-Device-ID'], 'device-id');
+        expect(
+          request.headers['Content-Type'],
+          contains('multipart/form-data'),
+        );
+        expect(request.bodyBytes, containsAllInOrder(bytes));
+        expect(
+          latin1.decode(request.bodyBytes),
+          contains('Content-Type: image/jpeg'),
+        );
+        return http.Response(
+          jsonEncode({
+            'photo_id': photo.photoId,
+            'checksum_sha256': checksum,
+            'byte_size': bytes.length,
+            'media_type': 'image/jpeg',
+            'content_status': 'uploaded_unverified',
+            'ruler_status': 'not_validated',
+            'quality_status': 'prepared_unverified',
+            'data_status': 'prepared',
+            'eligible_for_official_reporting': false,
+            'persisted': true,
+          }),
+          200,
+        );
+      }),
+    );
+
+    await gateway.uploadPreparedPhoto('signed-token', 'device-id', photo);
+  });
 }

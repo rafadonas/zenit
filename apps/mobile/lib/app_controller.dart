@@ -517,6 +517,34 @@ class ZenitAppController extends ChangeNotifier {
     );
   }
 
+  Future<bool> uploadPreparedPhotos(PreparedWorkOrder order) async {
+    final current = session;
+    if (current == null) return false;
+    return _run(() async {
+      var photos = await vault.readPhotoDrafts(order.id);
+      if (photos.length != 3 ||
+          photos.any(
+            (photo) => photo.syncState != DraftSyncState.acknowledged,
+          )) {
+        throw const IncompletePhotoBatchError();
+      }
+      final deviceId = await deviceIdentityStore.readOrCreate();
+      await gateway.registerDevice(current.accessToken, deviceId, appVersion);
+      for (var index = 0; index < photos.length; index++) {
+        final photo = photos[index];
+        if (photo.isUploaded) continue;
+        await gateway.uploadPreparedPhoto(current.accessToken, deviceId, photo);
+        photos = [...photos]
+          ..[index] = photo.copyWith(
+            uploadState: PhotoUploadState.uploadedUnverified,
+            syncResultMessage:
+                'Conteúdo recebido e criptografado; qualidade e régua não validadas.',
+          );
+        await vault.replacePhotoDrafts(order.id, photos);
+      }
+    });
+  }
+
   Future<bool> _run(Future<void> Function() action) async {
     busy = true;
     errorMessage = null;

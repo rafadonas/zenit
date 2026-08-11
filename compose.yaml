@@ -26,6 +26,7 @@ services:
       - ./infra/migrations/0013_prepared_photo_manifest.sql:/docker-entrypoint-initdb.d/0013.sql:ro
       - ./infra/migrations/0014_require_demo_finish_photos.sql:/docker-entrypoint-initdb.d/0014.sql:ro
       - ./infra/migrations/0015_prepared_photo_upload_receipt.sql:/docker-entrypoint-initdb.d/0015.sql:ro
+      - ./infra/migrations/0016_prepared_photo_access_audit.sql:/docker-entrypoint-initdb.d/0016.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s

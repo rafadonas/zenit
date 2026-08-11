@@ -15,6 +15,7 @@ Current P0 slice:
   verified local SHA-256; only its prepared manifest enters sync;
 - persistent event and batch UUIDs created before network delivery;
 - authenticated device registration and idempotent prepared-batch sync;
+- explicit upload of accepted photo manifests with resumable unverified receipts;
 - accepted, rejected, and conflicting outcomes retained locally;
 - logout/session expiry hides but does not delete unacknowledged encrypted data;
 - Android cloud backup and device-transfer extraction disabled.
@@ -25,8 +26,9 @@ Safety boundary: every accepted order must explicitly have
 declare GPS/photos as not collected. The demo start uses the first estimated
 planned point only as an explicitly `simulated`, `demo_only` coordinate. These
 events do not mutate the prepared order or make any data operational/official.
-Photo bytes remain encrypted on the device and are explicitly not uploaded;
-their ruler presence and quality remain unvalidated.
+Photo bytes remain encrypted on the device and, when explicitly uploaded, are
+still prepared and unverified; their ruler presence and quality remain
+unvalidated.
 
 Run checks from this directory with the repository-local Flutter SDK:
 

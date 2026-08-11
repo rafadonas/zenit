@@ -66,6 +66,10 @@ class FakeGateway implements ZenitGateway {
   MobileSyncResult Function(PendingSyncBatch batch)? syncResultFactory;
   int registrationCalls = 0;
   int syncCalls = 0;
+  Object? uploadFailure;
+  int? uploadFailureAtCall;
+  int uploadCalls = 0;
+  final List<String> uploadedPhotoIds = [];
   PendingSyncBatch? lastBatch;
   List<Map<String, Object?>>? lastEvents;
 
@@ -105,6 +109,21 @@ class FakeGateway implements ZenitGateway {
       conflictingEvents: const {},
       nextSyncCursor: batch.baseSyncCursor + 1,
     );
+  }
+
+  @override
+  Future<void> uploadPreparedPhoto(
+    String accessToken,
+    String deviceId,
+    PreparedPhotoDraft photo,
+  ) async {
+    uploadCalls++;
+    if (uploadFailure case final failure?
+        when uploadFailureAtCall == null ||
+            uploadFailureAtCall == uploadCalls) {
+      throw failure;
+    }
+    uploadedPhotoIds.add(photo.photoId);
   }
 }
 
@@ -233,7 +252,12 @@ class MemoryVault implements OfflineVault {
           .any((event) => !event.hasPersistentServerResult) ||
       photoDrafts.values
           .expand((values) => values)
-          .any((photo) => !photo.hasPersistentServerResult);
+          .any(
+            (photo) =>
+                !photo.hasPersistentServerResult ||
+                (photo.syncState == DraftSyncState.acknowledged &&
+                    !photo.isUploaded),
+          );
 
   @override
   Future<String?> readOwnerUserId() async => ownerUserId;

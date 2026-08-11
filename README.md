@@ -129,6 +129,8 @@ start, three prepared measurements, and finish. It deliberately has no real
 GPS or field execution. It captures one photo per planned point into the
 encrypted vault and synchronizes checksum-bound manifests. The API now accepts
 the exact manifested bytes through a separate prepared-media upload boundary.
+The app explicitly uploads accepted manifests and persists each unverified
+receipt so interrupted transfers resume without repeating confirmed photos.
 Uploaded objects remain encrypted, unvalidated, and non-official. The
 app persists event/batch UUIDs, registers
 its logical device, sends the exact idempotent batch, and retains local events
@@ -148,8 +150,8 @@ credentials.
 ## Database migrations and ingestion
 
 Apply migrations in numeric order before importing sources. The current local
-development database has migrations `0001` through `0015` applied. On the first
-startup of a new Compose volume, Postgres applies these fifteen up migrations in
+development database must have migrations `0001` through `0016` applied. On the first
+startup of a new Compose volume, Postgres applies these sixteen up migrations in
 order through `/docker-entrypoint-initdb.d`; existing volumes are never modified
 by that initialization mechanism. The explicit commands below remain useful
 for non-Compose environments and controlled upgrades of existing databases.
@@ -185,6 +187,8 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0014_require_demo_finish_photos.sql
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0015_prepared_photo_upload_receipt.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
+  < infra/migrations/0016_prepared_photo_access_audit.sql
 ```
 
 Migration `0008` starts the Sprint 4 management foundation with immutable,
@@ -235,6 +239,11 @@ with AES-256-GCM before writing them to the private, versioned media bucket.
 Receipts remain `uploaded_unverified`, ruler-unvalidated, prepared, and
 ineligible for official reporting. See
 `docs/decisions/ADR-0018-verified-encrypted-prepared-media-upload.md`.
+
+Migration `0016` adds append-only access events for successful human-review
+retrievals. PostgreSQL repeats active user, road-role, exact receipt, and safety
+status checks before recording delivery. See
+`docs/decisions/ADR-0020-authorized-prepared-media-retrieval.md`.
 
 The public, read-only management queue is available at:
 
@@ -360,8 +369,26 @@ Content-Type: multipart/form-data; boundary=...
 The endpoint verifies the signature, size, checksum, active actor/device and
 current road role. It stores application-encrypted bytes and an immutable
 version receipt, but deliberately returns only prepared/unverified/non-official
-status. Media retrieval, ruler validation, quality review, retention policy,
-and wiring this upload into the mobile sync worker remain future work.
+status. Media retrieval, ruler validation, quality review, and retention policy
+remain future work. The mobile client uploads only after the corresponding
+manifest has a persistent accepted result, persists each
+`uploaded_unverified` receipt before continuing, and skips already received
+photos when a partial upload is retried. Upload remains an explicit user action
+and never changes the prepared/non-official boundary.
+
+An authenticated manager or supervisor with a current non-simulated role on
+the photo's road may retrieve the exact decrypted bytes for human review:
+
+```text
+GET /v1/media/{photo_id}
+Authorization: Bearer <access-token>
+```
+
+The API reads the immutable object version, verifies AES-GCM authentication,
+byte size, and SHA-256 before returning it with `no-store`, `nosniff`, and
+explicit prepared/unverified/non-official headers. Unauthorized and absent
+photos share the same not-found boundary. Retrieval does not validate image
+quality, ruler presence, location, or vegetation height.
 
 Use `zenit-import` for one immutable raw file at a time. Full examples are in
 `docs/architecture/source-ingestion.md`.

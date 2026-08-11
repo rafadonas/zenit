@@ -11,7 +11,7 @@ from uuid import UUID
 
 import psycopg
 from Crypto.Cipher import AES
-from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Header, HTTPException, Response, UploadFile
 from minio import Minio
 from minio.error import S3Error
 from minio.versioningconfig import ENABLED, VersioningConfig
@@ -52,6 +52,13 @@ class StoredObject:
     etag: str
 
 
+@dataclass(frozen=True)
+class PreparedPhotoContent:
+    content: bytes
+    media_type: Literal["image/jpeg", "image/png"]
+    checksum_sha256: str
+
+
 class MediaWriter(Protocol):
     async def upload(
         self,
@@ -63,6 +70,15 @@ class MediaWriter(Protocol):
         media_type: str,
         checksum_sha256: str,
     ) -> PreparedPhotoUploadResponse: ...
+
+
+class MediaReader(Protocol):
+    async def retrieve(
+        self,
+        *,
+        actor: AuthenticatedUser,
+        photo_id: UUID,
+    ) -> PreparedPhotoContent: ...
 
 
 class PrivateMediaStore:
@@ -108,9 +124,7 @@ class PrivateMediaStore:
             if error.code not in {"NoSuchKey", "NoSuchObject"}:
                 raise
         else:
-            metadata = {
-                key.lower(): value for key, value in (existing.metadata or {}).items()
-            }
+            metadata = {key.lower(): value for key, value in (existing.metadata or {}).items()}
             if (
                 metadata.get("x-amz-meta-plaintext-sha256") != checksum_sha256
                 or metadata.get("x-amz-meta-plaintext-size") != str(len(content))
@@ -169,6 +183,11 @@ class PrivateMediaStore:
         content: bytes,
         checksum_sha256: str,
     ) -> None:
+        plaintext = self.get_verified(name=name, version_id=version_id)
+        if plaintext != content or hashlib.sha256(plaintext).hexdigest() != checksum_sha256:
+            raise PhotoContentMismatchError
+
+    def get_verified(self, *, name: str, version_id: str) -> bytes:
         response = self._client.get_object(
             self._bucket,
             name,
@@ -190,11 +209,7 @@ class PrivateMediaStore:
             ).decrypt_and_verify(ciphertext, tag)
         except ValueError as error:
             raise PhotoContentMismatchError from error
-        if (
-            plaintext != content
-            or hashlib.sha256(plaintext).hexdigest() != checksum_sha256
-        ):
-            raise PhotoContentMismatchError
+        return plaintext
 
 
 class PreparedMediaService:
@@ -308,6 +323,88 @@ class PreparedMediaService:
             )
         return _response(photo_id, checksum_sha256, len(content), media_type)
 
+    async def retrieve(
+        self,
+        *,
+        actor: AuthenticatedUser,
+        photo_id: UUID,
+    ) -> PreparedPhotoContent:
+        connection = await psycopg.AsyncConnection.connect(self._database_url)
+        async with connection, connection.cursor() as cursor:
+            await cursor.execute(
+                """
+                SELECT receipt.object_name, receipt.object_version_id,
+                       receipt.checksum_sha256, receipt.byte_size,
+                       receipt.media_type
+                FROM prepared_photo_upload_receipt receipt
+                JOIN prepared_field_photo_manifest manifest
+                  ON manifest.photo_id = receipt.photo_id
+                JOIN work_order order_record ON order_record.id = manifest.work_order_id
+                JOIN segment_zone zone ON zone.id = order_record.segment_zone_id
+                JOIN road_segment segment ON segment.id = zone.road_segment_id
+                JOIN road_axis_candidate axis
+                  ON axis.id = segment.road_axis_candidate_id
+                JOIN app_user actor ON actor.id = %s
+                WHERE receipt.photo_id = %s
+                  AND actor.status = 'active'
+                  AND receipt.content_status = 'uploaded_unverified'
+                  AND receipt.ruler_status = 'not_validated'
+                  AND receipt.quality_status = 'prepared_unverified'
+                  AND receipt.data_status = 'prepared'
+                  AND NOT receipt.eligible_for_official_reporting
+                  AND EXISTS (
+                      SELECT 1 FROM road_user_role assignment
+                      WHERE assignment.user_id = actor.id
+                        AND assignment.road_id = axis.road_id
+                        AND assignment.role IN ('manager', 'supervisor')
+                        AND assignment.data_status <> 'simulated'
+                  )
+                """,
+                (actor.id, photo_id),
+            )
+            receipt = await cursor.fetchone()
+        if receipt is None:
+            raise PhotoManifestNotFoundError
+        content = await asyncio.to_thread(
+            self._store.get_verified,
+            name=receipt[0],
+            version_id=receipt[1],
+        )
+        if len(content) != receipt[3] or hashlib.sha256(content).hexdigest() != receipt[2]:
+            raise PhotoContentMismatchError
+        await self._record_retrieval(
+            actor=actor,
+            photo_id=photo_id,
+            checksum_sha256=receipt[2],
+            byte_size=receipt[3],
+        )
+        return PreparedPhotoContent(
+            content=content,
+            media_type=receipt[4],
+            checksum_sha256=receipt[2],
+        )
+
+    async def _record_retrieval(
+        self,
+        *,
+        actor: AuthenticatedUser,
+        photo_id: UUID,
+        checksum_sha256: str,
+        byte_size: int,
+    ) -> None:
+        connection = await psycopg.AsyncConnection.connect(self._database_url)
+        async with connection, connection.cursor() as cursor:
+            await cursor.execute(
+                """
+                INSERT INTO prepared_photo_access_event (
+                    photo_id, actor_user_id, access_purpose, source_channel,
+                    checksum_sha256, byte_size, data_status,
+                    eligible_for_official_reporting
+                ) VALUES (%s, %s, 'human_review', 'api', %s, %s, 'prepared', false)
+                """,
+                (photo_id, actor.id, checksum_sha256, byte_size),
+            )
+
 
 def _response(
     photo_id: UUID,
@@ -327,7 +424,41 @@ async def get_media_writer() -> PreparedMediaService:
     return PreparedMediaService(get_settings())
 
 
+async def get_media_reader() -> PreparedMediaService:
+    return PreparedMediaService(get_settings())
+
+
 router = APIRouter(tags=["media"])
+
+
+@router.get("/v1/media/{photo_id}", response_class=Response)
+async def retrieve_prepared_photo(
+    photo_id: UUID,
+    actor: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    reader: Annotated[MediaReader, Depends(get_media_reader)],
+) -> Response:
+    try:
+        photo = await reader.retrieve(actor=actor, photo_id=photo_id)
+    except PhotoManifestNotFoundError:
+        raise HTTPException(status_code=404, detail="prepared photo not found") from None
+    except PhotoContentMismatchError:
+        raise HTTPException(status_code=409, detail="stored photo integrity check failed") from None
+    extension = "jpg" if photo.media_type == "image/jpeg" else "png"
+    return Response(
+        content=photo.content,
+        media_type=photo.media_type,
+        headers={
+            "Cache-Control": "no-store, private",
+            "Content-Disposition": f'inline; filename="prepared-{photo_id}.{extension}"',
+            "X-Content-Type-Options": "nosniff",
+            "X-Zenit-Checksum-SHA256": photo.checksum_sha256,
+            "X-Zenit-Content-Status": "uploaded_unverified",
+            "X-Zenit-Ruler-Status": "not_validated",
+            "X-Zenit-Quality-Status": "prepared_unverified",
+            "X-Zenit-Data-Status": "prepared",
+            "X-Zenit-Eligible-For-Official-Reporting": "false",
+        },
+    )
 
 
 @router.post("/v1/media/{photo_id}", response_model=PreparedPhotoUploadResponse)

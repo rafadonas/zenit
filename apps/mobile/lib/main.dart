@@ -514,6 +514,23 @@ class _OrderDraftPageState extends State<OrderDraftPage> {
                   icon: const Icon(Icons.sync),
                   label: const Text('Sincronizar lote preparado'),
                 ),
+                if (photos.every(
+                  (photo) => photo.syncState == DraftSyncState.acknowledged,
+                )) ...[
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    onPressed:
+                        syncing ||
+                            widget.controller.busy ||
+                            photos.every((photo) => photo.isUploaded)
+                        ? null
+                        : () => _transition(
+                            widget.controller.uploadPreparedPhotos,
+                          ),
+                    icon: const Icon(Icons.cloud_upload),
+                    label: const Text('Enviar fotos preparadas'),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 for (final event in lifecycle)
                   ListTile(
@@ -546,7 +563,7 @@ class _OrderDraftPageState extends State<OrderDraftPage> {
                     contentPadding: EdgeInsets.zero,
                     leading: Icon(_syncIcon(photo.syncState)),
                     title: Text(
-                      'Foto ${photo.sequence}: ${_syncLabel(photo.syncState)}',
+                      'Foto ${photo.sequence}: ${photo.isUploaded ? 'conteúdo recebido, não validado' : _syncLabel(photo.syncState)}',
                     ),
                     subtitle: Text(
                       photo.syncResultMessage ??
@@ -560,7 +577,7 @@ class _OrderDraftPageState extends State<OrderDraftPage> {
               ],
               const SizedBox(height: 20),
               const Text(
-                'O GPS exibido é simulado. As fotos permanecem locais, não enviadas e não validadas. Estes dados não comprovam inspeção, não entram em relatório oficial e não autorizam roçada.',
+                'O GPS exibido é simulado. Fotos enviadas permanecem preparadas e não validadas. Estes dados não comprovam inspeção, não entram em relatório oficial e não autorizam roçada.',
               ),
             ],
           ),

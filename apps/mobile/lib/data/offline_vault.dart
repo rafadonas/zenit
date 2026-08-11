@@ -222,7 +222,14 @@ class HiveOfflineVault implements OfflineVault {
       if (!key.startsWith('prepared_photos:')) continue;
       final orderId = key.substring('prepared_photos:'.length);
       final photos = await readPhotoDrafts(orderId);
-      if (photos.any((photo) => !photo.hasPersistentServerResult)) return true;
+      if (photos.any(
+        (photo) =>
+            !photo.hasPersistentServerResult ||
+            (photo.syncState == DraftSyncState.acknowledged &&
+                !photo.isUploaded),
+      )) {
+        return true;
+      }
     }
     for (final key in _openBox.keys.whereType<String>()) {
       if (!key.startsWith('demo_lifecycle:')) continue;

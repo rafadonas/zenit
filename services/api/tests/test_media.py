@@ -9,7 +9,9 @@ from zenit_api.main import app
 from zenit_api.media import (
     PhotoContentMismatchError,
     PhotoManifestNotFoundError,
+    PreparedPhotoContent,
     PreparedPhotoUploadResponse,
+    get_media_reader,
     get_media_writer,
 )
 
@@ -41,6 +43,21 @@ class FakeMediaWriter:
             checksum_sha256=values["checksum_sha256"],
             byte_size=len(JPEG),
             media_type="image/jpeg",
+        )
+
+
+class FakeMediaReader:
+    def __init__(self, failure: Exception | None = None) -> None:
+        self.failure = failure
+
+    async def retrieve(self, **values) -> PreparedPhotoContent:
+        if self.failure is not None:
+            raise self.failure
+        assert values == {"actor": ACTOR, "photo_id": PHOTO_ID}
+        return PreparedPhotoContent(
+            content=JPEG,
+            media_type="image/jpeg",
+            checksum_sha256=hashlib.sha256(JPEG).hexdigest(),
         )
 
 
@@ -106,3 +123,50 @@ def test_upload_requires_authentication() -> None:
     response = request_upload(authenticated=False)
 
     assert response.status_code == 401
+
+
+def request_retrieval(*, failure: Exception | None = None, authenticated: bool = True):
+    async def fake_actor() -> AuthenticatedUser:
+        return ACTOR
+
+    async def fake_reader() -> FakeMediaReader:
+        return FakeMediaReader(failure)
+
+    async def request():
+        if authenticated:
+            app.dependency_overrides[get_current_user] = fake_actor
+        app.dependency_overrides[get_media_reader] = fake_reader
+        try:
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                return await client.get(f"/v1/media/{PHOTO_ID}")
+        finally:
+            app.dependency_overrides.clear()
+
+    return asyncio.run(request())
+
+
+def test_retrieval_returns_verified_prepared_content_without_cache() -> None:
+    response = request_retrieval()
+
+    assert response.status_code == 200
+    assert response.content == JPEG
+    assert response.headers["content-type"] == "image/jpeg"
+    assert response.headers["cache-control"] == "no-store, private"
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-zenit-checksum-sha256"] == hashlib.sha256(JPEG).hexdigest()
+    assert response.headers["x-zenit-ruler-status"] == "not_validated"
+    assert response.headers["x-zenit-quality-status"] == "prepared_unverified"
+    assert response.headers["x-zenit-eligible-for-official-reporting"] == "false"
+
+
+def test_retrieval_hides_unauthorized_photo_and_reports_integrity_failure() -> None:
+    missing = request_retrieval(failure=PhotoManifestNotFoundError())
+    corrupt = request_retrieval(failure=PhotoContentMismatchError())
+
+    assert missing.status_code == 404
+    assert corrupt.status_code == 409
+
+
+def test_retrieval_requires_authentication() -> None:
+    assert request_retrieval(authenticated=False).status_code == 401
