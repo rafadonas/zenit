@@ -42,6 +42,7 @@ image.
   and non-operational safety checks.
 - The review can support later validation work without promoting prepared demo
   data or silently authorizing mowing.
-- A dashboard review interface, decoded-image safety checks, EXIF handling,
-  numeric measurement comparison, and operational evidence promotion remain
-  separate increments.
+- The dashboard uses same-origin authenticated proxies, CSRF protection, strict
+  response contract validation, and no-store image delivery.
+- Decoded-image safety checks, EXIF handling, numeric measurement comparison,
+  and operational evidence promotion remain separate increments.

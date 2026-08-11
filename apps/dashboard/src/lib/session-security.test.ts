@@ -5,6 +5,7 @@ import {
   getDashboardSecurityConfig,
   parseDecisionSubmission,
   parsePreparedInspectionOrderSubmission,
+  parsePhotoReviewSubmission,
   requestOriginMatches,
 } from "./session-security";
 
@@ -79,5 +80,33 @@ describe("dashboard session security", () => {
     });
     form.set("planning_rationale", " ");
     expect(parsePreparedInspectionOrderSubmission(form)).toBeNull();
+  });
+
+  it("accepts only a consistent non-operational photo review", () => {
+    const form = new FormData();
+    form.set("csrf_token", csrfToken);
+    form.set("idempotency_key", "10000000-0000-4000-8000-000000000001");
+    form.set("decision", "accepted");
+    form.set("quality_status", "accepted");
+    form.set("ruler_status", "visible");
+    form.set("authorizes_field_work", "true");
+
+    expect(parsePhotoReviewSubmission(form)).toEqual({
+      csrfToken,
+      idempotencyKey: "10000000-0000-4000-8000-000000000001",
+      decision: "accepted",
+      qualityStatus: "accepted",
+      rulerStatus: "visible",
+    });
+    form.set("ruler_status", "not_visible");
+    expect(parsePhotoReviewSubmission(form)).toBeNull();
+    form.set("decision", "rejected");
+    expect(parsePhotoReviewSubmission(form)).toBeNull();
+    form.set("rationale", "Régua ausente");
+    expect(parsePhotoReviewSubmission(form)).toMatchObject({
+      decision: "rejected",
+      rulerStatus: "not_visible",
+      rationale: "Régua ausente",
+    });
   });
 });

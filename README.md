@@ -424,6 +424,10 @@ Authorization: Bearer <access-token>
 The queue exposes order, segment, zone, planned-point sequence, capture/upload
 timestamps, media metadata, and the latest effective review. It omits reviewer
 identity, device identifiers, object-store coordinates, and encryption details.
+The authenticated dashboard exposes this workflow at `/photo-reviews`. Its
+server-side proxies keep the bearer token in the `httpOnly` session cookie,
+enforce origin and CSRF checks on writes, accept only JPEG/PNG responses, and
+preserve `no-store`, `nosniff`, prepared, and non-official response boundaries.
 
 Use `zenit-import` for one immutable raw file at a time. Full examples are in
 `docs/architecture/source-ingestion.md`.

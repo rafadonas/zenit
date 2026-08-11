@@ -73,6 +73,7 @@ export default async function RecommendationsPage({ searchParams }: Recommendati
         <nav className="topnav" aria-label="Navegação principal">
           <Link href="/">Corredor</Link>
           <Link aria-current="page" href="/recommendations">Recomendações</Link>
+          <Link href="/photo-reviews">Fotos</Link>
         </nav>
         {session ? (
           <div className="session-context">

@@ -230,6 +230,7 @@ export function CorridorDashboard({
         <nav className="topnav" aria-label="Navegação principal">
           <Link aria-current="page" href="/">Corredor</Link>
           <Link href="/recommendations">Recomendações</Link>
+          <Link href="/photo-reviews">Fotos</Link>
         </nav>
         <div className="update-context">
           <span>Geometria</span>

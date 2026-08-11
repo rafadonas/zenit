@@ -25,6 +25,16 @@ export interface PreparedInspectionOrderSubmission {
   planningRationale: string;
 }
 
+export interface PhotoReviewSubmission {
+  csrfToken: string;
+  idempotencyKey: string;
+  decision: "accepted" | "rejected" | "inconclusive";
+  qualityStatus: "accepted" | "rejected" | "inconclusive";
+  rulerStatus: "visible" | "not_visible" | "inconclusive";
+  rationale?: string;
+  supersedesReviewId?: string;
+}
+
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CSRF_PATTERN = /^[0-9a-f]{64}$/;
 
@@ -157,4 +167,36 @@ export function parsePreparedInspectionOrderSubmission(
 
 export function isUuid(value: string): boolean {
   return UUID_PATTERN.test(value);
+}
+
+export function parsePhotoReviewSubmission(form: FormData): PhotoReviewSubmission | null {
+  const csrfToken = formString(form, "csrf_token");
+  const idempotencyKey = formString(form, "idempotency_key");
+  const decision = formString(form, "decision");
+  const qualityStatus = formString(form, "quality_status");
+  const rulerStatus = formString(form, "ruler_status");
+  const rationale = formString(form, "rationale");
+  const supersedesReviewId = formString(form, "supersedes_review_id");
+  if (
+    csrfToken === null || !CSRF_PATTERN.test(csrfToken) ||
+    idempotencyKey === null || !UUID_PATTERN.test(idempotencyKey) ||
+    !["accepted", "rejected", "inconclusive"].includes(decision ?? "") ||
+    !["accepted", "rejected", "inconclusive"].includes(qualityStatus ?? "") ||
+    !["visible", "not_visible", "inconclusive"].includes(rulerStatus ?? "") ||
+    (supersedesReviewId !== null && supersedesReviewId !== "" &&
+      !UUID_PATTERN.test(supersedesReviewId)) ||
+    (rationale !== null && rationale.length > 2000)
+  ) return null;
+  const acceptedEvidence = qualityStatus === "accepted" && rulerStatus === "visible";
+  if ((decision === "accepted") !== acceptedEvidence) return null;
+  if (decision !== "accepted" && !rationale) return null;
+  return {
+    csrfToken,
+    idempotencyKey,
+    decision: decision as PhotoReviewSubmission["decision"],
+    qualityStatus: qualityStatus as PhotoReviewSubmission["qualityStatus"],
+    rulerStatus: rulerStatus as PhotoReviewSubmission["rulerStatus"],
+    ...(rationale ? { rationale } : {}),
+    ...(supersedesReviewId ? { supersedesReviewId } : {}),
+  };
 }
