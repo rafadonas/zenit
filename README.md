@@ -150,8 +150,8 @@ credentials.
 ## Database migrations and ingestion
 
 Apply migrations in numeric order before importing sources. The current local
-development database must have migrations `0001` through `0016` applied. On the first
-startup of a new Compose volume, Postgres applies these sixteen up migrations in
+development database must have migrations `0001` through `0017` applied. On the first
+startup of a new Compose volume, Postgres applies these seventeen up migrations in
 order through `/docker-entrypoint-initdb.d`; existing volumes are never modified
 by that initialization mechanism. The explicit commands below remain useful
 for non-Compose environments and controlled upgrades of existing databases.
@@ -189,6 +189,8 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0015_prepared_photo_upload_receipt.sql
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0016_prepared_photo_access_audit.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
+  < infra/migrations/0017_prepared_photo_human_review.sql
 ```
 
 Migration `0008` starts the Sprint 4 management foundation with immutable,
@@ -244,6 +246,12 @@ Migration `0016` adds append-only access events for successful human-review
 retrievals. PostgreSQL repeats active user, road-role, exact receipt, and safety
 status checks before recording delivery. See
 `docs/decisions/ADR-0020-authorized-prepared-media-retrieval.md`.
+
+Migration `0017` adds a versioned prepared photo-review policy and append-only,
+idempotent human decisions for image quality and ruler visibility. Even an
+accepted review remains prepared and ineligible for field evidence, model
+training, official reporting, or field authorization. See
+`docs/decisions/ADR-0021-prepared-photo-human-review.md`.
 
 The public, read-only management queue is available at:
 
@@ -369,7 +377,7 @@ Content-Type: multipart/form-data; boundary=...
 The endpoint verifies the signature, size, checksum, active actor/device and
 current road role. It stores application-encrypted bytes and an immutable
 version receipt, but deliberately returns only prepared/unverified/non-official
-status. Media retrieval, ruler validation, quality review, and retention policy
+status. Automated ruler validation, decoded-image safety, and retention policy
 remain future work. The mobile client uploads only after the corresponding
 manifest has a persistent accepted result, persists each
 `uploaded_unverified` receipt before continuing, and skips already received
@@ -389,6 +397,21 @@ byte size, and SHA-256 before returning it with `no-store`, `nosniff`, and
 explicit prepared/unverified/non-official headers. Unauthorized and absent
 photos share the same not-found boundary. Retrieval does not validate image
 quality, ruler presence, location, or vegetation height.
+
+Record a human review with a unique retry key:
+
+```text
+POST /v1/media/{photo_id}/reviews
+Authorization: Bearer <access-token>
+Idempotency-Key: <client-generated-stable-key>
+Content-Type: application/json
+
+{"decision":"accepted","quality_status":"accepted","ruler_status":"visible"}
+```
+
+Rejected and inconclusive outcomes require a rationale. Acceptance only records
+that a reviewer could assess the prepared image and see a ruler; it does not
+validate a height measurement or make the photo operational or official.
 
 Use `zenit-import` for one immutable raw file at a time. Full examples are in
 `docs/architecture/source-ingestion.md`.

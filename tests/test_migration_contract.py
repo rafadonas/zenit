@@ -19,6 +19,7 @@ PREPARED_PHOTO_MANIFEST_MIGRATION = Path("infra/migrations/0013_prepared_photo_m
 DEMO_FINISH_PHOTO_MIGRATION = Path("infra/migrations/0014_require_demo_finish_photos.sql")
 PHOTO_UPLOAD_RECEIPT_MIGRATION = Path("infra/migrations/0015_prepared_photo_upload_receipt.sql")
 PHOTO_ACCESS_AUDIT_MIGRATION = Path("infra/migrations/0016_prepared_photo_access_audit.sql")
+PHOTO_HUMAN_REVIEW_MIGRATION = Path("infra/migrations/0017_prepared_photo_human_review.sql")
 
 
 class MigrationContractTests(unittest.TestCase):
@@ -121,7 +122,7 @@ class MigrationContractTests(unittest.TestCase):
         mounts = [
             line.strip() for line in compose.splitlines() if "/docker-entrypoint-initdb.d/" in line
         ]
-        self.assertEqual(len(mounts), 16)
+        self.assertEqual(len(mounts), 17)
         for version, mount in enumerate(mounts, start=1):
             prefix = f"{version:04d}"
             self.assertIn(f"infra/migrations/{prefix}_", mount)
@@ -238,6 +239,18 @@ class MigrationContractTests(unittest.TestCase):
         self.assertIn("receipt.checksum_sha256 = NEW.checksum_sha256", sql)
         self.assertIn("CHECK (NOT eligible_for_official_reporting)", sql)
         self.assertIn("prepared_photo_access_event_immutable", sql)
+
+    def test_photo_human_review_is_versioned_guarded_and_non_operational(self) -> None:
+        sql = PHOTO_HUMAN_REVIEW_MIGRATION.read_text(encoding="utf-8")
+
+        self.assertIn("CREATE TABLE prepared_photo_review_policy", sql)
+        self.assertIn("prepared-photo-review-v1", sql)
+        self.assertIn("CREATE TABLE prepared_photo_human_review", sql)
+        self.assertIn("quality_status IN ('accepted', 'rejected', 'inconclusive')", sql)
+        self.assertIn("ruler_status IN ('visible', 'not_visible', 'inconclusive')", sql)
+        self.assertIn("CHECK (NOT eligible_for_model_training)", sql)
+        self.assertIn("CHECK (NOT authorizes_field_work)", sql)
+        self.assertIn("prepared_photo_human_review_immutable", sql)
 
 
 if __name__ == "__main__":
