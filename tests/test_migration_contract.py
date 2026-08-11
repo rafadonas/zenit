@@ -50,6 +50,9 @@ PREPARED_MOWING_READINESS_MIGRATION = Path(
 PREPARED_MOWING_PLANNING_APPROVAL_MIGRATION = Path(
     "infra/migrations/0027_prepared_mowing_planning_approval.sql"
 )
+PREPARED_MOWING_DEMO_LIFECYCLE_MIGRATION = Path(
+    "infra/migrations/0028_prepared_mowing_demo_lifecycle.sql"
+)
 
 
 class MigrationContractTests(unittest.TestCase):
@@ -152,12 +155,27 @@ class MigrationContractTests(unittest.TestCase):
         mounts = [
             line.strip() for line in compose.splitlines() if "/docker-entrypoint-initdb.d/" in line
         ]
-        self.assertEqual(len(mounts), 27)
+        self.assertEqual(len(mounts), 28)
         for version, mount in enumerate(mounts, start=1):
             prefix = f"{version:04d}"
             self.assertIn(f"infra/migrations/{prefix}_", mount)
             self.assertIn(f"/docker-entrypoint-initdb.d/{prefix}.sql:ro", mount)
             self.assertNotIn(".down.sql", mount)
+
+    def test_mowing_demo_lifecycle_is_simulated_sequenced_and_non_operational(self) -> None:
+        sql = PREPARED_MOWING_DEMO_LIFECYCLE_MIGRATION.read_text(encoding="utf-8")
+
+        self.assertIn("CREATE TABLE prepared_mowing_demo_event", sql)
+        self.assertIn(
+            "operation IN ('confirm', 'start', 'pause', 'resume', 'finish')", sql
+        )
+        self.assertIn("rehearsal_scope = 'mowing_demo_rehearsal_only'", sql)
+        self.assertIn("data_status = 'simulated'", sql)
+        self.assertIn("CHECK (NOT operational_approval_satisfied)", sql)
+        self.assertIn("CHECK (NOT authorizes_field_work)", sql)
+        self.assertIn("CHECK (NOT eligible_for_field_execution)", sql)
+        self.assertIn("prepared mowing demo event requires its exact accepted sync event", sql)
+        self.assertIn("prepared_mowing_demo_event_immutable", sql)
 
     def test_recommendation_reviews_are_audited_and_append_only(self) -> None:
         sql = RECOMMENDATION_REVIEW_MIGRATION.read_text(encoding="utf-8")

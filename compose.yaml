@@ -38,6 +38,7 @@ services:
       - ./infra/migrations/0025_prepared_mowing_resource_plan.sql:/docker-entrypoint-initdb.d/0025.sql:ro
       - ./infra/migrations/0026_prepared_mowing_readiness_assessment.sql:/docker-entrypoint-initdb.d/0026.sql:ro
       - ./infra/migrations/0027_prepared_mowing_planning_approval.sql:/docker-entrypoint-initdb.d/0027.sql:ro
+      - ./infra/migrations/0028_prepared_mowing_demo_lifecycle.sql:/docker-entrypoint-initdb.d/0028.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s

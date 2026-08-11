@@ -30,6 +30,8 @@ BATCH_ID = UUID("40000000-0000-4000-8000-000000000003")
 EVENT_ID = UUID("40000000-0000-4000-8000-000000000004")
 ORDER_ID = UUID("40000000-0000-4000-8000-000000000005")
 POINT_ID = UUID("40000000-0000-4000-8000-000000000006")
+MOWING_ORDER_ID = UUID("40000000-0000-4000-8000-000000000008")
+PLANNING_APPROVAL_ID = UUID("40000000-0000-4000-8000-000000000009")
 ACTOR = AuthenticatedUser(
     id=USER_ID,
     email="field@example.test",
@@ -78,6 +80,40 @@ def demo_order_event(operation: str) -> dict:
     return {
         "event_id": str(EVENT_ID),
         "entity_type": "work_order",
+        "operation": operation,
+        "payload": payload,
+    }
+
+
+def mowing_demo_event(
+    operation: str, *, occurred_at: str = "2026-08-11T14:00:00-03:00"
+) -> dict:
+    payload = {
+        "mowing_order_id": str(MOWING_ORDER_ID),
+        "source_planning_approval_id": str(PLANNING_APPROVAL_ID),
+        "occurred_at": occurred_at,
+        "data_status": "simulated",
+        "simulation_scope": "demo_only",
+        "rehearsal_scope": "mowing_demo_rehearsal_only",
+        "operational_approval_satisfied": False,
+        "authorizes_field_work": False,
+        "eligible_for_field_execution": False,
+        "eligible_for_model_training": False,
+        "eligible_for_official_reporting": False,
+        "location_status": "not_collected",
+    }
+    if operation == "start":
+        payload.update(
+            {
+                "location_status": "simulated",
+                "simulated_latitude": -23.5,
+                "simulated_longitude": -46.7,
+                "simulation_method": "prepared_point_demo_v1",
+            }
+        )
+    return {
+        "event_id": str(EVENT_ID),
+        "entity_type": "mowing_order",
         "operation": operation,
         "payload": payload,
     }
@@ -137,11 +173,20 @@ class FakeMobileSyncRepository:
             raise self.failure
         assert actor == ACTOR
         event = request.events[0]
-        if (
-            event.entity_type != "measurement"
-            and event.operation not in {"confirm", "start", "finish"}
-            and not (event.entity_type == "photo" and event.operation == "prepare")
-        ):
+        supported = (
+            (event.entity_type == "measurement" and event.operation == "create")
+            or (
+                event.entity_type == "work_order"
+                and event.operation in {"confirm", "start", "finish"}
+            )
+            or (
+                event.entity_type == "mowing_order"
+                and event.operation
+                in {"confirm", "start", "pause", "resume", "finish"}
+            )
+            or (event.entity_type == "photo" and event.operation == "prepare")
+        )
+        if not supported:
             return MobileSyncBatchResponse(
                 batch_id=request.batch_id,
                 accepted=[],
@@ -294,6 +339,84 @@ def test_demo_start_rejects_unlabelled_or_real_location_claims() -> None:
     assert response.status_code == 422
 
 
+@pytest.mark.parametrize("operation", ["confirm", "start", "pause", "resume", "finish"])
+def test_sync_contract_accepts_explicit_mowing_demo_events(operation: str) -> None:
+    response = request_with_overrides(
+        endpoint="/v1/sync/batch",
+        payload={
+            "device_id": str(DEVICE_ID),
+            "batch_id": str(BATCH_ID),
+            "base_sync_cursor": 0,
+            "events": [mowing_demo_event(operation)],
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["accepted"] == [{"event_id": str(EVENT_ID), "persisted": True}]
+    assert response.json()["authorizes_field_work"] is False
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "operational_approval_satisfied",
+        "authorizes_field_work",
+        "eligible_for_field_execution",
+        "eligible_for_model_training",
+        "eligible_for_official_reporting",
+    ],
+)
+def test_mowing_demo_rejects_every_operational_promotion(field: str) -> None:
+    event = mowing_demo_event("confirm")
+    event["payload"][field] = True
+    response = request_with_overrides(
+        endpoint="/v1/sync/batch",
+        payload={
+            "device_id": str(DEVICE_ID),
+            "batch_id": str(BATCH_ID),
+            "base_sync_cursor": 0,
+            "events": [event],
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_mowing_demo_start_requires_only_an_explicit_simulated_location() -> None:
+    event = mowing_demo_event("start")
+    del event["payload"]["simulation_method"]
+    response = request_with_overrides(
+        endpoint="/v1/sync/batch",
+        payload={
+            "device_id": str(DEVICE_ID),
+            "batch_id": str(BATCH_ID),
+            "base_sync_cursor": 0,
+            "events": [event],
+        },
+    )
+    assert response.status_code == 422
+
+    event = mowing_demo_event("pause")
+    event["payload"].update(
+        {
+            "location_status": "simulated",
+            "simulated_latitude": -23.5,
+            "simulated_longitude": -46.7,
+            "simulation_method": "prepared_point_demo_v1",
+        }
+    )
+    response = request_with_overrides(
+        endpoint="/v1/sync/batch",
+        payload={
+            "device_id": str(DEVICE_ID),
+            "batch_id": str(BATCH_ID),
+            "base_sync_cursor": 0,
+            "events": [event],
+        },
+    )
+    assert response.status_code == 422
+
+
 def test_sync_contract_accepts_only_unuploaded_unvalidated_photo_manifest() -> None:
     response = request_with_overrides(
         endpoint="/v1/sync/batch",
@@ -349,6 +472,26 @@ class DemoValidationCursor:
 
     async def fetchall(self) -> list[tuple[str]]:
         return [(operation,) for operation in self.operations]
+
+
+class MowingDemoValidationCursor:
+    def __init__(self, target: tuple | None, history: list[tuple[str, datetime]]) -> None:
+        self.target = target
+        self.history = history
+        self.query = ""
+
+    async def execute(self, query: str, parameters: tuple) -> None:
+        self.query = query
+
+    async def fetchone(self) -> tuple | None:
+        if "FROM prepared_mowing_order mowing" in self.query:
+            return self.target
+        raise AssertionError("unexpected fetchone query")
+
+    async def fetchall(self) -> list[tuple[str, datetime]]:
+        if "FROM prepared_mowing_demo_event" in self.query:
+            return self.history
+        raise AssertionError("unexpected fetchall query")
 
 
 class PhotoValidationCursor:
@@ -431,6 +574,115 @@ def test_demo_order_sequence_requires_confirm_then_start_then_finish() -> None:
         ).code
         == "photos_incomplete"
     )
+
+
+def validate_mowing_demo_event(
+    operation: str,
+    *,
+    target: tuple | None,
+    history: list[tuple[str, datetime]],
+    occurred_at: str = "2026-08-11T14:00:00-03:00",
+):
+    event = MobileSyncEventRequest.model_validate(
+        mowing_demo_event(operation, occurred_at=occurred_at)
+    )
+    return asyncio.run(
+        PostgresMobileSyncRepository._validate_mowing_demo_event(
+            MowingDemoValidationCursor(target, history),  # type: ignore[arg-type]
+            USER_ID,
+            event,
+        )
+    )
+
+
+ELIGIBLE_MOWING_DEMO_TARGET = (
+    "prepared",
+    "prepared",
+    "simulated",
+    "unassigned",
+    "unassigned",
+    "pending",
+    "pending",
+    True,
+    False,
+    False,
+    False,
+    True,
+    True,
+)
+
+
+def test_mowing_demo_requires_safe_order_access_and_effective_planning() -> None:
+    assert (
+        validate_mowing_demo_event(
+            "confirm", target=ELIGIBLE_MOWING_DEMO_TARGET, history=[]
+        )
+        is None
+    )
+    assert (
+        validate_mowing_demo_event("confirm", target=None, history=[]).code
+        == "mowing_order_not_found"
+    )
+    assert (
+        validate_mowing_demo_event(
+            "confirm",
+            target=(*ELIGIBLE_MOWING_DEMO_TARGET[:11], False, True),
+            history=[],
+        ).code
+        == "road_access_denied"
+    )
+    assert (
+        validate_mowing_demo_event(
+            "confirm",
+            target=(*ELIGIBLE_MOWING_DEMO_TARGET[:12], False),
+            history=[],
+        ).code
+        == "planning_approval_not_effective"
+    )
+    assert (
+        validate_mowing_demo_event(
+            "confirm",
+            target=("active", *ELIGIBLE_MOWING_DEMO_TARGET[1:]),
+            history=[],
+        ).code
+        == "unsupported_mowing_order_state"
+    )
+
+
+def test_mowing_demo_sequence_supports_balanced_pause_and_resume() -> None:
+    before = datetime(2026, 8, 11, 16, tzinfo=UTC)
+    target = ELIGIBLE_MOWING_DEMO_TARGET
+
+    assert validate_mowing_demo_event("start", target=target, history=[]).code == (
+        "invalid_mowing_demo_sequence"
+    )
+    assert validate_mowing_demo_event(
+        "start", target=target, history=[("confirm", before)]
+    ) is None
+    assert validate_mowing_demo_event(
+        "pause", target=target, history=[("confirm", before), ("start", before)]
+    ) is None
+    assert validate_mowing_demo_event(
+        "resume", target=target, history=[("pause", before)]
+    ) is None
+    assert validate_mowing_demo_event(
+        "finish", target=target, history=[("pause", before)]
+    ).code == "invalid_mowing_demo_sequence"
+    assert validate_mowing_demo_event(
+        "finish", target=target, history=[("resume", before)]
+    ) is None
+
+
+def test_mowing_demo_rejects_a_client_time_that_moves_backwards() -> None:
+    after = datetime(2026, 8, 11, 18, tzinfo=UTC)
+    result = validate_mowing_demo_event(
+        "pause",
+        target=ELIGIBLE_MOWING_DEMO_TARGET,
+        history=[("start", after)],
+        occurred_at="2026-08-11T14:00:00-03:00",
+    )
+
+    assert result.code == "invalid_mowing_demo_time"
 
 
 def test_measurement_requires_prepared_and_non_official_labels() -> None:

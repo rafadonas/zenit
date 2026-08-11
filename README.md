@@ -133,9 +133,11 @@ The app explicitly uploads accepted manifests and persists each unverified
 receipt so interrupted transfers resume without repeating confirmed photos.
 Uploaded objects remain encrypted, unvalidated, and non-official. The
 app also downloads the prepared mowing-planning chain into the encrypted vault
-for offline read-only review. Candidate resources, manual readiness, and a
-planning decision remain explicitly non-executable; no mowing confirmation,
-start, tracking, finish, dispatch, or sync control exists. The app persists
+for offline read-only review. The API accepts an append-only simulated mowing
+rehearsal sequence for confirmation, start, pause/resume, and finish, but the
+mobile app exposes no controls for it yet. Candidate resources, manual readiness,
+and a planning decision remain explicitly non-executable; no real mowing,
+dispatch, tracking, or operational approval exists. The app persists
 event/batch UUIDs, registers
 its logical device, sends the exact idempotent batch, and retains local events
 until a persistent accepted/rejected/conflict result arrives. The API has an
@@ -154,8 +156,8 @@ credentials.
 ## Database migrations and ingestion
 
 Apply migrations in numeric order before importing sources. The current local
-development database must have migrations `0001` through `0027` applied. On the first
-startup of a new Compose volume, Postgres applies these twenty-seven up migrations in
+development database must have migrations `0001` through `0028` applied. On the first
+startup of a new Compose volume, Postgres applies these twenty-eight up migrations in
 order through `/docker-entrypoint-initdb.d`; existing volumes are never modified
 by that initialization mechanism. The explicit commands below remain useful
 for non-Compose environments and controlled upgrades of existing databases.
@@ -215,6 +217,8 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0026_prepared_mowing_readiness_assessment.sql
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0027_prepared_mowing_planning_approval.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
+  < infra/migrations/0028_prepared_mowing_demo_lifecycle.sql
 ```
 
 Migration `0008` starts the Sprint 4 management foundation with immutable,
@@ -329,6 +333,13 @@ requires prepared `clear` weather and safety results but never satisfies
 operational approval or authorizes execution. Dual-approval rules remain
 pending official policy validation. See
 `docs/decisions/ADR-0029-prepared-mowing-planning-approval.md`.
+
+Migration `0028` adds append-only events for a strictly simulated mowing
+rehearsal: confirmation, start with an explicitly simulated coordinate,
+balanced pause/resume, and finish. The effective prepared planning decision is
+required, but operational approval and every execution/reporting/training flag
+remain false. See
+`docs/decisions/ADR-0031-prepared-mowing-demo-lifecycle.md`.
 
 The mobile client can cache this prepared mowing-planning chain for offline,
 read-only demonstration. It validates provenance links and every execution
