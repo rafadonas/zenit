@@ -1,0 +1,8 @@
+BEGIN;
+DROP TRIGGER IF EXISTS prepared_post_inspection_policy_immutable ON prepared_post_inspection_policy;
+DROP TRIGGER IF EXISTS prepared_post_inspection_proposal_immutable ON prepared_post_inspection_proposal;
+DROP TRIGGER IF EXISTS prepared_post_inspection_proposal_guard ON prepared_post_inspection_proposal;
+DROP FUNCTION IF EXISTS validate_prepared_post_inspection_proposal();
+DROP TABLE IF EXISTS prepared_post_inspection_proposal;
+DROP TABLE IF EXISTS prepared_post_inspection_policy;
+COMMIT;

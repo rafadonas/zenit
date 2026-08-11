@@ -32,6 +32,9 @@ SERIAL_PHOTO_REVIEW_MIGRATION = Path(
 PREPARED_SUMMARY_EXPORT_MIGRATION = Path(
     "infra/migrations/0021_audited_prepared_summary_export.sql"
 )
+PREPARED_POST_INSPECTION_PROPOSAL_MIGRATION = Path(
+    "infra/migrations/0022_prepared_post_inspection_proposal.sql"
+)
 
 
 class MigrationContractTests(unittest.TestCase):
@@ -134,7 +137,7 @@ class MigrationContractTests(unittest.TestCase):
         mounts = [
             line.strip() for line in compose.splitlines() if "/docker-entrypoint-initdb.d/" in line
         ]
-        self.assertEqual(len(mounts), 21)
+        self.assertEqual(len(mounts), 22)
         for version, mount in enumerate(mounts, start=1):
             prefix = f"{version:04d}"
             self.assertIn(f"infra/migrations/{prefix}_", mount)
@@ -295,6 +298,17 @@ class MigrationContractTests(unittest.TestCase):
         self.assertIn("assignment.role IN ('manager', 'supervisor')", sql)
         self.assertIn("CHECK (NOT eligible_for_official_reporting)", sql)
         self.assertIn("prepared_inspection_summary_export_event_immutable", sql)
+
+    def test_post_inspection_proposal_is_rule_bound_and_never_authorizes_work(self) -> None:
+        sql = PREPARED_POST_INSPECTION_PROPOSAL_MIGRATION.read_text(encoding="utf-8")
+        self.assertIn("prepared-post-inspection-v1", sql)
+        self.assertIn("general_threshold_cm = 30", sql)
+        self.assertIn("special_threshold_cm = 10", sql)
+        self.assertIn("cardinality(allowed_roles) > 0", sql)
+        self.assertIn("recommendation IN ('monitor', 'mowing_review')", sql)
+        self.assertIn("CHECK (requires_human_review)", sql)
+        self.assertIn("CHECK (NOT authorizes_field_work)", sql)
+        self.assertIn("prepared_post_inspection_proposal_immutable", sql)
 
 
 if __name__ == "__main__":

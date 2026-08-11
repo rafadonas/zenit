@@ -7,6 +7,10 @@ import Link from "next/link";
 import { loadDashboardSession } from "../../lib/dashboard-session";
 import { isPhotoReviewQueue, type PhotoReviewQueue } from "../../lib/photo-reviews";
 import {
+  isPreparedProposalCollection, type PreparedPostInspectionProposal,
+  type PreparedProposalCollection,
+} from "../../lib/post-inspection-proposals";
+import {
   isPreparedSummaryCollection, type PreparedInspectionSummary,
   type PreparedSummaryCollection,
 } from "../../lib/prepared-summaries";
@@ -15,7 +19,9 @@ import { SESSION_COOKIE_NAME } from "../../lib/session-security";
 export const dynamic = "force-dynamic";
 
 interface PageProps {
-  searchParams: Promise<{ review?: string; summary?: string; export?: string }>;
+  searchParams: Promise<{
+    review?: string; summary?: string; export?: string; proposal?: string;
+  }>;
 }
 
 async function loadQueue(): Promise<PhotoReviewQueue | null> {
@@ -48,7 +54,31 @@ async function loadSummaries(): Promise<PreparedSummaryCollection | null> {
   return payload;
 }
 
-function message(review?: string, summary?: string, exportStatus?: string): string | null {
+async function loadProposals(): Promise<PreparedProposalCollection | null> {
+  const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
+  if (!token) return null;
+  const baseUrl = process.env.INTERNAL_API_URL ?? "http://localhost:8000";
+  const response = await fetch(`${baseUrl}/v1/prepared-post-inspection-proposals?limit=50`, {
+    cache: "no-store", headers: { Authorization: `Bearer ${token}` },
+  });
+  if (response.status === 401) return null;
+  if (!response.ok) throw new Error(`Prepared proposal list returned HTTP ${response.status}`);
+  const payload: unknown = await response.json();
+  if (!isPreparedProposalCollection(payload)) {
+    throw new Error("Prepared proposal safety contract is invalid");
+  }
+  return payload;
+}
+
+function message(
+  review?: string, summary?: string, exportStatus?: string, proposal?: string,
+): string | null {
+  if (proposal === "created") return "Proposta pós-inspeção preparada; decisão humana ainda obrigatória.";
+  if (proposal === "forbidden") return "Seu usuário não pode criar proposta para esta rodovia.";
+  if (proposal === "missing") return "O resumo preparado não foi encontrado.";
+  if (proposal === "conflict") return "A proposta já existe ou a chave entrou em conflito.";
+  if (proposal === "invalid") return "A justificativa da proposta é inválida.";
+  if (proposal === "service-unavailable") return "O serviço de propostas não está disponível agora.";
   if (exportStatus === "missing") return "O resumo preparado não foi encontrado ou não está acessível.";
   if (exportStatus === "conflict") return "A chave da exportação entrou em conflito com outra solicitação.";
   if (exportStatus === "invalid") return "Informe um propósito válido para exportar o resumo.";
@@ -79,14 +109,17 @@ function formatHeight(value: string | number): string {
 }
 
 export default async function PhotoReviewsPage({ searchParams }: PageProps) {
-  const [session, queue, summaries, query] = await Promise.all([
-    loadDashboardSession(), loadQueue(), loadSummaries(), searchParams,
+  const [session, queue, summaries, proposals, query] = await Promise.all([
+    loadDashboardSession(), loadQueue(), loadSummaries(), loadProposals(), searchParams,
   ]);
-  const operationMessage = message(query.review, query.summary, query.export);
+  const operationMessage = message(query.review, query.summary, query.export, query.proposal);
   const summaryByOrder = new Map<string, PreparedInspectionSummary>(
     summaries?.items.map((summary) => [summary.work_order_id, summary]) ?? [],
   );
   const orderGroups = new Map<string, PhotoReviewQueue["items"]>();
+  const proposalBySummary = new Map<string, PreparedPostInspectionProposal>(
+    proposals?.items.map((proposal) => [proposal.summary_id, proposal]) ?? [],
+  );
   for (const item of queue?.items ?? []) {
     const group = orderGroups.get(item.work_order_id) ?? [];
     group.push(item);
@@ -116,6 +149,7 @@ export default async function PhotoReviewsPage({ searchParams }: PageProps) {
           const eligible = ordered.length === 3 && sequences.size === 3 &&
             [1, 2, 3].every((sequence) => sequences.has(sequence)) && acceptedCount === 3;
           const summary = summaryByOrder.get(workOrderId);
+          const proposal = summary ? proposalBySummary.get(summary.summary_id) : undefined;
           return <article className="prepared-summary-card" key={workOrderId}>
             <div className="prepared-summary-heading"><div><p className="eyebrow">{first.road_code} · trecho #{first.segment_index} · {first.zone_type}</p><h2>Retorno dos três pontos</h2></div><span className={`status-pill ${summary ? "review" : "prepared"}`}>{summary ? "Resumo gerado" : `${acceptedCount}/3 aceitos`}</span></div>
             {summary ? <>
@@ -128,6 +162,15 @@ export default async function PhotoReviewsPage({ searchParams }: PageProps) {
                 <label htmlFor={`export-purpose-${summary.summary_id}`}>Propósito da exportação</label><input defaultValue="Compartilhar resultado preparado para revisão" id={`export-purpose-${summary.summary_id}`} maxLength={2000} name="export_purpose" required />
                 <button className="secondary-button" type="submit">Baixar CSV preparado</button><small>O download gera um evento de auditoria imutável e mantém o bloqueio de relatório oficial.</small>
               </form>
+              {proposal ? <div className="post-inspection-proposal">
+                <div><strong>{proposal.recommendation === "mowing_review" ? "Revisar proposta de roçada" : "Manter monitoramento"}</strong><span>Máxima {formatHeight(proposal.maximum_height_cm)} cm · limiar {formatHeight(proposal.applicable_threshold_cm)} cm</span></div>
+                <span className="status-pill review">Decisão humana pendente</span>
+                <small>Regra {proposal.policy_version}. A proposta não cria ordem, não autoriza roçada e não entra em relatório oficial.</small>
+              </div> : <form action={`/api/prepared-inspection-summaries/${summary.summary_id}/post-inspection-proposal`} className="prepared-summary-form" method="post">
+                <input name="csrf_token" type="hidden" value={session.csrfToken} /><input name="idempotency_key" type="hidden" value={randomUUID()} />
+                <label htmlFor={`proposal-rationale-${summary.summary_id}`}>Justificativa para aplicar a regra pós-inspeção</label><textarea defaultValue="Aplicar a regra preparada de limiar ao retorno revisado" id={`proposal-rationale-${summary.summary_id}`} maxLength={2000} name="creation_rationale" required rows={2} />
+                <button className="primary-button" type="submit">Gerar proposta preparada</button><small>Compara a máxima digitada com 10 cm em área especial ou 30 cm nas demais zonas. Exige revisão humana posterior.</small>
+              </form>}
             </> : eligible ? <form action={`/api/work-orders/${workOrderId}/prepared-summary`} className="prepared-summary-form" method="post">
               <input name="csrf_token" type="hidden" value={session.csrfToken} /><input name="idempotency_key" type="hidden" value={randomUUID()} />
               <label htmlFor={`summary-rationale-${workOrderId}`}>Justificativa da consolidação</label><textarea defaultValue="Consolidar o retorno preparado dos três pontos revisados" id={`summary-rationale-${workOrderId}`} maxLength={2000} name="generation_rationale" required rows={2} />

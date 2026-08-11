@@ -6,6 +6,7 @@ import {
   parseDecisionSubmission,
   parsePreparedInspectionOrderSubmission,
   parsePhotoReviewSubmission,
+  parsePreparedProposalSubmission,
   parsePreparedSummaryExportSubmission,
   parsePreparedSummarySubmission,
   requestOriginMatches,
@@ -142,5 +143,18 @@ describe("dashboard session security", () => {
     });
     form.set("export_purpose", " ");
     expect(parsePreparedSummaryExportSubmission(form)).toBeNull();
+  });
+
+  it("allowlists a prepared post-inspection proposal rationale", () => {
+    const form = new FormData();
+    form.set("csrf_token", csrfToken);
+    form.set("idempotency_key", "10000000-0000-4000-8000-000000000001");
+    form.set("creation_rationale", "Aplicar regra preparada ao retorno revisado");
+    form.set("authorizes_field_work", "true");
+    expect(parsePreparedProposalSubmission(form)).toEqual({
+      csrfToken,
+      idempotencyKey: "10000000-0000-4000-8000-000000000001",
+      creationRationale: "Aplicar regra preparada ao retorno revisado",
+    });
   });
 });

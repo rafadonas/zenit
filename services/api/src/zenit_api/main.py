@@ -13,6 +13,8 @@ from zenit_api.media import router as media_router
 from zenit_api.mobile_sync import router as mobile_sync_router
 from zenit_api.photo_reviews import queue_router as photo_review_queue_router
 from zenit_api.photo_reviews import router as photo_reviews_router
+from zenit_api.post_inspection_proposals import collection_router as proposal_collection_router
+from zenit_api.post_inspection_proposals import summary_router as proposal_summary_router
 from zenit_api.recommendation_reviews import router as recommendation_reviews_router
 from zenit_api.recommendations import router as recommendations_router
 from zenit_api.satellite_observations import router as satellite_observations_router
@@ -52,6 +54,8 @@ app.include_router(photo_reviews_router)
 app.include_router(photo_review_queue_router)
 app.include_router(inspection_summaries_router)
 app.include_router(inspection_summary_collection_router)
+app.include_router(proposal_summary_router)
+app.include_router(proposal_collection_router)
 
 
 @app.get("/health", response_model=HealthResponse, tags=["system"])

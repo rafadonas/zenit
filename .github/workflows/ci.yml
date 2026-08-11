@@ -93,7 +93,8 @@ jobs:
                 AND to_regclass('public.mobile_sync_conflict') IS NOT NULL
                 AND to_regclass('public.prepared_field_measurement') IS NOT NULL
                 AND to_regclass('public.prepared_inspection_summary') IS NOT NULL
-                AND to_regclass('public.prepared_inspection_summary_export_event') IS NOT NULL;" \
+                AND to_regclass('public.prepared_inspection_summary_export_event') IS NOT NULL
+                AND to_regclass('public.prepared_post_inspection_proposal') IS NOT NULL;" \
             | grep -qx t
           docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit -Atc \
             "SELECT postgis_typmod_type(a.atttypmod)
@@ -132,6 +133,12 @@ jobs:
             -X POST -H 'Content-Type: application/json' -H 'Idempotency-Key: ci-export-check' \
             -d '{"export_purpose":"CI authentication boundary"}' \
             http://localhost:8000/v1/prepared-inspection-summaries/00000000-0000-4000-8000-000000000001/exports)" = 401
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            -X POST -H 'Content-Type: application/json' -H 'Idempotency-Key: ci-proposal-check' \
+            -d '{"creation_rationale":"CI authentication boundary"}' \
+            http://localhost:8000/v1/prepared-inspection-summaries/00000000-0000-4000-8000-000000000001/post-inspection-proposal)" = 401
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            http://localhost:8000/v1/prepared-post-inspection-proposals)" = 401
           curl --fail --silent --show-error --output /dev/null http://localhost:3000
           curl --fail --silent --show-error --output /dev/null http://localhost:3000/login
       - name: Show service logs on failure

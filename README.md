@@ -150,8 +150,8 @@ credentials.
 ## Database migrations and ingestion
 
 Apply migrations in numeric order before importing sources. The current local
-development database must have migrations `0001` through `0021` applied. On the first
-startup of a new Compose volume, Postgres applies these twenty-one up migrations in
+development database must have migrations `0001` through `0022` applied. On the first
+startup of a new Compose volume, Postgres applies these twenty-two up migrations in
 order through `/docker-entrypoint-initdb.d`; existing volumes are never modified
 by that initialization mechanism. The explicit commands below remain useful
 for non-Compose environments and controlled upgrades of existing databases.
@@ -199,6 +199,8 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0020_serialize_prepared_photo_reviews.sql
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0021_audited_prepared_summary_export.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
+  < infra/migrations/0022_prepared_post_inspection_proposal.sql
 ```
 
 Migration `0008` starts the Sprint 4 management foundation with immutable,
@@ -279,6 +281,12 @@ inspection summaries. PostgreSQL repeats current manager/supervisor road access
 and every simulated, prepared, non-official, non-authorizing safety gate. Each
 event records purpose, export schema version, byte size, and SHA-256 checksum.
 See `docs/decisions/ADR-0023-audited-prepared-summary-csv-export.md`.
+
+Migration `0022` adds the versioned, immutable prepared post-inspection
+proposal. PostgreSQL applies 10 cm to special zones and 30 cm elsewhere, then
+returns only `monitor` or `mowing_review`. Every result explicitly requires a
+separate human review and cannot create or authorize mowing work. See
+`docs/decisions/ADR-0024-prepared-post-inspection-proposal.md`.
 
 The public, read-only management queue is available at:
 
@@ -500,6 +508,22 @@ The deterministic artifact is versioned, checksum-addressed, formula-safe for
 user-authored cells, limited to one megabyte, and prominently states that it is
 a simulated prepared demo export—not an official report or field authorization.
 The dashboard verifies these labels and checksum before delivering the download.
+
+Create the prepared post-inspection planning signal from a generated summary:
+
+```text
+POST /v1/prepared-inspection-summaries/{summary_id}/post-inspection-proposal
+Authorization: Bearer <access-token>
+Idempotency-Key: <client-generated-stable-key>
+Content-Type: application/json
+
+{"creation_rationale":"Apply the prepared threshold rule to the reviewed return"}
+```
+
+The authenticated proposal list is available at
+`GET /v1/prepared-post-inspection-proposals?limit=50`. A threshold breach yields
+`mowing_review`, never a mowing authorization. The `/photo-reviews` dashboard
+shows the comparison and keeps the human-decision state visibly pending.
 
 Use `zenit-import` for one immutable raw file at a time. Full examples are in
 `docs/architecture/source-ingestion.md`.

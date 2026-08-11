@@ -32,6 +32,7 @@ services:
       - ./infra/migrations/0019_linear_prepared_photo_review_chain.sql:/docker-entrypoint-initdb.d/0019.sql:ro
       - ./infra/migrations/0020_serialize_prepared_photo_reviews.sql:/docker-entrypoint-initdb.d/0020.sql:ro
       - ./infra/migrations/0021_audited_prepared_summary_export.sql:/docker-entrypoint-initdb.d/0021.sql:ro
+      - ./infra/migrations/0022_prepared_post_inspection_proposal.sql:/docker-entrypoint-initdb.d/0022.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -74,6 +75,7 @@ services:
       INSPECTION_ORDER_POLICY_VERSION: ${INSPECTION_ORDER_POLICY_VERSION:-prepared-inspection-order-v1}
       PREPARED_PHOTO_REVIEW_POLICY_VERSION: ${PREPARED_PHOTO_REVIEW_POLICY_VERSION:-prepared-photo-review-v1}
       PREPARED_INSPECTION_SUMMARY_POLICY_VERSION: ${PREPARED_INSPECTION_SUMMARY_POLICY_VERSION:-prepared-inspection-summary-v1}
+      PREPARED_POST_INSPECTION_POLICY_VERSION: ${PREPARED_POST_INSPECTION_POLICY_VERSION:-prepared-post-inspection-v1}
       OBJECT_STORAGE_ENDPOINT: ${OBJECT_STORAGE_ENDPOINT:-http://minio:9000}
       OBJECT_STORAGE_ACCESS_KEY: ${OBJECT_STORAGE_ACCESS_KEY:-zenit}
       OBJECT_STORAGE_SECRET_KEY: ${OBJECT_STORAGE_SECRET_KEY:-change_me}
