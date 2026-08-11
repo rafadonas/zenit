@@ -26,6 +26,8 @@ export interface PreparedPostInspectionProposal {
   latest_review_rationale: string | null;
   latest_reviewed_at: string | null;
   review_state: "awaiting_review" | "review_recorded_no_work_authorization";
+  prepared_mowing_order_id: string | null;
+  mowing_order_state: "not_prepared" | "prepared_no_execution_authorization";
 }
 
 export interface PreparedProposalCollection {
@@ -63,9 +65,17 @@ function isProposal(value: unknown): value is PreparedPostInspectionProposal {
       value.review_state === "review_recorded_no_work_authorization" &&
       ((value.latest_review_decision === "adjusted") ===
         ["monitor", "mowing_review"].includes(String(value.latest_adjusted_recommendation)));
+  const effectiveRecommendation = value.latest_review_decision === "adjusted"
+    ? value.latest_adjusted_recommendation
+    : value.latest_review_decision === "accepted" ? value.recommendation : null;
+  const mowingOrderConsistent = value.prepared_mowing_order_id === null
+    ? value.mowing_order_state === "not_prepared"
+    : typeof value.prepared_mowing_order_id === "string" &&
+      value.mowing_order_state === "prepared_no_execution_authorization" &&
+      effectiveRecommendation === "mowing_review";
   return [10, 30].includes(threshold) && value.threshold_exceeded === exceeded &&
     typeof value.review_count === "number" && Number.isInteger(value.review_count) &&
-    reviewConsistent &&
+    reviewConsistent && mowingOrderConsistent &&
     value.recommendation === (exceeded ? "mowing_review" : "monitor") &&
     typeof value.proposal_id === "string" &&
     typeof value.summary_id === "string" && typeof value.work_order_id === "string" &&

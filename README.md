@@ -150,8 +150,8 @@ credentials.
 ## Database migrations and ingestion
 
 Apply migrations in numeric order before importing sources. The current local
-development database must have migrations `0001` through `0023` applied. On the first
-startup of a new Compose volume, Postgres applies these twenty-three up migrations in
+development database must have migrations `0001` through `0024` applied. On the first
+startup of a new Compose volume, Postgres applies these twenty-four up migrations in
 order through `/docker-entrypoint-initdb.d`; existing volumes are never modified
 by that initialization mechanism. The explicit commands below remain useful
 for non-Compose environments and controlled upgrades of existing databases.
@@ -203,6 +203,8 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0022_prepared_post_inspection_proposal.sql
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0023_prepared_post_inspection_review.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
+  < infra/migrations/0024_prepared_mowing_order.sql
 ```
 
 Migration `0008` starts the Sprint 4 management foundation with immutable,
@@ -295,6 +297,12 @@ proposals. Corrections form one serialized linear supersession chain; rejection
 and adjustment require rationale, and every outcome remains prepared,
 non-official, and unable to authorize mowing. See
 `docs/decisions/ADR-0025-prepared-post-inspection-human-review.md`.
+
+Migration `0024` adds an immutable prepared mowing-order foundation. Only the
+effective human review selecting `mowing_review` can create one. Team and
+equipment remain unassigned, weather and safety remain pending, and the order
+cannot authorize field execution. See
+`docs/decisions/ADR-0026-prepared-mowing-order-foundation.md`.
 
 The public, read-only management queue is available at:
 
@@ -547,6 +555,24 @@ Content-Type: application/json
 The effective review is returned in the authenticated proposal list. Accepting
 `mowing_review` records agreement with a prepared planning signal only; it does
 not create a mowing order or authorize field activity.
+
+Prepare or list non-executable mowing orders:
+
+```text
+POST /v1/prepared-mowing-orders
+Authorization: Bearer <access-token>
+Idempotency-Key: <client-generated-stable-key>
+Content-Type: application/json
+
+{"source_review_id":"<effective-review-uuid>","planning_rationale":"Prepare planning without authorizing execution"}
+
+GET /v1/prepared-mowing-orders?limit=50
+Authorization: Bearer <access-token>
+```
+
+The creation endpoint rejects rejected, superseded, or effective `monitor`
+reviews. Its result remains prepared, simulated-location, non-official, and
+ineligible for field execution.
 
 Use `zenit-import` for one immutable raw file at a time. Full examples are in
 `docs/architecture/source-ingestion.md`.

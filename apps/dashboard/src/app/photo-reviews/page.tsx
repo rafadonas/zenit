@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
 interface PageProps {
   searchParams: Promise<{
     review?: string; summary?: string; export?: string; proposal?: string;
-    proposal_review?: string;
+    proposal_review?: string; mowing_order?: string;
   }>;
 }
 
@@ -73,8 +73,14 @@ async function loadProposals(): Promise<PreparedProposalCollection | null> {
 
 function message(
   review?: string, summary?: string, exportStatus?: string, proposal?: string,
-  proposalReview?: string,
+  proposalReview?: string, mowingOrder?: string,
 ): string | null {
+  if (mowingOrder === "created") return "Ordem de roçada preparada para planejamento, sem autorização de execução.";
+  if (mowingOrder === "forbidden") return "Seu usuário não pode preparar ordem de roçada para esta rodovia.";
+  if (mowingOrder === "missing") return "A revisão humana efetiva não foi encontrada.";
+  if (mowingOrder === "conflict") return "A revisão não indica roçada, já possui ordem ou a chave entrou em conflito.";
+  if (mowingOrder === "invalid") return "A solicitação da ordem preparada está incompleta.";
+  if (mowingOrder === "service-unavailable") return "O serviço de ordens preparadas não está disponível agora.";
   if (proposalReview === "recorded") return "Decisão humana sobre a proposta registrada na trilha append-only.";
   if (proposalReview === "forbidden") return "Seu usuário não pode revisar esta proposta.";
   if (proposalReview === "missing") return "A proposta preparada não foi encontrada.";
@@ -122,6 +128,7 @@ export default async function PhotoReviewsPage({ searchParams }: PageProps) {
   ]);
   const operationMessage = message(
     query.review, query.summary, query.export, query.proposal, query.proposal_review,
+    query.mowing_order,
   );
   const summaryByOrder = new Map<string, PreparedInspectionSummary>(
     summaries?.items.map((summary) => [summary.work_order_id, summary]) ?? [],
@@ -160,6 +167,9 @@ export default async function PhotoReviewsPage({ searchParams }: PageProps) {
             [1, 2, 3].every((sequence) => sequences.has(sequence)) && acceptedCount === 3;
           const summary = summaryByOrder.get(workOrderId);
           const proposal = summary ? proposalBySummary.get(summary.summary_id) : undefined;
+          const effectiveProposalRecommendation = proposal?.latest_review_decision === "adjusted"
+            ? proposal.latest_adjusted_recommendation
+            : proposal?.latest_review_decision === "accepted" ? proposal.recommendation : null;
           return <article className="prepared-summary-card" key={workOrderId}>
             <div className="prepared-summary-heading"><div><p className="eyebrow">{first.road_code} · trecho #{first.segment_index} · {first.zone_type}</p><h2>Retorno dos três pontos</h2></div><span className={`status-pill ${summary ? "review" : "prepared"}`}>{summary ? "Resumo gerado" : `${acceptedCount}/3 aceitos`}</span></div>
             {summary ? <>
@@ -185,6 +195,14 @@ export default async function PhotoReviewsPage({ searchParams }: PageProps) {
                   <div className="decision-rationale"><label htmlFor={`proposal-review-rationale-${proposal.proposal_id}`}>Justificativa</label><textarea id={`proposal-review-rationale-${proposal.proposal_id}`} maxLength={2000} name="rationale" placeholder="Obrigatória ao rejeitar ou ajustar" rows={2} /></div>
                   <button className="primary-button" type="submit">{proposal.latest_review_id ? "Registrar correção auditável" : "Registrar decisão humana"}</button><small>Aceitar significa apenas concordar com o sinal preparado para planejamento; uso em campo permanece bloqueado.</small>
                 </form>
+                {proposal.prepared_mowing_order_id ? <div className="post-inspection-proposal">
+                  <div><strong>Ordem de roçada preparada</strong><span>ID {proposal.prepared_mowing_order_id}</span></div><span className="status-pill prepared">Não executável</span>
+                  <small>Equipe e equipamento não atribuídos; clima e segurança pendentes; aprovação operacional obrigatória.</small>
+                </div> : effectiveProposalRecommendation === "mowing_review" && proposal.latest_review_id ? <form action="/api/prepared-mowing-orders" className="prepared-summary-form" method="post">
+                  <input name="csrf_token" type="hidden" value={session.csrfToken} /><input name="idempotency_key" type="hidden" value={randomUUID()} /><input name="source_review_id" type="hidden" value={proposal.latest_review_id} />
+                  <label htmlFor={`mowing-rationale-${proposal.proposal_id}`}>Justificativa do planejamento de roçada</label><textarea defaultValue="Preparar ordem de roçada sem liberar execução operacional" id={`mowing-rationale-${proposal.proposal_id}`} maxLength={2000} name="planning_rationale" required rows={2} />
+                  <button className="primary-button" type="submit">Preparar ordem de roçada</button><small>Cria apenas a fundação de planejamento. Não atribui equipe/equipamento, não verifica clima/segurança e não autoriza campo.</small>
+                </form> : null}
               </> : <form action={`/api/prepared-inspection-summaries/${summary.summary_id}/post-inspection-proposal`} className="prepared-summary-form" method="post">
                 <input name="csrf_token" type="hidden" value={session.csrfToken} /><input name="idempotency_key" type="hidden" value={randomUUID()} />
                 <label htmlFor={`proposal-rationale-${summary.summary_id}`}>Justificativa para aplicar a regra pós-inspeção</label><textarea defaultValue="Aplicar a regra preparada de limiar ao retorno revisado" id={`proposal-rationale-${summary.summary_id}`} maxLength={2000} name="creation_rationale" required rows={2} />

@@ -60,6 +60,10 @@ class PreparedProposalResponse(BaseModel):
     review_state: Literal["awaiting_review", "review_recorded_no_work_authorization"] = (
         "awaiting_review"
     )
+    prepared_mowing_order_id: UUID | None = None
+    mowing_order_state: Literal[
+        "not_prepared", "prepared_no_execution_authorization"
+    ] = "not_prepared"
 
     @model_validator(mode="after")
     def validate_review_state(self) -> PreparedProposalResponse:
@@ -84,6 +88,18 @@ class PreparedProposalResponse(BaseModel):
             != (self.latest_adjusted_recommendation is not None)
         ):
             raise ValueError("reviewed proposal requires one consistent effective review")
+        effective_recommendation = (
+            self.latest_adjusted_recommendation
+            if self.latest_review_decision == "adjusted"
+            else self.recommendation if self.latest_review_decision == "accepted" else None
+        )
+        if (self.prepared_mowing_order_id is not None) != (
+            self.mowing_order_state == "prepared_no_execution_authorization"
+        ) or (
+            self.prepared_mowing_order_id is not None
+            and effective_recommendation != "mowing_review"
+        ):
+            raise ValueError("prepared mowing order requires an effective mowing-review decision")
         return self
 
 
@@ -449,7 +465,8 @@ class PostgresPreparedProposalRepository:
                    proposal.applicable_threshold_cm, proposal.maximum_height_cm,
                    proposal.threshold_exceeded, proposal.created_at,
                    COALESCE(review_total.review_count, 0), latest.id, latest.decision,
-                   latest.adjusted_recommendation, latest.rationale, latest.reviewed_at
+                   latest.adjusted_recommendation, latest.rationale, latest.reviewed_at,
+                   mowing.id
             FROM prepared_post_inspection_proposal proposal
             JOIN prepared_post_inspection_policy policy ON policy.id = proposal.policy_id
             JOIN prepared_inspection_summary summary ON summary.id = proposal.summary_id
@@ -473,6 +490,7 @@ class PostgresPreparedProposalRepository:
                       WHERE newer.supersedes_review_id = review.id)
                 ORDER BY review.reviewed_at DESC LIMIT 1
             ) latest ON true
+            LEFT JOIN prepared_mowing_order mowing ON mowing.source_review_id = latest.id
             WHERE proposal.location_status = 'simulated' AND proposal.data_status = 'prepared'
               AND NOT proposal.eligible_for_official_reporting
               AND NOT proposal.authorizes_field_work AND {where_clause}"""
@@ -490,6 +508,10 @@ class PostgresPreparedProposalRepository:
             latest_reviewed_at=row[18],
             review_state=(
                 "review_recorded_no_work_authorization" if row[14] else "awaiting_review"
+            ),
+            prepared_mowing_order_id=row[19],
+            mowing_order_state=(
+                "prepared_no_execution_authorization" if row[19] else "not_prepared"
             ),
         )
 

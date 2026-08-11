@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     prepared_photo_review_policy_version: str = "prepared-photo-review-v1"
     prepared_inspection_summary_policy_version: str = "prepared-inspection-summary-v1"
     prepared_post_inspection_policy_version: str = "prepared-post-inspection-v1"
+    prepared_mowing_order_policy_version: str = "prepared-mowing-order-v1"
     object_storage_endpoint: str = "http://minio:9000"
     object_storage_access_key: str = "zenit"
     object_storage_secret_key: SecretStr = SecretStr("change_me")

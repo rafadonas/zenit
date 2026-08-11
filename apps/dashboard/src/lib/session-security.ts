@@ -62,6 +62,13 @@ export interface PreparedProposalReviewSubmission {
   supersedesReviewId?: string;
 }
 
+export interface PreparedMowingOrderSubmission {
+  csrfToken: string;
+  idempotencyKey: string;
+  sourceReviewId: string;
+  planningRationale: string;
+}
+
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CSRF_PATTERN = /^[0-9a-f]{64}$/;
 
@@ -297,4 +304,21 @@ export function parsePreparedProposalReviewSubmission(
     ...(rationale ? { rationale } : {}),
     ...(supersedesReviewId ? { supersedesReviewId } : {}),
   };
+}
+
+export function parsePreparedMowingOrderSubmission(
+  form: FormData,
+): PreparedMowingOrderSubmission | null {
+  const csrfToken = formString(form, "csrf_token");
+  const idempotencyKey = formString(form, "idempotency_key");
+  const sourceReviewId = formString(form, "source_review_id");
+  const planningRationale = formString(form, "planning_rationale");
+  if (
+    csrfToken === null || !CSRF_PATTERN.test(csrfToken) ||
+    idempotencyKey === null || !UUID_PATTERN.test(idempotencyKey) ||
+    sourceReviewId === null || !UUID_PATTERN.test(sourceReviewId) ||
+    planningRationale === null || planningRationale.length < 1 ||
+    planningRationale.length > 2000
+  ) return null;
+  return { csrfToken, idempotencyKey, sourceReviewId, planningRationale };
 }

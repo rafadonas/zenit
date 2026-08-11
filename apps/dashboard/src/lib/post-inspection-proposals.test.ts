@@ -18,6 +18,7 @@ const value = {
     review_count: 0, latest_review_id: null, latest_review_decision: null,
     latest_adjusted_recommendation: null, latest_review_rationale: null,
     latest_reviewed_at: null, review_state: "awaiting_review",
+    prepared_mowing_order_id: null, mowing_order_state: "not_prepared",
   }], result_count: 1, limit: 50, truncated: false,
   warning: "Requires human review and never authorizes mowing.",
 };
@@ -33,6 +34,11 @@ describe("prepared post-inspection proposal contract", () => {
     })).toBe(false);
     expect(isPreparedProposalCollection({
       ...value, items: [{ ...value.items[0], review_count: 1 }],
+    })).toBe(false);
+    expect(isPreparedProposalCollection({
+      ...value, items: [{ ...value.items[0],
+        prepared_mowing_order_id: "70000000-0000-4000-8000-000000000001",
+        mowing_order_state: "prepared_no_execution_authorization" }],
     })).toBe(false);
   });
 });

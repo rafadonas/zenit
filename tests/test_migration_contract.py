@@ -38,6 +38,9 @@ PREPARED_POST_INSPECTION_PROPOSAL_MIGRATION = Path(
 PREPARED_POST_INSPECTION_REVIEW_MIGRATION = Path(
     "infra/migrations/0023_prepared_post_inspection_review.sql"
 )
+PREPARED_MOWING_ORDER_MIGRATION = Path(
+    "infra/migrations/0024_prepared_mowing_order.sql"
+)
 
 
 class MigrationContractTests(unittest.TestCase):
@@ -140,7 +143,7 @@ class MigrationContractTests(unittest.TestCase):
         mounts = [
             line.strip() for line in compose.splitlines() if "/docker-entrypoint-initdb.d/" in line
         ]
-        self.assertEqual(len(mounts), 23)
+        self.assertEqual(len(mounts), 24)
         for version, mount in enumerate(mounts, start=1):
             prefix = f"{version:04d}"
             self.assertIn(f"infra/migrations/{prefix}_", mount)
@@ -323,6 +326,18 @@ class MigrationContractTests(unittest.TestCase):
         self.assertIn("can only supersede its effective review", sql)
         self.assertIn("CHECK (NOT authorizes_field_work)", sql)
         self.assertIn("prepared_post_inspection_review_immutable", sql)
+
+    def test_prepared_mowing_order_requires_effective_review_and_blocks_execution(self) -> None:
+        sql = PREPARED_MOWING_ORDER_MIGRATION.read_text(encoding="utf-8")
+        self.assertIn("prepared-mowing-order-v1", sql)
+        self.assertIn("CREATE TABLE prepared_mowing_order", sql)
+        self.assertIn("requires the effective proposal review", sql)
+        self.assertIn("only an effective mowing-review decision", sql)
+        self.assertIn("team_assignment_status = 'unassigned'", sql)
+        self.assertIn("weather_check_status = 'pending'", sql)
+        self.assertIn("CHECK (NOT authorizes_field_work)", sql)
+        self.assertIn("CHECK (NOT eligible_for_field_execution)", sql)
+        self.assertIn("prepared_mowing_order_immutable", sql)
 
 
 if __name__ == "__main__":

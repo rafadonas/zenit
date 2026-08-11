@@ -5,6 +5,7 @@ import {
   getDashboardSecurityConfig,
   parseDecisionSubmission,
   parsePreparedInspectionOrderSubmission,
+  parsePreparedMowingOrderSubmission,
   parsePhotoReviewSubmission,
   parsePreparedProposalSubmission,
   parsePreparedProposalReviewSubmission,
@@ -174,5 +175,22 @@ describe("dashboard session security", () => {
     });
     form.delete("rationale");
     expect(parsePreparedProposalReviewSubmission(form)).toBeNull();
+  });
+
+  it("allowlists a prepared mowing-order request without execution fields", () => {
+    const form = new FormData();
+    form.set("csrf_token", csrfToken);
+    form.set("idempotency_key", "10000000-0000-4000-8000-000000000001");
+    form.set("source_review_id", "20000000-0000-4000-8000-000000000001");
+    form.set("planning_rationale", "Preparar planejamento sem liberar execução");
+    form.set("authorizes_field_work", "true");
+    expect(parsePreparedMowingOrderSubmission(form)).toEqual({
+      csrfToken,
+      idempotencyKey: "10000000-0000-4000-8000-000000000001",
+      sourceReviewId: "20000000-0000-4000-8000-000000000001",
+      planningRationale: "Preparar planejamento sem liberar execução",
+    });
+    form.set("planning_rationale", " ");
+    expect(parsePreparedMowingOrderSubmission(form)).toBeNull();
   });
 });
