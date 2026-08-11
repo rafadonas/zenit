@@ -53,7 +53,10 @@ photos/GPS/measurements, and operational reporting.
 4. Implement cohesive changes and run relevant checks.
 5. Review scope, security, provenance, and simulation labels.
 6. Update documentation, ADRs, and contracts when behavior changes.
-7. Report changes, tests, limitations, and the recommended next step.
+7. Commit every completed repository change before reporting it; never leave
+   completed work uncommitted. Keep each commit cohesive and do not push unless
+   explicitly requested.
+8. Report changes, tests, limitations, and the recommended next step.
 
 ## Forbidden without explicit request
 
