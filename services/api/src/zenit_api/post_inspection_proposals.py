@@ -9,7 +9,7 @@ from uuid import UUID
 import psycopg
 from fastapi import APIRouter, Depends, Header, HTTPException
 from psycopg.errors import UniqueViolation
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from zenit_api.auth import AuthenticatedUser, get_current_user
 from zenit_api.config import get_settings
@@ -51,6 +51,77 @@ class PreparedProposalResponse(BaseModel):
     eligible_for_official_reporting: Literal[False] = False
     authorizes_field_work: Literal[False] = False
     created_at: datetime
+    review_count: int = 0
+    latest_review_id: UUID | None = None
+    latest_review_decision: Literal["accepted", "rejected", "adjusted"] | None = None
+    latest_adjusted_recommendation: Literal["monitor", "mowing_review"] | None = None
+    latest_review_rationale: str | None = None
+    latest_reviewed_at: datetime | None = None
+    review_state: Literal["awaiting_review", "review_recorded_no_work_authorization"] = (
+        "awaiting_review"
+    )
+
+    @model_validator(mode="after")
+    def validate_review_state(self) -> PreparedProposalResponse:
+        if self.review_count == 0:
+            if any(
+                value is not None
+                for value in (
+                    self.latest_review_id,
+                    self.latest_review_decision,
+                    self.latest_adjusted_recommendation,
+                    self.latest_review_rationale,
+                    self.latest_reviewed_at,
+                )
+            ) or self.review_state != "awaiting_review":
+                raise ValueError("unreviewed proposal cannot expose review metadata")
+        elif (
+            self.latest_review_id is None
+            or self.latest_review_decision is None
+            or self.latest_reviewed_at is None
+            or self.review_state != "review_recorded_no_work_authorization"
+            or (self.latest_review_decision == "adjusted")
+            != (self.latest_adjusted_recommendation is not None)
+        ):
+            raise ValueError("reviewed proposal requires one consistent effective review")
+        return self
+
+
+class PreparedProposalReviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    decision: Literal["accepted", "rejected", "adjusted"]
+    adjusted_recommendation: Literal["monitor", "mowing_review"] | None = None
+    rationale: str | None = Field(default=None, max_length=2000)
+    supersedes_review_id: UUID | None = None
+
+    @field_validator("rationale")
+    @classmethod
+    def normalize_review_rationale(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return value.strip() or None
+
+    @model_validator(mode="after")
+    def validate_review(self) -> PreparedProposalReviewRequest:
+        if (self.decision == "adjusted") != (self.adjusted_recommendation is not None):
+            raise ValueError("adjusted decision requires exactly one replacement")
+        if self.decision in {"rejected", "adjusted"} and self.rationale is None:
+            raise ValueError("rejected and adjusted decisions require a rationale")
+        return self
+
+
+class PreparedProposalReviewResponse(BaseModel):
+    review_id: UUID
+    proposal_id: UUID
+    decision: Literal["accepted", "rejected", "adjusted"]
+    adjusted_recommendation: Literal["monitor", "mowing_review"] | None
+    rationale: str | None
+    supersedes_review_id: UUID | None
+    policy_version: str
+    data_status: Literal["prepared"] = "prepared"
+    eligible_for_official_reporting: Literal[False] = False
+    authorizes_field_work: Literal[False] = False
+    reviewed_at: datetime
 
 
 class PreparedProposalCollection(BaseModel):
@@ -83,6 +154,10 @@ class ProposalAlreadyExistsError(Exception):
     pass
 
 
+class ProposalReviewSupersessionError(Exception):
+    pass
+
+
 class PreparedProposalWriter(Protocol):
     async def create(
         self,
@@ -98,6 +173,17 @@ class PreparedProposalReader(Protocol):
     async def list_for_actor(
         self, *, actor: AuthenticatedUser, limit: int
     ) -> PreparedProposalCollection: ...
+
+
+class PreparedProposalReviewWriter(Protocol):
+    async def record_review(
+        self,
+        *,
+        proposal_id: UUID,
+        actor: AuthenticatedUser,
+        idempotency_key: str,
+        request: PreparedProposalReviewRequest,
+    ) -> PreparedProposalReviewResponse: ...
 
 
 class PostgresPreparedProposalRepository:
@@ -225,6 +311,95 @@ class PostgresPreparedProposalRepository:
             result_count=len(visible), limit=limit, truncated=truncated,
         )
 
+    async def record_review(
+        self,
+        *,
+        proposal_id: UUID,
+        actor: AuthenticatedUser,
+        idempotency_key: str,
+        request: PreparedProposalReviewRequest,
+    ) -> PreparedProposalReviewResponse:
+        key_hash = hashlib.sha256(idempotency_key.encode()).hexdigest()
+        connection = await psycopg.AsyncConnection.connect(self._database_url)
+        async with connection, connection.cursor() as cursor:
+            await cursor.execute(
+                """
+                SELECT proposal.policy_id, policy.version, axis.road_id, policy.allowed_roles
+                FROM prepared_post_inspection_proposal proposal
+                JOIN prepared_post_inspection_policy policy ON policy.id = proposal.policy_id
+                JOIN prepared_inspection_summary summary ON summary.id = proposal.summary_id
+                JOIN work_order order_record ON order_record.id = summary.work_order_id
+                JOIN segment_zone zone ON zone.id = order_record.segment_zone_id
+                JOIN road_segment segment ON segment.id = zone.road_segment_id
+                JOIN road_axis_candidate axis ON axis.id = segment.road_axis_candidate_id
+                WHERE proposal.id = %s AND proposal.requires_human_review
+                  AND proposal.data_status = 'prepared'
+                  AND NOT proposal.eligible_for_official_reporting
+                  AND NOT proposal.authorizes_field_work
+                  AND policy.data_status = 'prepared' AND policy.requires_human_review
+                  AND NOT policy.authorizes_field_work
+                """,
+                (proposal_id,),
+            )
+            target = await cursor.fetchone()
+            if target is None:
+                raise ProposalNotFoundError
+            await cursor.execute(
+                """SELECT 1 FROM road_user_role WHERE user_id = %s AND road_id = %s
+                   AND role = ANY(%s)
+                   AND data_status <> 'simulated' LIMIT 1""",
+                (actor.id, target[2], target[3]),
+            )
+            if not await cursor.fetchone():
+                raise ProposalPermissionError
+            existing = await self._review_by_key(cursor, key_hash)
+            if existing is not None:
+                self._assert_review_replay(existing, proposal_id, actor, request)
+                return self._review_response(existing)
+            await cursor.execute(
+                "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                (f"prepared-post-inspection-review:{proposal_id}",),
+            )
+            await cursor.execute(
+                """SELECT review.id FROM prepared_post_inspection_review review
+                   WHERE review.proposal_id = %s
+                     AND NOT EXISTS (SELECT 1 FROM prepared_post_inspection_review newer
+                                     WHERE newer.supersedes_review_id = review.id)
+                   ORDER BY review.reviewed_at DESC LIMIT 1""",
+                (proposal_id,),
+            )
+            effective = await cursor.fetchone()
+            if (effective is None and request.supersedes_review_id is not None) or (
+                effective is not None and request.supersedes_review_id != effective[0]
+            ):
+                raise ProposalReviewSupersessionError
+            await cursor.execute(
+                """
+                INSERT INTO prepared_post_inspection_review (
+                    proposal_id, reviewer_user_id, policy_id, supersedes_review_id,
+                    idempotency_key, decision, adjusted_recommendation, rationale,
+                    data_status, eligible_for_official_reporting, authorizes_field_work)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'prepared', false, false)
+                ON CONFLICT (idempotency_key) DO NOTHING
+                RETURNING id, proposal_id, reviewer_user_id, decision,
+                          adjusted_recommendation, rationale, supersedes_review_id,
+                          reviewed_at
+                """,
+                (
+                    proposal_id, actor.id, target[0], request.supersedes_review_id,
+                    key_hash, request.decision, request.adjusted_recommendation,
+                    request.rationale,
+                ),
+            )
+            inserted = await cursor.fetchone()
+            if inserted is None:
+                existing = await self._review_by_key(cursor, key_hash)
+                if existing is None:
+                    raise ProposalIdempotencyConflictError
+                self._assert_review_replay(existing, proposal_id, actor, request)
+                return self._review_response(existing)
+            return self._review_response((*inserted, target[1]))
+
     async def _by_key(self, cursor, key_hash):
         await cursor.execute(
             """SELECT id, summary_id, created_by_user_id, creation_rationale
@@ -232,6 +407,35 @@ class PostgresPreparedProposalRepository:
             (key_hash,),
         )
         return await cursor.fetchone()
+
+    async def _review_by_key(self, cursor, key_hash):
+        await cursor.execute(
+            """SELECT review.id, review.proposal_id, review.reviewer_user_id,
+                      review.decision, review.adjusted_recommendation, review.rationale,
+                      review.supersedes_review_id, review.reviewed_at, policy.version
+               FROM prepared_post_inspection_review review
+               JOIN prepared_post_inspection_policy policy ON policy.id = review.policy_id
+               WHERE review.idempotency_key = %s""",
+            (key_hash,),
+        )
+        return await cursor.fetchone()
+
+    @staticmethod
+    def _assert_review_replay(row, proposal_id, actor, request):
+        expected = (
+            proposal_id, actor.id, request.decision, request.adjusted_recommendation,
+            request.rationale, request.supersedes_review_id,
+        )
+        if row[1:7] != expected:
+            raise ProposalIdempotencyConflictError
+
+    @staticmethod
+    def _review_response(row) -> PreparedProposalReviewResponse:
+        return PreparedProposalReviewResponse(
+            review_id=row[0], proposal_id=row[1], decision=row[3],
+            adjusted_recommendation=row[4], rationale=row[5],
+            supersedes_review_id=row[6], reviewed_at=row[7], policy_version=row[8],
+        )
 
     async def _response(self, cursor, proposal_id):
         await cursor.execute(self._response_query("proposal.id = %s"), (proposal_id,))
@@ -243,7 +447,9 @@ class PostgresPreparedProposalRepository:
                    road.code, segment.segment_index, zone.zone_type, policy.version,
                    proposal.creation_rationale, proposal.recommendation,
                    proposal.applicable_threshold_cm, proposal.maximum_height_cm,
-                   proposal.threshold_exceeded, proposal.created_at
+                   proposal.threshold_exceeded, proposal.created_at,
+                   COALESCE(review_total.review_count, 0), latest.id, latest.decision,
+                   latest.adjusted_recommendation, latest.rationale, latest.reviewed_at
             FROM prepared_post_inspection_proposal proposal
             JOIN prepared_post_inspection_policy policy ON policy.id = proposal.policy_id
             JOIN prepared_inspection_summary summary ON summary.id = proposal.summary_id
@@ -252,6 +458,21 @@ class PostgresPreparedProposalRepository:
             JOIN road_segment segment ON segment.id = zone.road_segment_id
             JOIN road_axis_candidate axis ON axis.id = segment.road_axis_candidate_id
             JOIN road ON road.id = axis.road_id
+            LEFT JOIN LATERAL (
+                SELECT count(*) AS review_count
+                FROM prepared_post_inspection_review review
+                WHERE review.proposal_id = proposal.id
+            ) review_total ON true
+            LEFT JOIN LATERAL (
+                SELECT review.id, review.decision, review.adjusted_recommendation,
+                       review.rationale, review.reviewed_at
+                FROM prepared_post_inspection_review review
+                WHERE review.proposal_id = proposal.id
+                  AND NOT EXISTS (
+                      SELECT 1 FROM prepared_post_inspection_review newer
+                      WHERE newer.supersedes_review_id = review.id)
+                ORDER BY review.reviewed_at DESC LIMIT 1
+            ) latest ON true
             WHERE proposal.location_status = 'simulated' AND proposal.data_status = 'prepared'
               AND NOT proposal.eligible_for_official_reporting
               AND NOT proposal.authorizes_field_work AND {where_clause}"""
@@ -263,7 +484,13 @@ class PostgresPreparedProposalRepository:
             segment_index=row[4], zone_type=row[5], policy_version=row[6],
             creation_rationale=row[7], recommendation=row[8],
             applicable_threshold_cm=row[9], maximum_height_cm=row[10],
-            threshold_exceeded=row[11], created_at=row[12],
+            threshold_exceeded=row[11], created_at=row[12], review_count=row[13],
+            latest_review_id=row[14], latest_review_decision=row[15],
+            latest_adjusted_recommendation=row[16], latest_review_rationale=row[17],
+            latest_reviewed_at=row[18],
+            review_state=(
+                "review_recorded_no_work_authorization" if row[14] else "awaiting_review"
+            ),
         )
 
 
@@ -311,3 +538,34 @@ async def list_prepared_proposals(
     limit: Annotated[int, Field(ge=1, le=100)] = 50,
 ) -> PreparedProposalCollection:
     return await reader.list_for_actor(actor=actor, limit=limit)
+
+
+@collection_router.post(
+    "/{proposal_id}/decisions", response_model=PreparedProposalReviewResponse
+)
+async def review_prepared_proposal(
+    proposal_id: UUID,
+    request: PreparedProposalReviewRequest,
+    idempotency_key: Annotated[
+        str, Header(alias="Idempotency-Key", min_length=8, max_length=200)
+    ],
+    actor: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    writer: Annotated[
+        PreparedProposalReviewWriter, Depends(get_prepared_proposal_repository)
+    ],
+) -> PreparedProposalReviewResponse:
+    try:
+        return await writer.record_review(
+            proposal_id=proposal_id,
+            actor=actor,
+            idempotency_key=idempotency_key,
+            request=request,
+        )
+    except ProposalNotFoundError:
+        raise HTTPException(404, "Prepared proposal not found") from None
+    except ProposalPermissionError:
+        raise HTTPException(403, "User cannot review this road") from None
+    except ProposalIdempotencyConflictError:
+        raise HTTPException(409, "Idempotency-Key conflict") from None
+    except ProposalReviewSupersessionError:
+        raise HTTPException(409, "Review must supersede the effective proposal review") from None

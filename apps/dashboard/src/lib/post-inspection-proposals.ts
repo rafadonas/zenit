@@ -19,6 +19,13 @@ export interface PreparedPostInspectionProposal {
   eligible_for_official_reporting: false;
   authorizes_field_work: false;
   created_at: string;
+  review_count: number;
+  latest_review_id: string | null;
+  latest_review_decision: "accepted" | "rejected" | "adjusted" | null;
+  latest_adjusted_recommendation: "monitor" | "mowing_review" | null;
+  latest_review_rationale: string | null;
+  latest_reviewed_at: string | null;
+  review_state: "awaiting_review" | "review_recorded_no_work_authorization";
 }
 
 export interface PreparedProposalCollection {
@@ -44,7 +51,21 @@ function isProposal(value: unknown): value is PreparedPostInspectionProposal {
   const threshold = Number(value.applicable_threshold_cm);
   const maximum = Number(value.maximum_height_cm);
   const exceeded = maximum > threshold;
+  const unreviewed = value.review_count === 0;
+  const reviewConsistent = unreviewed
+    ? value.latest_review_id === null && value.latest_review_decision === null &&
+      value.latest_adjusted_recommendation === null && value.latest_review_rationale === null &&
+      value.latest_reviewed_at === null && value.review_state === "awaiting_review"
+    : typeof value.review_count === "number" && value.review_count > 0 &&
+      typeof value.latest_review_id === "string" &&
+      ["accepted", "rejected", "adjusted"].includes(String(value.latest_review_decision)) &&
+      typeof value.latest_reviewed_at === "string" &&
+      value.review_state === "review_recorded_no_work_authorization" &&
+      ((value.latest_review_decision === "adjusted") ===
+        ["monitor", "mowing_review"].includes(String(value.latest_adjusted_recommendation)));
   return [10, 30].includes(threshold) && value.threshold_exceeded === exceeded &&
+    typeof value.review_count === "number" && Number.isInteger(value.review_count) &&
+    reviewConsistent &&
     value.recommendation === (exceeded ? "mowing_review" : "monitor") &&
     typeof value.proposal_id === "string" &&
     typeof value.summary_id === "string" && typeof value.work_order_id === "string" &&

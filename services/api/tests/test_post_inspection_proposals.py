@@ -13,12 +13,16 @@ from zenit_api.post_inspection_proposals import (
     PreparedProposalReader,
     PreparedProposalRequest,
     PreparedProposalResponse,
+    PreparedProposalReviewRequest,
+    PreparedProposalReviewResponse,
+    PreparedProposalReviewWriter,
     PreparedProposalWriter,
     ProposalAlreadyExistsError,
     ProposalIdempotencyConflictError,
     ProposalNotFoundError,
     ProposalPermissionError,
     ProposalPolicyUnavailableError,
+    ProposalReviewSupersessionError,
     get_prepared_proposal_repository,
 )
 
@@ -50,7 +54,9 @@ def proposal() -> PreparedProposalResponse:
     )
 
 
-class FakeProposalRepository(PreparedProposalWriter, PreparedProposalReader):
+class FakeProposalRepository(
+    PreparedProposalWriter, PreparedProposalReader, PreparedProposalReviewWriter
+):
     def __init__(self, failure: type[Exception] | None = None) -> None:
         self.failure = failure
 
@@ -68,6 +74,24 @@ class FakeProposalRepository(PreparedProposalWriter, PreparedProposalReader):
         assert values == {"actor": ACTOR, "limit": 7}
         return PreparedProposalCollection(
             items=[proposal()], result_count=1, limit=7, truncated=False
+        )
+
+    async def record_review(self, **values) -> PreparedProposalReviewResponse:
+        if self.failure:
+            raise self.failure
+        assert values["proposal_id"] == PROPOSAL_ID
+        assert values["actor"] == ACTOR
+        assert values["idempotency_key"] == "proposal-review-0001"
+        request: PreparedProposalReviewRequest = values["request"]
+        return PreparedProposalReviewResponse(
+            review_id=UUID("60000000-0000-4000-8000-000000000005"),
+            proposal_id=PROPOSAL_ID,
+            decision=request.decision,
+            adjusted_recommendation=request.adjusted_recommendation,
+            rationale=request.rationale,
+            supersedes_review_id=request.supersedes_review_id,
+            policy_version="prepared-post-inspection-v1",
+            reviewed_at=datetime(2026, 8, 11, 18, tzinfo=UTC),
         )
 
 
@@ -175,3 +199,71 @@ def test_proposal_collection_requires_authentication() -> None:
             app.dependency_overrides.clear()
 
     assert asyncio.run(request()).status_code == 401
+
+
+def request_review(
+    failure: type[Exception] | None = None,
+    authenticated: bool = True,
+    payload: dict[str, object] | None = None,
+):
+    async def fake_actor():
+        return ACTOR
+
+    async def fake_repository():
+        return FakeProposalRepository(failure)
+
+    async def request():
+        if authenticated:
+            app.dependency_overrides[get_current_user] = fake_actor
+        app.dependency_overrides[get_prepared_proposal_repository] = fake_repository
+        try:
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                return await client.post(
+                    f"/v1/prepared-post-inspection-proposals/{PROPOSAL_ID}/decisions",
+                    headers={"Idempotency-Key": "proposal-review-0001"},
+                    json=payload or {"decision": "accepted"},
+                )
+        finally:
+            app.dependency_overrides.clear()
+
+    return asyncio.run(request())
+
+
+def test_review_records_human_decision_without_authorizing_mowing() -> None:
+    response = request_review()
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["decision"] == "accepted"
+    assert payload["data_status"] == "prepared"
+    assert payload["eligible_for_official_reporting"] is False
+    assert payload["authorizes_field_work"] is False
+
+
+def test_review_requires_consistent_adjustment_and_rationale() -> None:
+    assert request_review(payload={"decision": "adjusted"}).status_code == 422
+    assert request_review(payload={
+        "decision": "adjusted", "adjusted_recommendation": "monitor",
+        "rationale": "Manter em observação no cenário preparado",
+    }).status_code == 200
+    assert request_review(payload={"decision": "rejected"}).status_code == 422
+
+
+@pytest.mark.parametrize(
+    ("failure", "status"),
+    [
+        (ProposalNotFoundError, 404),
+        (ProposalPermissionError, 403),
+        (ProposalIdempotencyConflictError, 409),
+        (ProposalReviewSupersessionError, 409),
+    ],
+)
+def test_review_failures_have_stable_statuses(failure: type[Exception], status: int) -> None:
+    assert request_review(failure).status_code == status
+
+
+def test_review_requires_authentication_and_forbids_authorization_fields() -> None:
+    assert request_review(authenticated=False).status_code == 401
+    assert request_review(payload={
+        "decision": "accepted", "authorizes_field_work": True,
+    }).status_code == 422

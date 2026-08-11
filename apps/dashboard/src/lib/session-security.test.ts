@@ -7,6 +7,7 @@ import {
   parsePreparedInspectionOrderSubmission,
   parsePhotoReviewSubmission,
   parsePreparedProposalSubmission,
+  parsePreparedProposalReviewSubmission,
   parsePreparedSummaryExportSubmission,
   parsePreparedSummarySubmission,
   requestOriginMatches,
@@ -156,5 +157,22 @@ describe("dashboard session security", () => {
       idempotencyKey: "10000000-0000-4000-8000-000000000001",
       creationRationale: "Aplicar regra preparada ao retorno revisado",
     });
+  });
+
+  it("requires consistent human decisions for prepared proposals", () => {
+    const form = new FormData();
+    form.set("csrf_token", csrfToken);
+    form.set("idempotency_key", "10000000-0000-4000-8000-000000000001");
+    form.set("decision", "adjusted");
+    form.set("adjusted_recommendation", "monitor");
+    form.set("rationale", "Manter monitoramento no cenário preparado");
+    form.set("authorizes_field_work", "true");
+    expect(parsePreparedProposalReviewSubmission(form)).toMatchObject({
+      decision: "adjusted",
+      adjustedRecommendation: "monitor",
+      rationale: "Manter monitoramento no cenário preparado",
+    });
+    form.delete("rationale");
+    expect(parsePreparedProposalReviewSubmission(form)).toBeNull();
   });
 });

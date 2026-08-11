@@ -35,6 +35,9 @@ PREPARED_SUMMARY_EXPORT_MIGRATION = Path(
 PREPARED_POST_INSPECTION_PROPOSAL_MIGRATION = Path(
     "infra/migrations/0022_prepared_post_inspection_proposal.sql"
 )
+PREPARED_POST_INSPECTION_REVIEW_MIGRATION = Path(
+    "infra/migrations/0023_prepared_post_inspection_review.sql"
+)
 
 
 class MigrationContractTests(unittest.TestCase):
@@ -137,7 +140,7 @@ class MigrationContractTests(unittest.TestCase):
         mounts = [
             line.strip() for line in compose.splitlines() if "/docker-entrypoint-initdb.d/" in line
         ]
-        self.assertEqual(len(mounts), 22)
+        self.assertEqual(len(mounts), 23)
         for version, mount in enumerate(mounts, start=1):
             prefix = f"{version:04d}"
             self.assertIn(f"infra/migrations/{prefix}_", mount)
@@ -309,6 +312,17 @@ class MigrationContractTests(unittest.TestCase):
         self.assertIn("CHECK (requires_human_review)", sql)
         self.assertIn("CHECK (NOT authorizes_field_work)", sql)
         self.assertIn("prepared_post_inspection_proposal_immutable", sql)
+
+    def test_post_inspection_review_is_linear_audited_and_non_authorizing(self) -> None:
+        sql = PREPARED_POST_INSPECTION_REVIEW_MIGRATION.read_text(encoding="utf-8")
+        self.assertIn("CREATE TABLE prepared_post_inspection_review", sql)
+        self.assertIn("decision IN ('accepted', 'rejected', 'adjusted')", sql)
+        self.assertIn("adjusted_recommendation IN ('monitor', 'mowing_review')", sql)
+        self.assertIn("rationale IS NOT NULL AND btrim(rationale) <> ''", sql)
+        self.assertIn("prepared-post-inspection-review:", sql)
+        self.assertIn("can only supersede its effective review", sql)
+        self.assertIn("CHECK (NOT authorizes_field_work)", sql)
+        self.assertIn("prepared_post_inspection_review_immutable", sql)
 
 
 if __name__ == "__main__":

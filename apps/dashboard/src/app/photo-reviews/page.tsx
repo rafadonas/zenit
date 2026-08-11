@@ -21,6 +21,7 @@ export const dynamic = "force-dynamic";
 interface PageProps {
   searchParams: Promise<{
     review?: string; summary?: string; export?: string; proposal?: string;
+    proposal_review?: string;
   }>;
 }
 
@@ -72,7 +73,14 @@ async function loadProposals(): Promise<PreparedProposalCollection | null> {
 
 function message(
   review?: string, summary?: string, exportStatus?: string, proposal?: string,
+  proposalReview?: string,
 ): string | null {
+  if (proposalReview === "recorded") return "Decisão humana sobre a proposta registrada na trilha append-only.";
+  if (proposalReview === "forbidden") return "Seu usuário não pode revisar esta proposta.";
+  if (proposalReview === "missing") return "A proposta preparada não foi encontrada.";
+  if (proposalReview === "conflict") return "A correção não substitui a revisão efetiva ou a chave entrou em conflito.";
+  if (proposalReview === "invalid") return "A decisão sobre a proposta está incompleta ou inválida.";
+  if (proposalReview === "service-unavailable") return "O serviço de decisões não está disponível agora.";
   if (proposal === "created") return "Proposta pós-inspeção preparada; decisão humana ainda obrigatória.";
   if (proposal === "forbidden") return "Seu usuário não pode criar proposta para esta rodovia.";
   if (proposal === "missing") return "O resumo preparado não foi encontrado.";
@@ -112,7 +120,9 @@ export default async function PhotoReviewsPage({ searchParams }: PageProps) {
   const [session, queue, summaries, proposals, query] = await Promise.all([
     loadDashboardSession(), loadQueue(), loadSummaries(), loadProposals(), searchParams,
   ]);
-  const operationMessage = message(query.review, query.summary, query.export, query.proposal);
+  const operationMessage = message(
+    query.review, query.summary, query.export, query.proposal, query.proposal_review,
+  );
   const summaryByOrder = new Map<string, PreparedInspectionSummary>(
     summaries?.items.map((summary) => [summary.work_order_id, summary]) ?? [],
   );
@@ -162,11 +172,20 @@ export default async function PhotoReviewsPage({ searchParams }: PageProps) {
                 <label htmlFor={`export-purpose-${summary.summary_id}`}>Propósito da exportação</label><input defaultValue="Compartilhar resultado preparado para revisão" id={`export-purpose-${summary.summary_id}`} maxLength={2000} name="export_purpose" required />
                 <button className="secondary-button" type="submit">Baixar CSV preparado</button><small>O download gera um evento de auditoria imutável e mantém o bloqueio de relatório oficial.</small>
               </form>
-              {proposal ? <div className="post-inspection-proposal">
-                <div><strong>{proposal.recommendation === "mowing_review" ? "Revisar proposta de roçada" : "Manter monitoramento"}</strong><span>Máxima {formatHeight(proposal.maximum_height_cm)} cm · limiar {formatHeight(proposal.applicable_threshold_cm)} cm</span></div>
-                <span className="status-pill review">Decisão humana pendente</span>
-                <small>Regra {proposal.policy_version}. A proposta não cria ordem, não autoriza roçada e não entra em relatório oficial.</small>
-              </div> : <form action={`/api/prepared-inspection-summaries/${summary.summary_id}/post-inspection-proposal`} className="prepared-summary-form" method="post">
+              {proposal ? <>
+                <div className="post-inspection-proposal">
+                  <div><strong>{proposal.recommendation === "mowing_review" ? "Revisar proposta de roçada" : "Manter monitoramento"}</strong><span>Máxima {formatHeight(proposal.maximum_height_cm)} cm · limiar {formatHeight(proposal.applicable_threshold_cm)} cm</span>{proposal.latest_review_decision ? <span>Última decisão: {proposal.latest_review_decision}{proposal.latest_adjusted_recommendation ? ` → ${proposal.latest_adjusted_recommendation}` : ""}</span> : null}</div>
+                  <span className="status-pill review">{proposal.review_state === "awaiting_review" ? "Decisão humana pendente" : "Decisão registrada"}</span>
+                  <small>Regra {proposal.policy_version}. Mesmo aceita, a proposta não cria ordem, não autoriza roçada e não entra em relatório oficial.</small>
+                </div>
+                <form action={`/api/prepared-post-inspection-proposals/${proposal.proposal_id}/decisions`} className="decision-form proposal-review-form" method="post">
+                  <input name="csrf_token" type="hidden" value={session.csrfToken} /><input name="idempotency_key" type="hidden" value={randomUUID()} />{proposal.latest_review_id ? <input name="supersedes_review_id" type="hidden" value={proposal.latest_review_id} /> : null}
+                  <div><label htmlFor={`proposal-decision-${proposal.proposal_id}`}>Decisão humana</label><select id={`proposal-decision-${proposal.proposal_id}`} name="decision"><option value="accepted">Aceitar para planejamento</option><option value="rejected">Rejeitar proposta</option><option value="adjusted">Ajustar ação</option></select></div>
+                  <div><label htmlFor={`proposal-adjustment-${proposal.proposal_id}`}>Ajuste, se aplicável</label><select id={`proposal-adjustment-${proposal.proposal_id}`} name="adjusted_recommendation"><option value="">Selecione somente ao ajustar</option><option value="monitor">Monitorar</option><option value="mowing_review">Manter revisão de roçada</option></select></div>
+                  <div className="decision-rationale"><label htmlFor={`proposal-review-rationale-${proposal.proposal_id}`}>Justificativa</label><textarea id={`proposal-review-rationale-${proposal.proposal_id}`} maxLength={2000} name="rationale" placeholder="Obrigatória ao rejeitar ou ajustar" rows={2} /></div>
+                  <button className="primary-button" type="submit">{proposal.latest_review_id ? "Registrar correção auditável" : "Registrar decisão humana"}</button><small>Aceitar significa apenas concordar com o sinal preparado para planejamento; uso em campo permanece bloqueado.</small>
+                </form>
+              </> : <form action={`/api/prepared-inspection-summaries/${summary.summary_id}/post-inspection-proposal`} className="prepared-summary-form" method="post">
                 <input name="csrf_token" type="hidden" value={session.csrfToken} /><input name="idempotency_key" type="hidden" value={randomUUID()} />
                 <label htmlFor={`proposal-rationale-${summary.summary_id}`}>Justificativa para aplicar a regra pós-inspeção</label><textarea defaultValue="Aplicar a regra preparada de limiar ao retorno revisado" id={`proposal-rationale-${summary.summary_id}`} maxLength={2000} name="creation_rationale" required rows={2} />
                 <button className="primary-button" type="submit">Gerar proposta preparada</button><small>Compara a máxima digitada com 10 cm em área especial ou 30 cm nas demais zonas. Exige revisão humana posterior.</small>
