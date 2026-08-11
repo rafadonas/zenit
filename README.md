@@ -150,8 +150,8 @@ credentials.
 ## Database migrations and ingestion
 
 Apply migrations in numeric order before importing sources. The current local
-development database must have migrations `0001` through `0020` applied. On the first
-startup of a new Compose volume, Postgres applies these twenty up migrations in
+development database must have migrations `0001` through `0021` applied. On the first
+startup of a new Compose volume, Postgres applies these twenty-one up migrations in
 order through `/docker-entrypoint-initdb.d`; existing volumes are never modified
 by that initialization mechanism. The explicit commands below remain useful
 for non-Compose environments and controlled upgrades of existing databases.
@@ -197,6 +197,8 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0019_linear_prepared_photo_review_chain.sql
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0020_serialize_prepared_photo_reviews.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
+  < infra/migrations/0021_audited_prepared_summary_export.sql
 ```
 
 Migration `0008` starts the Sprint 4 management foundation with immutable,
@@ -271,6 +273,12 @@ chain. After the first review, every correction must supersede the effective
 leaf, preventing parallel outcomes from satisfying summary evidence gates.
 Migration `0020` serializes concurrent review inserts per photo before checking
 that chain, closing the race between simultaneous first reviews or corrections.
+
+Migration `0021` adds immutable, idempotent CSV-export audit events for prepared
+inspection summaries. PostgreSQL repeats current manager/supervisor road access
+and every simulated, prepared, non-official, non-authorizing safety gate. Each
+event records purpose, export schema version, byte size, and SHA-256 checksum.
+See `docs/decisions/ADR-0023-audited-prepared-summary-csv-export.md`.
 
 The public, read-only management queue is available at:
 
@@ -476,6 +484,22 @@ by order. Once every latest effective review is accepted with accepted quality
 and a visible ruler, it offers a CSRF-checked summary-generation form. Generated
 minimum, mean, maximum, and N1/N2/N3 counts remain visibly labeled as prepared,
 simulated, non-operational, and ineligible for official reporting.
+
+Generated summaries can be exported as an audited prepared CSV:
+
+```text
+POST /v1/prepared-inspection-summaries/{summary_id}/exports
+Authorization: Bearer <access-token>
+Idempotency-Key: <client-generated-stable-key>
+Content-Type: application/json
+
+{"export_purpose":"Share the prepared result for review"}
+```
+
+The deterministic artifact is versioned, checksum-addressed, formula-safe for
+user-authored cells, limited to one megabyte, and prominently states that it is
+a simulated prepared demo export—not an official report or field authorization.
+The dashboard verifies these labels and checksum before delivering the download.
 
 Use `zenit-import` for one immutable raw file at a time. Full examples are in
 `docs/architecture/source-ingestion.md`.

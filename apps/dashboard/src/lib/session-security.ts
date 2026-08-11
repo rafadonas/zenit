@@ -41,6 +41,12 @@ export interface PreparedSummarySubmission {
   generationRationale: string;
 }
 
+export interface PreparedSummaryExportSubmission {
+  csrfToken: string;
+  idempotencyKey: string;
+  exportPurpose: string;
+}
+
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CSRF_PATTERN = /^[0-9a-f]{64}$/;
 
@@ -218,4 +224,18 @@ export function parsePreparedSummarySubmission(form: FormData): PreparedSummaryS
     generationRationale.length > 2000
   ) return null;
   return { csrfToken, idempotencyKey, generationRationale };
+}
+
+export function parsePreparedSummaryExportSubmission(
+  form: FormData,
+): PreparedSummaryExportSubmission | null {
+  const csrfToken = formString(form, "csrf_token");
+  const idempotencyKey = formString(form, "idempotency_key");
+  const exportPurpose = formString(form, "export_purpose");
+  if (
+    csrfToken === null || !CSRF_PATTERN.test(csrfToken) ||
+    idempotencyKey === null || !UUID_PATTERN.test(idempotencyKey) ||
+    exportPurpose === null || exportPurpose.length < 1 || exportPurpose.length > 2000
+  ) return null;
+  return { csrfToken, idempotencyKey, exportPurpose };
 }

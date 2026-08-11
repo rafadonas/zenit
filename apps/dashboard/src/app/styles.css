@@ -246,6 +246,11 @@ h1 { margin-bottom: 8px; font: 600 clamp(2.1rem, 4vw, 3.2rem)/1 Georgia, serif; 
 .prepared-summary-form textarea { padding: 9px; border: 1px solid #d1c18e; border-radius: 7px; resize: vertical; color: var(--ink); background: white; }
 .prepared-summary-form button { justify-self: start; margin-top: 3px; }
 .summary-pending { display: grid; gap: 4px; margin-top: 15px; padding: 12px; border-radius: 8px; color: #69522d; background: #faf1d7; font-size: .68rem; }
+.summary-export-form { display: grid; grid-template-columns: 1fr auto; gap: 7px 10px; margin-top: 14px; padding-top: 13px; border-top: 1px solid #dfd8be; }
+.summary-export-form label { grid-column: 1 / -1; color: #66512f; font-size: .65rem; font-weight: 750; }
+.summary-export-form input { min-width: 0; padding: 9px; border: 1px solid #d1c18e; border-radius: 7px; color: var(--ink); background: white; }
+.summary-export-form button { white-space: nowrap; }
+.summary-export-form small { grid-column: 1 / -1; color: #73552a; font-size: .62rem; }
 .login-shell { min-height: 100vh; display: grid; place-items: center; padding: 30px; }
 .login-card { width: min(460px, 100%); padding: 34px; border: 1px solid var(--line); border-radius: 18px; background: var(--card); box-shadow: var(--shadow); }
 .login-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 30px; color: var(--green-dark); }
@@ -284,6 +289,7 @@ h1 { margin-bottom: 8px; font: 600 clamp(2.1rem, 4vw, 3.2rem)/1 Georgia, serif; 
   .role-list { justify-items: start; }
   .decision-form { grid-template-columns: 1fr; }
   .photo-review-card { grid-template-columns: 1fr; }
+  .summary-export-form { grid-template-columns: 1fr; }
   .decision-rationale, .decision-form small { grid-column: auto; }
   .warning-banner { max-width: none; }
   .kpi-grid { grid-template-columns: 1fr 1fr; }

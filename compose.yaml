@@ -31,6 +31,7 @@ services:
       - ./infra/migrations/0018_prepared_inspection_summary.sql:/docker-entrypoint-initdb.d/0018.sql:ro
       - ./infra/migrations/0019_linear_prepared_photo_review_chain.sql:/docker-entrypoint-initdb.d/0019.sql:ro
       - ./infra/migrations/0020_serialize_prepared_photo_reviews.sql:/docker-entrypoint-initdb.d/0020.sql:ro
+      - ./infra/migrations/0021_audited_prepared_summary_export.sql:/docker-entrypoint-initdb.d/0021.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s

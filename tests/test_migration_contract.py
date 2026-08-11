@@ -29,6 +29,9 @@ LINEAR_PHOTO_REVIEW_MIGRATION = Path(
 SERIAL_PHOTO_REVIEW_MIGRATION = Path(
     "infra/migrations/0020_serialize_prepared_photo_reviews.sql"
 )
+PREPARED_SUMMARY_EXPORT_MIGRATION = Path(
+    "infra/migrations/0021_audited_prepared_summary_export.sql"
+)
 
 
 class MigrationContractTests(unittest.TestCase):
@@ -131,7 +134,7 @@ class MigrationContractTests(unittest.TestCase):
         mounts = [
             line.strip() for line in compose.splitlines() if "/docker-entrypoint-initdb.d/" in line
         ]
-        self.assertEqual(len(mounts), 20)
+        self.assertEqual(len(mounts), 21)
         for version, mount in enumerate(mounts, start=1):
             prefix = f"{version:04d}"
             self.assertIn(f"infra/migrations/{prefix}_", mount)
@@ -282,6 +285,16 @@ class MigrationContractTests(unittest.TestCase):
         sql = SERIAL_PHOTO_REVIEW_MIGRATION.read_text(encoding="utf-8")
         self.assertIn("pg_advisory_xact_lock", sql)
         self.assertIn("prepared-photo-review:", sql)
+
+    def test_prepared_summary_export_is_authorized_audited_and_non_official(self) -> None:
+        sql = PREPARED_SUMMARY_EXPORT_MIGRATION.read_text(encoding="utf-8")
+        self.assertIn("CREATE TABLE prepared_inspection_summary_export_event", sql)
+        self.assertIn("prepared-inspection-summary-csv-v1", sql)
+        self.assertIn("idempotency_key char(64) NOT NULL UNIQUE", sql)
+        self.assertIn("char_length(export_purpose) <= 2000", sql)
+        self.assertIn("assignment.role IN ('manager', 'supervisor')", sql)
+        self.assertIn("CHECK (NOT eligible_for_official_reporting)", sql)
+        self.assertIn("prepared_inspection_summary_export_event_immutable", sql)
 
 
 if __name__ == "__main__":

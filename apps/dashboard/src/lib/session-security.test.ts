@@ -6,6 +6,7 @@ import {
   parseDecisionSubmission,
   parsePreparedInspectionOrderSubmission,
   parsePhotoReviewSubmission,
+  parsePreparedSummaryExportSubmission,
   parsePreparedSummarySubmission,
   requestOriginMatches,
 } from "./session-security";
@@ -125,5 +126,21 @@ describe("dashboard session security", () => {
     });
     form.set("generation_rationale", " ");
     expect(parsePreparedSummarySubmission(form)).toBeNull();
+  });
+
+  it("allowlists a prepared CSV export purpose and ignores promotion fields", () => {
+    const form = new FormData();
+    form.set("csrf_token", csrfToken);
+    form.set("idempotency_key", "10000000-0000-4000-8000-000000000001");
+    form.set("export_purpose", "Compartilhar resultado preparado");
+    form.set("eligible_for_official_reporting", "true");
+
+    expect(parsePreparedSummaryExportSubmission(form)).toEqual({
+      csrfToken,
+      idempotencyKey: "10000000-0000-4000-8000-000000000001",
+      exportPurpose: "Compartilhar resultado preparado",
+    });
+    form.set("export_purpose", " ");
+    expect(parsePreparedSummaryExportSubmission(form)).toBeNull();
   });
 });

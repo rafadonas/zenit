@@ -14,7 +14,9 @@ import { SESSION_COOKIE_NAME } from "../../lib/session-security";
 
 export const dynamic = "force-dynamic";
 
-interface PageProps { searchParams: Promise<{ review?: string; summary?: string }>; }
+interface PageProps {
+  searchParams: Promise<{ review?: string; summary?: string; export?: string }>;
+}
 
 async function loadQueue(): Promise<PhotoReviewQueue | null> {
   const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
@@ -46,7 +48,12 @@ async function loadSummaries(): Promise<PreparedSummaryCollection | null> {
   return payload;
 }
 
-function message(review?: string, summary?: string): string | null {
+function message(review?: string, summary?: string, exportStatus?: string): string | null {
+  if (exportStatus === "missing") return "O resumo preparado não foi encontrado ou não está acessível.";
+  if (exportStatus === "conflict") return "A chave da exportação entrou em conflito com outra solicitação.";
+  if (exportStatus === "invalid") return "Informe um propósito válido para exportar o resumo.";
+  if (exportStatus === "unsafe-response") return "A exportação foi bloqueada porque o arquivo não confirmou todos os rótulos de segurança.";
+  if (exportStatus === "service-unavailable") return "O serviço de exportação não está disponível agora.";
   if (summary === "generated") return "Resumo preparado gerado e registrado de forma imutável.";
   if (summary === "forbidden") return "Seu usuário não pode gerar resumo para esta rodovia.";
   if (summary === "missing") return "A ordem preparada não foi encontrada.";
@@ -75,7 +82,7 @@ export default async function PhotoReviewsPage({ searchParams }: PageProps) {
   const [session, queue, summaries, query] = await Promise.all([
     loadDashboardSession(), loadQueue(), loadSummaries(), searchParams,
   ]);
-  const operationMessage = message(query.review, query.summary);
+  const operationMessage = message(query.review, query.summary, query.export);
   const summaryByOrder = new Map<string, PreparedInspectionSummary>(
     summaries?.items.map((summary) => [summary.work_order_id, summary]) ?? [],
   );
@@ -116,6 +123,11 @@ export default async function PhotoReviewsPage({ searchParams }: PageProps) {
               <div className="summary-classes"><span>N1 · {summary.n1_count}</span><span>N2 · {summary.n2_count}</span><span>N3 · {summary.n3_count}</span></div>
               <p className="summary-rationale">{summary.generation_rationale}</p>
               <small>Resultado preparado de medições digitadas em cenário simulado. Não é relatório oficial e não autoriza campo.</small>
+              <form action={`/api/prepared-inspection-summaries/${summary.summary_id}/exports`} className="summary-export-form" method="post">
+                <input name="csrf_token" type="hidden" value={session.csrfToken} /><input name="idempotency_key" type="hidden" value={randomUUID()} />
+                <label htmlFor={`export-purpose-${summary.summary_id}`}>Propósito da exportação</label><input defaultValue="Compartilhar resultado preparado para revisão" id={`export-purpose-${summary.summary_id}`} maxLength={2000} name="export_purpose" required />
+                <button className="secondary-button" type="submit">Baixar CSV preparado</button><small>O download gera um evento de auditoria imutável e mantém o bloqueio de relatório oficial.</small>
+              </form>
             </> : eligible ? <form action={`/api/work-orders/${workOrderId}/prepared-summary`} className="prepared-summary-form" method="post">
               <input name="csrf_token" type="hidden" value={session.csrfToken} /><input name="idempotency_key" type="hidden" value={randomUUID()} />
               <label htmlFor={`summary-rationale-${workOrderId}`}>Justificativa da consolidação</label><textarea defaultValue="Consolidar o retorno preparado dos três pontos revisados" id={`summary-rationale-${workOrderId}`} maxLength={2000} name="generation_rationale" required rows={2} />

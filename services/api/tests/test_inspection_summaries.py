@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID
@@ -8,17 +9,25 @@ from httpx import ASGITransport, AsyncClient
 
 from zenit_api.auth import AuthenticatedUser, get_current_user
 from zenit_api.inspection_summaries import (
+    PREPARED_SUMMARY_CSV_VERSION,
     PreparedSummaryCollection,
+    PreparedSummaryExportContent,
+    PreparedSummaryExporter,
+    PreparedSummaryExportRequest,
     PreparedSummaryReader,
     PreparedSummaryRequest,
     PreparedSummaryResponse,
     PreparedSummaryWriter,
     SummaryAlreadyExistsError,
     SummaryEvidenceIncompleteError,
+    SummaryExportIdempotencyConflictError,
+    SummaryExportNotFoundError,
     SummaryIdempotencyConflictError,
     SummaryPermissionError,
     SummaryPolicyUnavailableError,
     SummaryTargetNotFoundError,
+    build_prepared_summary_csv,
+    get_prepared_summary_exporter,
     get_prepared_summary_reader,
     get_prepared_summary_writer,
 )
@@ -85,6 +94,25 @@ class FakeSummaryReader(PreparedSummaryReader):
             result_count=1,
             limit=7,
             truncated=False,
+        )
+
+
+class FakeSummaryExporter(PreparedSummaryExporter):
+    def __init__(self, failure: type[Exception] | None = None) -> None:
+        self.failure = failure
+
+    async def export_csv(self, **values) -> PreparedSummaryExportContent:
+        if self.failure:
+            raise self.failure
+        assert values["summary_id"] == SUMMARY_ID
+        assert values["actor"] == ACTOR
+        assert values["idempotency_key"] == "summary-export-0001"
+        request: PreparedSummaryExportRequest = values["request"]
+        assert request.export_purpose == "Compartilhar resultado preparado"
+        content = b"export_notice,summary_id\r\nPREPARED DEMO EXPORT,summary\r\n"
+        return PreparedSummaryExportContent(
+            content=content,
+            checksum_sha256=hashlib.sha256(content).hexdigest(),
         )
 
 
@@ -187,3 +215,96 @@ def test_summary_collection_requires_authentication() -> None:
             app.dependency_overrides.clear()
 
     assert asyncio.run(request()).status_code == 401
+
+
+def request_export(
+    failure: type[Exception] | None = None,
+    authenticated: bool = True,
+    payload: dict[str, object] | None = None,
+):
+    async def fake_actor():
+        return ACTOR
+
+    async def fake_exporter():
+        return FakeSummaryExporter(failure)
+
+    async def request():
+        if authenticated:
+            app.dependency_overrides[get_current_user] = fake_actor
+        app.dependency_overrides[get_prepared_summary_exporter] = fake_exporter
+        try:
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                return await client.post(
+                    f"/v1/prepared-inspection-summaries/{SUMMARY_ID}/exports",
+                    headers={"Idempotency-Key": "summary-export-0001"},
+                    json=payload or {"export_purpose": "  Compartilhar resultado preparado  "},
+                )
+        finally:
+            app.dependency_overrides.clear()
+
+    return asyncio.run(request())
+
+
+def test_export_returns_audited_prepared_csv_with_fail_closed_headers() -> None:
+    response = request_export()
+
+    assert response.status_code == 200
+    assert response.content.startswith(b"export_notice")
+    assert response.headers["content-type"] == "text/csv; charset=utf-8"
+    assert response.headers["cache-control"] == "no-store, private"
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-zenit-export-schema-version"] == PREPARED_SUMMARY_CSV_VERSION
+    assert response.headers["x-zenit-data-status"] == "prepared"
+    assert response.headers["x-zenit-location-status"] == "simulated"
+    assert response.headers["x-zenit-eligible-for-official-reporting"] == "false"
+    assert response.headers["x-zenit-authorizes-field-work"] == "false"
+    assert response.headers["x-zenit-checksum-sha256"] == hashlib.sha256(
+        response.content
+    ).hexdigest()
+
+
+@pytest.mark.parametrize(
+    ("failure", "status"),
+    [
+        (SummaryExportNotFoundError, 404),
+        (SummaryExportIdempotencyConflictError, 409),
+    ],
+)
+def test_export_failures_have_stable_statuses(failure: type[Exception], status: int) -> None:
+    assert request_export(failure=failure).status_code == status
+
+
+def test_export_requires_authentication_and_forbids_promotion_fields() -> None:
+    assert request_export(authenticated=False).status_code == 401
+    response = request_export(
+        payload={
+            "export_purpose": "Compartilhar resultado preparado",
+            "eligible_for_official_reporting": True,
+        }
+    )
+    assert response.status_code == 422
+
+
+def test_csv_export_neutralizes_spreadsheet_formula_prefixes() -> None:
+    summary = PreparedSummaryResponse(
+        summary_id=SUMMARY_ID,
+        work_order_id=ORDER_ID,
+        summary_policy_version="prepared-inspection-summary-v1",
+        generation_rationale="  =HYPERLINK(\"https://example.test\")",
+        measurement_count=3,
+        accepted_photo_review_count=3,
+        minimum_height_cm=Decimal("8"),
+        maximum_height_cm=Decimal("35"),
+        mean_height_cm=Decimal("21.6667"),
+        n1_count=1,
+        n2_count=1,
+        n3_count=1,
+        generated_at=datetime(2026, 8, 11, 15, tzinfo=UTC),
+    )
+
+    content = build_prepared_summary_csv(summary, "@SUM(1+1)").decode("utf-8-sig")
+
+    assert "'@SUM(1+1)" in content
+    assert "'  =HYPERLINK" in content
+    assert "NOT AN OFFICIAL REPORT" in content
