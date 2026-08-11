@@ -705,6 +705,22 @@ or non-real data returns `inconclusive` and `inspect`; a real height over the
 applicable 30 cm or 10 cm threshold returns `mowing_review`, which still requires
 human approval. See `docs/decisions/ADR-0005-quality-gated-satellite-baseline.md`.
 
+### Local cached NDVI preview
+
+The checksummed 5 × 11 Sentinel-2 NDVI crop can be inspected in the
+self-contained [cached NDVI preview](docs/previews/sentinel-ndvi-preview.html).
+When the ignored checksummed cache is available, regenerate it without network
+access or third-party Python packages:
+
+```bash
+python scripts/render_cached_ndvi_preview.py
+```
+
+The renderer verifies the source GeoTIFF and provider-metadata checksums before
+writing the preview and its lineage manifest. The page clearly labels the AOI
+as prepared, estimated, non-operational, and ineligible for official reporting.
+No true-color RGB raster is currently cached.
+
 ## Satellite observation API
 
 Persisted satellite evidence for a 100 m segment is available read-only:

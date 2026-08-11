@@ -1,0 +1,33 @@
+{
+  "artifact_type": "derived_visual_preview",
+  "processor_version": "zenit-cached-ndvi-preview-v1",
+  "source": {
+    "relative_path": "data/processed/sentinel/aef56900-9470-45a5-8fb5-b142994f03e9/685d33f38e064428661e9c60c6acb53ee4a4e38f9a4b3baf72a4081e5b671d37/ndvi.tif",
+    "sha256": "49a56d955b5f47cfb1c009004a0ab7f0515644961f108f7b8a7bac083ccd76dc",
+    "metadata_relative_path": "data/processed/sentinel/aef56900-9470-45a5-8fb5-b142994f03e9/685d33f38e064428661e9c60c6acb53ee4a4e38f9a4b3baf72a4081e5b671d37/userdata.json",
+    "metadata_sha256": "0f0fff226c03d496fabf5efec1b7972d313167287f18e6dba930aedb97c33f12",
+    "sensor_product": "Sentinel-2 L2A",
+    "acquisition_date": "2026-07-29",
+    "source_status": "real_provider_response",
+    "cache_status": "partially_cached"
+  },
+  "spatial_scope_status": "prepared_estimated_aoi",
+  "result_status": "inconclusive",
+  "operational_eligibility": false,
+  "eligible_for_model_training": false,
+  "eligible_for_official_reporting": false,
+  "statistics": {
+    "width": 5,
+    "height": 11,
+    "valid_pixels": 35,
+    "nodata_pixels": 20,
+    "minimum_ndvi": -0.15737704932689667,
+    "maximum_ndvi": 0.28398269414901733,
+    "mean_ndvi_cached_geotiff": 0.07995302099734544,
+    "related_statistical_api_mean_ndvi": 0.097354
+  },
+  "artifact": {
+    "relative_path": "docs/previews/sentinel-ndvi-preview.html",
+    "sha256": "e201a4015b8a52b510ebef775f00df2064345cb11832c464c25dffccf18a0e7d"
+  }
+}
