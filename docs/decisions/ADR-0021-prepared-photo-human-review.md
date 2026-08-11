@@ -18,6 +18,11 @@ whose initial values are project placeholders, not official Motiva policy.
 Managers and supervisors with a current non-simulated role on the photo's road
 may append an idempotent human review.
 
+Provide an authenticated review queue scoped by the same current road roles.
+Expose only operational context, safe media metadata, and the latest effective
+review; do not expose reviewer identity, device identity, object-store
+coordinates, or encryption metadata.
+
 Record decision, image-quality status, ruler-visibility status, rationale,
 reviewer identity, policy version, timestamp, and optional supersession. An
 accepted decision requires both accepted image quality and a visible ruler.
@@ -32,6 +37,7 @@ image.
 ## Consequences
 
 - Human visual outcomes are retry-safe, immutable, attributable, and versioned.
+- Review clients can discover eligible photos without possessing raw photo IDs.
 - PostgreSQL repeats target, active identity, road role, policy, supersession,
   and non-operational safety checks.
 - The review can support later validation work without promoting prepared demo

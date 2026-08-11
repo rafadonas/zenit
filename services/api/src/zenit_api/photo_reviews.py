@@ -57,6 +57,42 @@ class PhotoReviewResponse(BaseModel):
     authorizes_field_work: Literal[False] = False
 
 
+class PhotoReviewQueueItem(BaseModel):
+    photo_id: UUID
+    work_order_id: UUID
+    road_code: str
+    segment_index: int
+    zone_type: Literal["left", "right", "median", "special"]
+    planned_point_sequence: int
+    captured_at: datetime
+    uploaded_at: datetime
+    media_type: Literal["image/jpeg", "image/png"]
+    byte_size: int
+    latest_review_id: UUID | None
+    latest_decision: Literal["accepted", "rejected", "inconclusive"] | None
+    latest_quality_status: Literal["accepted", "rejected", "inconclusive"] | None
+    latest_ruler_status: Literal["visible", "not_visible", "inconclusive"] | None
+    latest_rationale: str | None
+    latest_reviewed_at: datetime | None
+    latest_review_policy_version: str | None
+    review_state: Literal["awaiting_review", "review_recorded"]
+    data_status: Literal["prepared"] = "prepared"
+    eligible_for_field_evidence: Literal[False] = False
+    eligible_for_model_training: Literal[False] = False
+    eligible_for_official_reporting: Literal[False] = False
+    authorizes_field_work: Literal[False] = False
+
+
+class PhotoReviewQueue(BaseModel):
+    items: list[PhotoReviewQueueItem]
+    result_count: int
+    limit: int
+    truncated: bool
+    warning: str = (
+        "Human review does not validate height or authorize field work or official reporting."
+    )
+
+
 class PhotoReviewTargetNotFoundError(Exception):
     pass
 
@@ -86,6 +122,15 @@ class PhotoReviewWriter(Protocol):
         idempotency_key: str,
         review: PhotoReviewRequest,
     ) -> PhotoReviewResponse: ...
+
+
+class PhotoReviewQueueReader(Protocol):
+    async def list_for_actor(
+        self,
+        *,
+        actor: AuthenticatedUser,
+        limit: int,
+    ) -> PhotoReviewQueue: ...
 
 
 class PostgresPhotoReviewRepository:
@@ -214,6 +259,73 @@ class PostgresPhotoReviewRepository:
                 return self._response(existing)
             return self._response((*inserted, policy[1], policy[3]))
 
+    async def list_for_actor(
+        self,
+        *,
+        actor: AuthenticatedUser,
+        limit: int,
+    ) -> PhotoReviewQueue:
+        connection = await psycopg.AsyncConnection.connect(self._database_url)
+        async with connection, connection.cursor() as cursor:
+            await cursor.execute(
+                """
+                SELECT receipt.photo_id, manifest.work_order_id, road.code,
+                       segment.segment_index, zone.zone_type, point.sequence,
+                       manifest.client_captured_at, receipt.uploaded_at,
+                       receipt.media_type, receipt.byte_size,
+                       latest.id, latest.decision, latest.quality_status,
+                       latest.ruler_status, latest.rationale, latest.reviewed_at,
+                       policy.version, count(*) OVER ()
+                FROM prepared_photo_upload_receipt receipt
+                JOIN prepared_field_photo_manifest manifest
+                  ON manifest.photo_id = receipt.photo_id
+                JOIN work_order_planned_point point ON point.id = manifest.planned_point_id
+                JOIN work_order order_record ON order_record.id = manifest.work_order_id
+                JOIN segment_zone zone ON zone.id = order_record.segment_zone_id
+                JOIN road_segment segment ON segment.id = zone.road_segment_id
+                JOIN road_axis_candidate axis
+                  ON axis.id = segment.road_axis_candidate_id
+                JOIN road ON road.id = axis.road_id
+                LEFT JOIN LATERAL (
+                    SELECT review.*
+                    FROM prepared_photo_human_review review
+                    WHERE review.photo_id = receipt.photo_id
+                      AND NOT EXISTS (
+                          SELECT 1 FROM prepared_photo_human_review newer
+                          WHERE newer.supersedes_review_id = review.id
+                      )
+                    ORDER BY review.reviewed_at DESC, review.id DESC
+                    LIMIT 1
+                ) latest ON true
+                LEFT JOIN prepared_photo_review_policy policy
+                  ON policy.id = latest.review_policy_id
+                WHERE receipt.content_status = 'uploaded_unverified'
+                  AND receipt.ruler_status = 'not_validated'
+                  AND receipt.quality_status = 'prepared_unverified'
+                  AND receipt.data_status = 'prepared'
+                  AND NOT receipt.eligible_for_official_reporting
+                  AND EXISTS (
+                      SELECT 1 FROM road_user_role assignment
+                      WHERE assignment.user_id = %s
+                        AND assignment.road_id = road.id
+                        AND assignment.role IN ('manager', 'supervisor')
+                        AND assignment.data_status <> 'simulated'
+                  )
+                ORDER BY receipt.uploaded_at DESC, receipt.photo_id
+                LIMIT %s
+                """,
+                (actor.id, limit + 1),
+            )
+            rows = await cursor.fetchall()
+        truncated = len(rows) > limit
+        visible = rows[:limit]
+        return PhotoReviewQueue(
+            items=[self._queue_item(row) for row in visible],
+            result_count=len(visible),
+            limit=limit,
+            truncated=truncated,
+        )
+
     async def _find_existing(self, cursor: psycopg.AsyncCursor[tuple], key_hash: str):
         await cursor.execute(
             """
@@ -264,6 +376,29 @@ class PostgresPhotoReviewRepository:
             policy_data_status=row[11],
         )
 
+    @staticmethod
+    def _queue_item(row: tuple) -> PhotoReviewQueueItem:
+        return PhotoReviewQueueItem(
+            photo_id=row[0],
+            work_order_id=row[1],
+            road_code=row[2],
+            segment_index=row[3],
+            zone_type=row[4],
+            planned_point_sequence=row[5],
+            captured_at=row[6],
+            uploaded_at=row[7],
+            media_type=row[8],
+            byte_size=row[9],
+            latest_review_id=row[10],
+            latest_decision=row[11],
+            latest_quality_status=row[12],
+            latest_ruler_status=row[13],
+            latest_rationale=row[14],
+            latest_reviewed_at=row[15],
+            latest_review_policy_version=row[16],
+            review_state="review_recorded" if row[10] else "awaiting_review",
+        )
+
 
 async def get_photo_review_writer() -> PhotoReviewWriter:
     settings = get_settings()
@@ -273,7 +408,25 @@ async def get_photo_review_writer() -> PhotoReviewWriter:
     )
 
 
+async def get_photo_review_queue_reader() -> PhotoReviewQueueReader:
+    settings = get_settings()
+    return PostgresPhotoReviewRepository(
+        settings.database_url,
+        settings.prepared_photo_review_policy_version,
+    )
+
+
 router = APIRouter(prefix="/v1/media", tags=["media"])
+queue_router = APIRouter(prefix="/v1/photo-review-queue", tags=["media"])
+
+
+@queue_router.get("", response_model=PhotoReviewQueue)
+async def list_photo_review_queue(
+    actor: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    reader: Annotated[PhotoReviewQueueReader, Depends(get_photo_review_queue_reader)],
+    limit: Annotated[int, Field(ge=1, le=100)] = 50,
+) -> PhotoReviewQueue:
+    return await reader.list_for_actor(actor=actor, limit=limit)
 
 
 @router.post("/{photo_id}/reviews", response_model=PhotoReviewResponse)

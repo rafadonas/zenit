@@ -413,6 +413,18 @@ Rejected and inconclusive outcomes require a rationale. Acceptance only records
 that a reviewer could assess the prepared image and see a ruler; it does not
 validate a height measurement or make the photo operational or official.
 
+Authenticated reviewers discover only photos on roads covered by their current
+non-simulated manager/supervisor roles:
+
+```text
+GET /v1/photo-review-queue?limit=50
+Authorization: Bearer <access-token>
+```
+
+The queue exposes order, segment, zone, planned-point sequence, capture/upload
+timestamps, media metadata, and the latest effective review. It omits reviewer
+identity, device identifiers, object-store coordinates, and encryption details.
+
 Use `zenit-import` for one immutable raw file at a time. Full examples are in
 `docs/architecture/source-ingestion.md`.
 

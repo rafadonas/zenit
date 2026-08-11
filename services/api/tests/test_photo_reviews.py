@@ -11,11 +11,15 @@ from zenit_api.photo_reviews import (
     PhotoReviewIdempotencyConflictError,
     PhotoReviewPermissionError,
     PhotoReviewPolicyUnavailableError,
+    PhotoReviewQueue,
+    PhotoReviewQueueItem,
+    PhotoReviewQueueReader,
     PhotoReviewRequest,
     PhotoReviewResponse,
     PhotoReviewSupersessionError,
     PhotoReviewTargetNotFoundError,
     PhotoReviewWriter,
+    get_photo_review_queue_reader,
     get_photo_review_writer,
 )
 
@@ -182,3 +186,80 @@ def test_photo_review_requires_authentication() -> None:
             )
 
     assert asyncio.run(request()).status_code == 401
+
+
+class FakePhotoReviewQueueReader(PhotoReviewQueueReader):
+    async def list_for_actor(
+        self,
+        *,
+        actor: AuthenticatedUser,
+        limit: int,
+    ) -> PhotoReviewQueue:
+        assert actor == ACTOR
+        assert limit == 25
+        return PhotoReviewQueue(
+            items=[
+                PhotoReviewQueueItem(
+                    photo_id=PHOTO_ID,
+                    work_order_id=UUID("40000000-0000-4000-8000-000000000009"),
+                    road_code="SP021",
+                    segment_index=195,
+                    zone_type="left",
+                    planned_point_sequence=1,
+                    captured_at=datetime(2026, 8, 11, 11, tzinfo=UTC),
+                    uploaded_at=datetime(2026, 8, 11, 12, tzinfo=UTC),
+                    media_type="image/jpeg",
+                    byte_size=4,
+                    latest_review_id=None,
+                    latest_decision=None,
+                    latest_quality_status=None,
+                    latest_ruler_status=None,
+                    latest_rationale=None,
+                    latest_reviewed_at=None,
+                    latest_review_policy_version=None,
+                    review_state="awaiting_review",
+                )
+            ],
+            result_count=1,
+            limit=25,
+            truncated=False,
+        )
+
+
+def request_queue(*, authenticated: bool = True):
+    async def fake_actor() -> AuthenticatedUser:
+        return ACTOR
+
+    async def fake_reader() -> FakePhotoReviewQueueReader:
+        return FakePhotoReviewQueueReader()
+
+    async def request():
+        if authenticated:
+            app.dependency_overrides[get_current_user] = fake_actor
+        app.dependency_overrides[get_photo_review_queue_reader] = fake_reader
+        try:
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                return await client.get("/v1/photo-review-queue?limit=25")
+        finally:
+            app.dependency_overrides.clear()
+
+    return asyncio.run(request())
+
+
+def test_queue_returns_only_prepared_non_operational_contract() -> None:
+    response = request_queue()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["result_count"] == 1
+    assert payload["items"][0]["review_state"] == "awaiting_review"
+    assert payload["items"][0]["data_status"] == "prepared"
+    assert payload["items"][0]["eligible_for_model_training"] is False
+    assert payload["items"][0]["eligible_for_official_reporting"] is False
+    assert payload["items"][0]["authorizes_field_work"] is False
+    assert "reviewer" not in response.text
+
+
+def test_queue_requires_authentication() -> None:
+    assert request_queue(authenticated=False).status_code == 401
