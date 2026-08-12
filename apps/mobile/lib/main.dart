@@ -428,6 +428,23 @@ class _PreparedMowingPlanPageState extends State<PreparedMowingPlanPage> {
     });
   }
 
+  Future<void> _uploadPostServicePhotos() async {
+    setState(() => syncing = true);
+    final uploaded = await widget.controller.uploadMowingPostServicePhotos(
+      plan,
+    );
+    if (!mounted) return;
+    await _load();
+    if (!mounted) return;
+    final uploadedCount = photos.where((photo) => photo.isUploaded).length;
+    setState(() {
+      syncing = false;
+      confirmation = uploaded
+          ? '$uploadedCount fotos simuladas recebidas e criptografadas; conteúdo não validado.'
+          : widget.controller.errorMessage;
+    });
+  }
+
   Future<void> _savePostServiceMeasurements() async {
     final heights = postServiceFields
         .map((field) => double.tryParse(field.text.replaceAll(',', '.')))
@@ -692,7 +709,7 @@ class _PreparedMowingPlanPageState extends State<PreparedMowingPlanPage> {
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    'Os bytes ficam criptografados somente no aparelho. A sincronização envia apenas checksum e metadados não validados.',
+                    'Os bytes ficam criptografados no aparelho. A sincronização envia apenas o manifesto; depois, um envio explícito transfere o conteúdo ainda simulado e não validado.',
                   ),
                   const SizedBox(height: 8),
                   if (sourceOrder case final PreparedWorkOrder order)
@@ -758,6 +775,23 @@ class _PreparedMowingPlanPageState extends State<PreparedMowingPlanPage> {
                       'Sincronizar medições e manifestos simulados',
                     ),
                   ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed:
+                        syncing ||
+                            widget.controller.busy ||
+                            photos.length != 3 ||
+                            photos.any(
+                              (photo) =>
+                                  photo.syncState !=
+                                  DraftSyncState.acknowledged,
+                            ) ||
+                            photos.every((photo) => photo.isUploaded)
+                        ? null
+                        : _uploadPostServicePhotos,
+                    icon: const Icon(Icons.cloud_upload),
+                    label: const Text('Enviar fotos simuladas pós-serviço'),
+                  ),
                 ],
                 for (final event in events)
                   ListTile(
@@ -788,9 +822,13 @@ class _PreparedMowingPlanPageState extends State<PreparedMowingPlanPage> {
                   ListTile(
                     dense: true,
                     contentPadding: EdgeInsets.zero,
-                    leading: Icon(_syncIcon(photo.syncState)),
+                    leading: Icon(
+                      photo.isUploaded
+                          ? Icons.cloud_done
+                          : _syncIcon(photo.syncState),
+                    ),
                     title: Text(
-                      'Foto pós-serviço ${photo.sequence}: ${_syncLabel(photo.syncState)}',
+                      'Foto pós-serviço ${photo.sequence}: ${photo.isUploaded ? 'conteúdo recebido, não validado' : _syncLabel(photo.syncState)}',
                     ),
                     subtitle: Text(
                       photo.syncResultMessage ??

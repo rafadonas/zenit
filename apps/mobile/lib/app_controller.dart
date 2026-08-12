@@ -779,6 +779,56 @@ class ZenitAppController extends ChangeNotifier {
     );
   }
 
+  Future<bool> uploadMowingPostServicePhotos(PreparedMowingPlan plan) async {
+    final current = session;
+    if (current == null) return false;
+    return _run(() async {
+      var photos = await vault.readMowingPostServicePhotos(plan.id);
+      final sourceOrders = orders.where(
+        (order) => order.id == plan.sourceInspectionWorkOrderId,
+      );
+      if (sourceOrders.length != 1) {
+        throw const MowingDemoSourcePointError();
+      }
+      final expectedPoints = {
+        for (final point in sourceOrders.single.points) point.id,
+      };
+      if (photos.length != 3 ||
+          photos.any(
+            (photo) =>
+                photo.mowingOrderId != plan.id ||
+                photo.sourcePlanningApprovalId != plan.planningApprovalId ||
+                photo.syncState != DraftSyncState.acknowledged,
+          ) ||
+          photos.map((photo) => photo.sourcePlannedPointId).toSet().length !=
+              3 ||
+          !photos
+              .map((photo) => photo.sourcePlannedPointId)
+              .toSet()
+              .containsAll(expectedPoints)) {
+        throw const IncompleteMowingPostServicePhotoError();
+      }
+      final deviceId = await deviceIdentityStore.readOrCreate();
+      await gateway.registerDevice(current.accessToken, deviceId, appVersion);
+      for (var index = 0; index < photos.length; index++) {
+        final photo = photos[index];
+        if (photo.isUploaded) continue;
+        await gateway.uploadMowingPostServicePhoto(
+          current.accessToken,
+          deviceId,
+          photo,
+        );
+        photos = [...photos]
+          ..[index] = photo.copyWith(
+            uploadState: MowingPhotoUploadState.uploadedUnverified,
+            syncResultMessage:
+                'Conteúdo simulado recebido e criptografado; localização, qualidade e régua não validadas.',
+          );
+        await vault.replaceMowingPostServicePhotos(plan.id, photos);
+      }
+    });
+  }
+
   Future<bool> capturePreparedPhoto(
     PreparedWorkOrder order,
     PlannedInspectionPoint point,

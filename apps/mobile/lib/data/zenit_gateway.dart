@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../domain/auth_session.dart';
 import '../domain/mobile_sync.dart';
+import '../domain/mowing_post_service_photo_draft.dart';
 import '../domain/prepared_mowing_plan.dart';
 import '../domain/prepared_work_order.dart';
 import '../domain/prepared_photo_draft.dart';
@@ -27,6 +28,11 @@ abstract interface class ZenitGateway {
     String accessToken,
     String deviceId,
     PreparedPhotoDraft photo,
+  );
+  Future<void> uploadMowingPostServicePhoto(
+    String accessToken,
+    String deviceId,
+    MowingPostServicePhotoDraft photo,
   );
 }
 
@@ -252,6 +258,67 @@ class HttpZenitGateway implements ZenitGateway {
         payload['persisted'] != true) {
       throw const ZenitApiException(
         'A API retornou uma confirmação de foto incompatível.',
+      );
+    }
+  }
+
+  @override
+  Future<void> uploadMowingPostServicePhoto(
+    String accessToken,
+    String deviceId,
+    MowingPostServicePhotoDraft photo,
+  ) async {
+    final boundary = 'zenit-mowing-${photo.photoId}';
+    final body = BytesBuilder(copy: false)
+      ..add(utf8.encode('--$boundary\r\n'))
+      ..add(
+        utf8.encode(
+          'Content-Disposition: form-data; name="file"; filename="post-service.${photo.mediaType == 'image/png' ? 'png' : 'jpg'}"\r\n',
+        ),
+      )
+      ..add(utf8.encode('Content-Type: ${photo.mediaType}\r\n\r\n'))
+      ..add(photo.bytes)
+      ..add(utf8.encode('\r\n--$boundary--\r\n'));
+    final request =
+        http.Request('POST', _uri('/v1/mowing-media/${photo.photoId}'))
+          ..headers.addAll({
+            'Accept': 'application/json',
+            'Authorization': 'Bearer $accessToken',
+            'X-Zenit-Device-ID': deviceId,
+            'Content-Type': 'multipart/form-data; boundary=$boundary',
+          })
+          ..bodyBytes = body.takeBytes();
+    final streamed = await _client.send(request);
+    final response = await http.Response.fromStream(streamed);
+    final payload = _decodeObject(response);
+    if (response.statusCode != 200) {
+      throw ZenitApiException(
+        _detail(
+          payload,
+          'Não foi possível enviar a foto pós-serviço simulada.',
+        ),
+        statusCode: response.statusCode,
+      );
+    }
+    if (payload['photo_id'] != photo.photoId ||
+        payload['checksum_sha256'] != photo.checksumSha256 ||
+        payload['byte_size'] != photo.bytes.length ||
+        payload['media_type'] != photo.mediaType ||
+        payload['phase'] != 'post_service' ||
+        payload['photo_scope'] != 'mowing_demo_post_service_only' ||
+        payload['content_status'] != 'uploaded_unverified' ||
+        payload['ruler_status'] != 'not_validated' ||
+        payload['location_status'] != 'not_collected' ||
+        payload['quality_status'] != 'simulated_unverified' ||
+        payload['data_status'] != 'simulated' ||
+        payload['operational_approval_satisfied'] != false ||
+        payload['authorizes_field_work'] != false ||
+        payload['eligible_for_field_execution'] != false ||
+        payload['eligible_for_model_training'] != false ||
+        payload['eligible_for_official_reporting'] != false ||
+        payload['persisted'] != true) {
+      throw const ZenitApiException(
+        'A API retornou uma confirmação pós-serviço incompatível.',
       );
     }
   }

@@ -6,6 +6,21 @@ import 'package:crypto/crypto.dart';
 import 'measurement_draft.dart';
 import 'prepared_work_order.dart';
 
+enum MowingPhotoUploadState {
+  notUploaded('not_uploaded'),
+  uploadedUnverified('uploaded_unverified');
+
+  const MowingPhotoUploadState(this.wireValue);
+  final String wireValue;
+
+  static MowingPhotoUploadState fromWire(String value) => values.firstWhere(
+    (state) => state.wireValue == value,
+    orElse: () => throw const FormatException(
+      'Unknown mowing post-service photo upload state',
+    ),
+  );
+}
+
 class MowingPostServicePhotoDraft {
   const MowingPostServicePhotoDraft({
     required this.eventId,
@@ -21,6 +36,7 @@ class MowingPostServicePhotoDraft {
     this.syncState = DraftSyncState.localOnly,
     this.syncResultCode,
     this.syncResultMessage,
+    this.uploadState = MowingPhotoUploadState.notUploaded,
   });
 
   final String eventId;
@@ -36,19 +52,25 @@ class MowingPostServicePhotoDraft {
   final DraftSyncState syncState;
   final String? syncResultCode;
   final String? syncResultMessage;
+  final MowingPhotoUploadState uploadState;
 
   bool get hasPersistentServerResult =>
       syncState == DraftSyncState.acknowledged ||
       syncState == DraftSyncState.rejected ||
       syncState == DraftSyncState.conflict;
 
-  bool get awaitsFutureUpload => syncState == DraftSyncState.acknowledged;
+  bool get isUploaded =>
+      uploadState == MowingPhotoUploadState.uploadedUnverified;
+
+  bool get awaitsFutureUpload =>
+      syncState == DraftSyncState.acknowledged && !isUploaded;
 
   MowingPostServicePhotoDraft copyWith({
     DraftSyncState? syncState,
     String? syncResultCode,
     String? syncResultMessage,
     bool clearResult = false,
+    MowingPhotoUploadState? uploadState,
   }) => MowingPostServicePhotoDraft(
     eventId: eventId,
     photoId: photoId,
@@ -65,6 +87,7 @@ class MowingPostServicePhotoDraft {
     syncResultMessage: clearResult
         ? null
         : syncResultMessage ?? this.syncResultMessage,
+    uploadState: uploadState ?? this.uploadState,
   );
 
   JsonMap toSyncEventJson() {
@@ -113,7 +136,7 @@ class MowingPostServicePhotoDraft {
       'content_base64': base64Encode(bytes),
       'phase': 'post_service',
       'photo_scope': 'mowing_demo_post_service_only',
-      'content_status': 'not_uploaded',
+      'content_status': uploadState.wireValue,
       'ruler_status': 'not_validated',
       'location_status': 'not_collected',
       'data_status': 'simulated',
@@ -130,9 +153,14 @@ class MowingPostServicePhotoDraft {
   }
 
   factory MowingPostServicePhotoDraft.fromJson(JsonMap json) {
+    final uploadState = MowingPhotoUploadState.fromWire(
+      json['content_status']! as String,
+    );
+    final syncState = DraftSyncState.fromWire(json['sync_state']! as String);
     if (json['phase'] != 'post_service' ||
         json['photo_scope'] != 'mowing_demo_post_service_only' ||
-        json['content_status'] != 'not_uploaded' ||
+        (uploadState == MowingPhotoUploadState.uploadedUnverified &&
+            syncState != DraftSyncState.acknowledged) ||
         json['ruler_status'] != 'not_validated' ||
         json['location_status'] != 'not_collected' ||
         json['data_status'] != 'simulated' ||
@@ -157,9 +185,10 @@ class MowingPostServicePhotoDraft {
       checksumSha256: json['checksum_sha256']! as String,
       mediaType: json['media_type']! as String,
       bytes: base64Decode(json['content_base64']! as String),
-      syncState: DraftSyncState.fromWire(json['sync_state']! as String),
+      syncState: syncState,
       syncResultCode: json['sync_result_code'] as String?,
       syncResultMessage: json['sync_result_message'] as String?,
+      uploadState: uploadState,
     );
     try {
       draft._validateValues();

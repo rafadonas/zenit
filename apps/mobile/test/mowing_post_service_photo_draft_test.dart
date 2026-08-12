@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zenit_mobile/domain/measurement_draft.dart';
 import 'package:zenit_mobile/domain/mowing_post_service_photo_draft.dart';
 
 void main() {
@@ -41,6 +42,27 @@ void main() {
     );
     expect(
       () => MowingPostServicePhotoDraft.fromJson(promoted),
+      throwsFormatException,
+    );
+  });
+
+  test('persists only an acknowledged unverified upload receipt', () {
+    final uploaded = _draft().copyWith(
+      syncState: DraftSyncState.acknowledged,
+      uploadState: MowingPhotoUploadState.uploadedUnverified,
+    );
+
+    final restored = MowingPostServicePhotoDraft.fromJson(uploaded.toJson());
+    expect(restored.isUploaded, isTrue);
+    expect(restored.awaitsFutureUpload, isFalse);
+    expect(
+      restored.toSyncEventJson()['payload'],
+      containsPair('content_status', 'not_uploaded'),
+    );
+
+    final unsafe = uploaded.toJson()..['sync_state'] = 'local_only';
+    expect(
+      () => MowingPostServicePhotoDraft.fromJson(unsafe),
       throwsFormatException,
     );
   });

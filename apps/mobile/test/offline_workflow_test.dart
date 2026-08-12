@@ -5,6 +5,7 @@ import 'package:zenit_mobile/domain/auth_session.dart';
 import 'package:zenit_mobile/domain/measurement_draft.dart';
 import 'package:zenit_mobile/domain/mobile_sync.dart';
 import 'package:zenit_mobile/domain/mowing_demo_lifecycle.dart';
+import 'package:zenit_mobile/domain/mowing_post_service_photo_draft.dart';
 import 'package:zenit_mobile/domain/prepared_mowing_plan.dart';
 import 'package:zenit_mobile/domain/prepared_photo_draft.dart';
 import 'package:zenit_mobile/domain/prepared_work_order.dart';
@@ -196,9 +197,9 @@ void main() {
       );
       expect(await vault.hasUnacknowledgedEvents(), isTrue);
       expect(
-        (await vault.readMowingPostServicePhotos(plan.id)).every(
-          (photo) => photo.bytes.isNotEmpty && photo.awaitsFutureUpload,
-        ),
+        (await vault.readMowingPostServicePhotos(
+          plan.id,
+        )).every((photo) => photo.bytes.isNotEmpty && photo.awaitsFutureUpload),
         isTrue,
       );
     },
@@ -322,6 +323,67 @@ void main() {
       everyElement('mowing_photo'),
     );
   });
+
+  test(
+    'uploads only acknowledged mowing manifests and resumes after failure',
+    () async {
+      final order = preparedOrder();
+      final plan = preparedMowingPlan();
+      final vault = MemoryVault();
+      final gateway = FakeGateway(orders: [order], mowingPlans: [plan]);
+      final controller = ZenitAppController(
+        gateway: gateway,
+        sessionStore: MemorySessionStore(),
+        vault: vault,
+        deviceIdentityStore: MemoryDeviceIdentityStore(),
+        appVersion: 'test',
+        photoCapture: FakePhotoCapture(),
+        uuidFactory: _uuidFactory(),
+        clock: () => DateTime.utc(2026, 8, 12, 14),
+      );
+      await controller.initialize();
+      await controller.login('field@example.test', 'secret');
+      await controller.confirmMowingDemo(plan);
+      await controller.startMowingDemo(plan);
+      await controller.finishMowingDemo(plan);
+      await controller.saveThreeMowingPostServiceMeasurements(plan, [5, 6, 7]);
+      await _captureMowingPhotos(controller, plan, order);
+
+      expect(await controller.uploadMowingPostServicePhotos(plan), isFalse);
+      expect(gateway.mowingUploadCalls, 0);
+      expect(await controller.syncMowingDemo(plan), isTrue);
+
+      gateway.mowingUploadFailure = const ZenitApiException('offline');
+      gateway.mowingUploadFailureAtCall = 2;
+      expect(await controller.uploadMowingPostServicePhotos(plan), isFalse);
+      expect(gateway.mowingUploadCalls, 2);
+      expect(
+        (await vault.readMowingPostServicePhotos(
+          plan.id,
+        )).where((photo) => photo.isUploaded).map((photo) => photo.sequence),
+        [1],
+      );
+
+      gateway.mowingUploadFailure = null;
+      expect(await controller.uploadMowingPostServicePhotos(plan), isTrue);
+      expect(gateway.mowingUploadCalls, 4);
+      final uploaded = await vault.readMowingPostServicePhotos(plan.id);
+      expect(uploaded.every((photo) => photo.isUploaded), isTrue);
+      expect(uploaded.every((photo) => !photo.awaitsFutureUpload), isTrue);
+      expect(
+        uploaded.every(
+          (photo) =>
+              photo.toJson()['eligible_for_model_training'] == false &&
+              photo.toJson()['eligible_for_official_reporting'] == false,
+        ),
+        isTrue,
+      );
+      expect(await vault.hasUnacknowledgedEvents(), isFalse);
+
+      expect(await controller.uploadMowingPostServicePhotos(plan), isTrue);
+      expect(gateway.mowingUploadCalls, 4);
+    },
+  );
 
   test('refresh retains mowing point provenance required by a retry', () async {
     final order = preparedOrder();
@@ -938,5 +1000,12 @@ class _UnauthorizedGateway implements ZenitGateway {
     String accessToken,
     String deviceId,
     PreparedPhotoDraft photo,
+  ) => throw UnimplementedError();
+
+  @override
+  Future<void> uploadMowingPostServicePhoto(
+    String accessToken,
+    String deviceId,
+    MowingPostServicePhotoDraft photo,
   ) => throw UnimplementedError();
 }

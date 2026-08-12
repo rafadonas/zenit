@@ -134,6 +134,10 @@ class FakeGateway implements ZenitGateway {
   int? uploadFailureAtCall;
   int uploadCalls = 0;
   final List<String> uploadedPhotoIds = [];
+  Object? mowingUploadFailure;
+  int? mowingUploadFailureAtCall;
+  int mowingUploadCalls = 0;
+  final List<String> uploadedMowingPhotoIds = [];
   PendingSyncBatch? lastBatch;
   List<Map<String, Object?>>? lastEvents;
 
@@ -193,6 +197,21 @@ class FakeGateway implements ZenitGateway {
       throw failure;
     }
     uploadedPhotoIds.add(photo.photoId);
+  }
+
+  @override
+  Future<void> uploadMowingPostServicePhoto(
+    String accessToken,
+    String deviceId,
+    MowingPostServicePhotoDraft photo,
+  ) async {
+    mowingUploadCalls++;
+    if (mowingUploadFailure case final failure?
+        when mowingUploadFailureAtCall == null ||
+            mowingUploadFailureAtCall == mowingUploadCalls) {
+      throw failure;
+    }
+    uploadedMowingPhotoIds.add(photo.photoId);
   }
 }
 

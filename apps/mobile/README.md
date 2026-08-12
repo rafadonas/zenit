@@ -18,8 +18,10 @@ Current P0 slice:
 - exactly three post-service mowing heights captured after `finish` as separate
   simulated, unverified drafts and synchronized after the ordered lifecycle;
 - one later post-service photo per measured mowing point copied into the
-  encrypted vault; only its simulated, unverified, `not_uploaded` manifest is
-  synchronized;
+  encrypted vault; its simulated, unverified, `not_uploaded` manifest is
+  synchronized before any bytes;
+- explicit upload of accepted post-service mowing-photo manifests with
+  per-photo resumable `uploaded_unverified` receipts;
 - one inspection camera photo per planned point copied into the encrypted vault
   with a verified local SHA-256; only its prepared manifest enters sync;
 - persistent event and batch UUIDs created before network delivery;
@@ -60,12 +62,14 @@ explicitly not collected by the typed height record. A fully local rehearsal
 sends its ordered lifecycle before interleaved height/manifest pairs in one
 idempotent batch. A previously acknowledged rehearsal sends only new
 measurements and manifests, while previously acknowledged measurements allow a
-manifest-only batch. Photo bytes remain encrypted on the device and are not
-uploaded. None of these paths proves vegetation condition, mowing completion,
-location, image quality, or server possession. See
+manifest-only batch. After all three manifests are accepted, a separate user
+action uploads the exact encrypted-vault bytes and persists each unverified
+receipt before continuing, allowing interrupted transfers to resume. None of
+these paths proves vegetation condition, mowing completion, location, or image
+quality. See
 `docs/decisions/ADR-0036-mobile-simulated-mowing-post-service-measurements.md`
-and
-`docs/decisions/ADR-0039-mobile-encrypted-simulated-mowing-post-service-photos.md`.
+through
+`docs/decisions/ADR-0041-mobile-simulated-mowing-photo-upload-orchestration.md`.
 
 Run checks from this directory with the repository-local Flutter SDK:
 

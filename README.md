@@ -168,9 +168,11 @@ checksum-bound post-service photo manifest per measured point, explicitly
 labelled simulated, unverified, unlocated, and not uploaded. The mobile app now
 captures one later image per measured point into its encrypted vault and
 synchronizes only the separate manifest. The API now has a separate verified,
-AES-256-GCM encrypted upload boundary and immutable simulated receipt, but the
-mobile app does not call it yet. No post-service retrieval, review, map update,
-or summary exists yet.
+AES-256-GCM encrypted upload boundary and immutable simulated receipt. After
+all three manifests are accepted, the mobile app can explicitly upload their
+exact bytes and persist each unverified receipt before continuing, so a partial
+transfer resumes without repeating locally confirmed photos. No post-service
+retrieval, review, map update, or summary exists yet.
 
 CI repeats this validation from an empty Compose volume after the Python,
 dashboard, and Flutter jobs pass. The Flutter job checks formatting, analysis,
