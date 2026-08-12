@@ -119,6 +119,34 @@ class PreparedMowingDemoEventPayload(BaseModel):
         return value
 
 
+class PreparedMowingPostServiceMeasurementPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    mowing_order_id: UUID
+    source_planning_approval_id: UUID
+    source_planned_point_id: UUID
+    phase: Literal["post_service"]
+    height_cm: Decimal = Field(ge=0, le=1000, max_digits=7, decimal_places=2)
+    captured_at: datetime
+    measurement_scope: Literal["mowing_demo_post_service_only"]
+    location_status: Literal["not_collected"]
+    photo_status: Literal["not_collected"]
+    data_status: Literal["simulated"]
+    quality_status: Literal["simulated_unverified"]
+    operational_approval_satisfied: Literal[False]
+    authorizes_field_work: Literal[False]
+    eligible_for_field_execution: Literal[False]
+    eligible_for_model_training: Literal[False]
+    eligible_for_official_reporting: Literal[False]
+
+    @field_validator("captured_at")
+    @classmethod
+    def require_timezone(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("captured_at must include a UTC offset")
+        return value
+
+
 class PreparedPhotoManifestPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -207,6 +235,11 @@ class MobileSyncEventRequest(BaseModel):
             ):
                 raise ValueError("mowing demo location does not match its operation")
             self.payload = mowing_event.model_dump(mode="json")
+        if self.entity_type == "mowing_measurement" and self.operation == "create":
+            measurement = PreparedMowingPostServiceMeasurementPayload.model_validate(
+                self.payload
+            )
+            self.payload = measurement.model_dump(mode="json")
         if self.entity_type == "photo" and self.operation == "prepare":
             photo = PreparedPhotoManifestPayload.model_validate(self.payload)
             self.payload = photo.model_dump(mode="json")
@@ -421,8 +454,15 @@ class PostgresMobileSyncRepository:
                 {
                     str(event.payload["mowing_order_id"])
                     for event in request.events
-                    if event.entity_type == "mowing_order"
-                    and event.operation in {"confirm", "start", "pause", "resume", "finish"}
+                    if (
+                        event.entity_type == "mowing_order"
+                        and event.operation
+                        in {"confirm", "start", "pause", "resume", "finish"}
+                    )
+                    or (
+                        event.entity_type == "mowing_measurement"
+                        and event.operation == "create"
+                    )
                 }
             )
             for mowing_order_id in mowing_order_ids:
@@ -615,6 +655,38 @@ class PostgresMobileSyncRepository:
                             mowing_event.rehearsal_scope,
                         ),
                     )
+                elif event.entity_type == "mowing_measurement":
+                    measurement = PreparedMowingPostServiceMeasurementPayload.model_validate(
+                        event.payload
+                    )
+                    await cursor.execute(
+                        """
+                        INSERT INTO prepared_mowing_post_service_measurement (
+                            event_id, mowing_order_id, source_planning_approval_id,
+                            source_planned_point_id, actor_user_id, device_id,
+                            phase, height_cm, client_captured_at,
+                            measurement_scope, location_status, photo_status,
+                            quality_status
+                        ) VALUES (
+                            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                        )
+                        """,
+                        (
+                            event.event_id,
+                            measurement.mowing_order_id,
+                            measurement.source_planning_approval_id,
+                            measurement.source_planned_point_id,
+                            actor.id,
+                            request.device_id,
+                            measurement.phase,
+                            measurement.height_cm,
+                            measurement.captured_at,
+                            measurement.measurement_scope,
+                            measurement.location_status,
+                            measurement.photo_status,
+                            measurement.quality_status,
+                        ),
+                    )
                 elif event.entity_type == "photo":
                     photo = PreparedPhotoManifestPayload.model_validate(event.payload)
                     await cursor.execute(
@@ -749,6 +821,10 @@ class PostgresMobileSyncRepository:
             "finish",
         }:
             return await PostgresMobileSyncRepository._validate_mowing_demo_event(
+                cursor, actor_id, event
+            )
+        if event.entity_type == "mowing_measurement" and event.operation == "create":
+            return await PostgresMobileSyncRepository._validate_mowing_post_service_measurement(
                 cursor, actor_id, event
             )
         if event.entity_type == "photo" and event.operation == "prepare":
@@ -976,6 +1052,176 @@ class PostgresMobileSyncRepository:
                     code="photos_incomplete",
                     message="finish requires three persisted prepared point photo manifests",
                 )
+        return None
+
+    @staticmethod
+    async def _validate_mowing_post_service_measurement(
+        cursor: psycopg.AsyncCursor[tuple],
+        actor_id: UUID,
+        event: MobileSyncEventRequest,
+    ) -> RejectedSyncEventResponse | None:
+        measurement = PreparedMowingPostServiceMeasurementPayload.model_validate(
+            event.payload
+        )
+        await cursor.execute(
+            """
+            SELECT point.work_order_id, mowing.source_inspection_work_order_id,
+                   mowing.status, mowing.data_status, mowing.location_status,
+                   mowing.team_assignment_status, mowing.equipment_assignment_status,
+                   mowing.weather_check_status, mowing.safety_check_status,
+                   mowing.requires_operational_approval, mowing.authorizes_field_work,
+                   mowing.eligible_for_field_execution,
+                   mowing.eligible_for_official_reporting,
+                   point.eligible_for_field_execution,
+                   EXISTS (
+                       SELECT 1 FROM road_user_role assignment
+                       WHERE assignment.user_id = %s
+                         AND assignment.road_id = axis.road_id
+                         AND assignment.role IN ('manager', 'supervisor')
+                         AND assignment.data_status <> 'simulated'
+                   ),
+                   EXISTS (
+                       SELECT 1
+                       FROM prepared_mowing_planning_approval approval
+                       JOIN prepared_mowing_readiness_assessment assessment
+                         ON assessment.id = approval.readiness_assessment_id
+                       JOIN prepared_mowing_resource_plan plan
+                         ON plan.id = assessment.resource_plan_id
+                       WHERE approval.id = %s
+                         AND approval.mowing_order_id = mowing.id
+                         AND assessment.mowing_order_id = mowing.id
+                         AND plan.mowing_order_id = mowing.id
+                         AND plan.resource_reference_status
+                             = 'prepared_placeholder_pending_validation'
+                         AND plan.team_assignment_status = 'unassigned'
+                         AND plan.equipment_assignment_status = 'unassigned'
+                         AND plan.requires_operational_approval
+                         AND NOT plan.authorizes_field_work
+                         AND NOT plan.eligible_for_field_execution
+                         AND NOT plan.eligible_for_official_reporting
+                         AND assessment.weather_result = 'clear'
+                         AND assessment.safety_result = 'clear'
+                         AND assessment.validation_status
+                             = 'prepared_manual_pending_validation'
+                         AND assessment.requires_operational_approval
+                         AND NOT assessment.authorizes_field_work
+                         AND NOT assessment.eligible_for_field_execution
+                         AND NOT assessment.eligible_for_official_reporting
+                         AND approval.decision = 'approved_for_planning'
+                         AND approval.approval_effect
+                             = 'planning_only_no_execution_authorization'
+                         AND approval.dual_approval_requirement_status
+                             = 'pending_official_policy_validation'
+                         AND NOT approval.operational_approval_satisfied
+                         AND NOT approval.authorizes_field_work
+                         AND NOT approval.eligible_for_field_execution
+                         AND NOT approval.eligible_for_official_reporting
+                         AND NOT EXISTS (
+                             SELECT 1 FROM prepared_post_inspection_review correction
+                             WHERE correction.supersedes_review_id = mowing.source_review_id)
+                         AND NOT EXISTS (
+                             SELECT 1 FROM prepared_mowing_resource_plan newer_plan
+                             WHERE newer_plan.supersedes_plan_id = plan.id)
+                         AND NOT EXISTS (
+                             SELECT 1 FROM prepared_mowing_readiness_assessment newer_assessment
+                             WHERE newer_assessment.supersedes_assessment_id = assessment.id)
+                         AND NOT EXISTS (
+                             SELECT 1 FROM prepared_mowing_planning_approval newer_approval
+                             WHERE newer_approval.supersedes_approval_id = approval.id)
+                   ),
+                   (
+                       SELECT finish_event.client_occurred_at
+                       FROM prepared_mowing_demo_event finish_event
+                       WHERE finish_event.mowing_order_id = mowing.id
+                         AND finish_event.source_planning_approval_id = %s
+                         AND finish_event.operation = 'finish'
+                       LIMIT 1
+                   )
+            FROM prepared_mowing_order mowing
+            JOIN work_order inspection
+              ON inspection.id = mowing.source_inspection_work_order_id
+            JOIN segment_zone zone ON zone.id = inspection.segment_zone_id
+            JOIN road_segment segment ON segment.id = zone.road_segment_id
+            JOIN road_axis_candidate axis ON axis.id = segment.road_axis_candidate_id
+            CROSS JOIN work_order_planned_point point
+            WHERE mowing.id = %s AND point.id = %s
+            """,
+            (
+                actor_id,
+                measurement.source_planning_approval_id,
+                measurement.source_planning_approval_id,
+                measurement.mowing_order_id,
+                measurement.source_planned_point_id,
+            ),
+        )
+        target = await cursor.fetchone()
+        if target is None:
+            return RejectedSyncEventResponse(
+                event_id=event.event_id,
+                code="mowing_measurement_target_not_found",
+                message="prepared mowing order or source planned point was not found",
+            )
+        if target[0] != target[1]:
+            return RejectedSyncEventResponse(
+                event_id=event.event_id,
+                code="mowing_measurement_point_mismatch",
+                message="source planned point does not belong to the mowing source order",
+            )
+        if target[2:13] != (
+            "prepared",
+            "prepared",
+            "simulated",
+            "unassigned",
+            "unassigned",
+            "pending",
+            "pending",
+            True,
+            False,
+            False,
+            False,
+        ) or target[13] is not False:
+            return RejectedSyncEventResponse(
+                event_id=event.event_id,
+                code="unsupported_mowing_measurement_state",
+                message="post-service measurements require a non-operational prepared target",
+            )
+        if not target[14]:
+            return RejectedSyncEventResponse(
+                event_id=event.event_id,
+                code="road_access_denied",
+                message="actor no longer has an eligible role for this road",
+            )
+        if not target[15]:
+            return RejectedSyncEventResponse(
+                event_id=event.event_id,
+                code="planning_approval_not_effective",
+                message="post-service measurement requires effective prepared planning",
+            )
+        if target[16] is None:
+            return RejectedSyncEventResponse(
+                event_id=event.event_id,
+                code="mowing_rehearsal_not_finished",
+                message="post-service measurement requires a finished mowing rehearsal",
+            )
+        if measurement.captured_at < target[16]:
+            return RejectedSyncEventResponse(
+                event_id=event.event_id,
+                code="mowing_measurement_time_invalid",
+                message="post-service measurement cannot predate rehearsal finish",
+            )
+        await cursor.execute(
+            """
+            SELECT 1 FROM prepared_mowing_post_service_measurement
+            WHERE mowing_order_id = %s AND source_planned_point_id = %s
+            """,
+            (measurement.mowing_order_id, measurement.source_planned_point_id),
+        )
+        if await cursor.fetchone() is not None:
+            return RejectedSyncEventResponse(
+                event_id=event.event_id,
+                code="mowing_measurement_already_recorded",
+                message="post-service measurement already exists for this source point",
+            )
         return None
 
     @staticmethod

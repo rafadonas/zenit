@@ -99,7 +99,9 @@ jobs:
                 AND to_regclass('public.prepared_mowing_order') IS NOT NULL
                 AND to_regclass('public.prepared_mowing_resource_plan') IS NOT NULL
                 AND to_regclass('public.prepared_mowing_readiness_assessment') IS NOT NULL
-                AND to_regclass('public.prepared_mowing_planning_approval') IS NOT NULL;" \
+                AND to_regclass('public.prepared_mowing_planning_approval') IS NOT NULL
+                AND to_regclass('public.prepared_mowing_demo_event') IS NOT NULL
+                AND to_regclass('public.prepared_mowing_post_service_measurement') IS NOT NULL;" \
             | grep -qx t
           docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit -Atc \
             "SELECT postgis_typmod_type(a.atttypmod)

@@ -153,6 +153,10 @@ simulated mowing rehearsal in the dashboard. The timeline revalidates event
 ordering, timestamps, and every execution block, and labels a terminal event
 only as `rehearsal_only_no_field_completion_claim`; it is not post-service
 evidence or real mowing completion.
+The sync boundary now also has a separate foundation for one simulated,
+unverified post-service height per source point after the rehearsal finish.
+These records do not reuse inspection measurements and explicitly keep GPS and
+photos uncollected; no mobile capture screen or post-service summary exists yet.
 
 CI repeats this validation from an empty Compose volume after the Python,
 dashboard, and Flutter jobs pass. The Flutter job checks formatting, analysis,
@@ -165,8 +169,8 @@ credentials.
 ## Database migrations and ingestion
 
 Apply migrations in numeric order before importing sources. The current local
-development database must have migrations `0001` through `0028` applied. On the first
-startup of a new Compose volume, Postgres applies these twenty-eight up migrations in
+development database must have migrations `0001` through `0029` applied. On the first
+startup of a new Compose volume, Postgres applies these twenty-nine up migrations in
 order through `/docker-entrypoint-initdb.d`; existing volumes are never modified
 by that initialization mechanism. The explicit commands below remain useful
 for non-Compose environments and controlled upgrades of existing databases.
@@ -228,6 +232,8 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0027_prepared_mowing_planning_approval.sql
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0028_prepared_mowing_demo_lifecycle.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
+  < infra/migrations/0029_prepared_mowing_post_service_measurement.sql
 ```
 
 Migration `0008` starts the Sprint 4 management foundation with immutable,
@@ -349,6 +355,12 @@ balanced pause/resume, and finish. The effective prepared planning decision is
 required, but operational approval and every execution/reporting/training flag
 remain false. See
 `docs/decisions/ADR-0031-prepared-mowing-demo-lifecycle.md`.
+
+Migration `0029` adds one immutable simulated post-service height per source
+point after the rehearsal finish. The new sync event remains unverified,
+collects neither GPS nor photo, and cannot authorize work, training, or official
+reporting. See
+`docs/decisions/ADR-0035-simulated-mowing-post-service-measurement-foundation.md`.
 
 The mobile client can cache this prepared mowing-planning chain for offline,
 guarded demonstration. It validates provenance links and every execution block
@@ -482,6 +494,12 @@ prepared order or authorize field activity or official reporting. Responses
 contain `accepted`, `rejected`, `conflicts`, and `next_sync_cursor`.
 `photo/prepare` registers checksum-bound metadata only and explicitly reports
 that the content has not been uploaded or validated.
+
+After a separate mowing rehearsal reaches `finish`, the same endpoint accepts
+one `mowing_measurement/create` event per source planned point. The payload is
+fixed to simulated, unverified post-service input without GPS or photo, and is
+ineligible for field execution, model training, or official reporting. It does
+not claim real mowing completion or update inspection evidence.
 
 After its manifest is accepted, upload the exact prepared JPEG or PNG bytes:
 

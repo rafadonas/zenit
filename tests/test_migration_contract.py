@@ -53,6 +53,9 @@ PREPARED_MOWING_PLANNING_APPROVAL_MIGRATION = Path(
 PREPARED_MOWING_DEMO_LIFECYCLE_MIGRATION = Path(
     "infra/migrations/0028_prepared_mowing_demo_lifecycle.sql"
 )
+PREPARED_MOWING_POST_SERVICE_MEASUREMENT_MIGRATION = Path(
+    "infra/migrations/0029_prepared_mowing_post_service_measurement.sql"
+)
 
 
 class MigrationContractTests(unittest.TestCase):
@@ -155,7 +158,7 @@ class MigrationContractTests(unittest.TestCase):
         mounts = [
             line.strip() for line in compose.splitlines() if "/docker-entrypoint-initdb.d/" in line
         ]
-        self.assertEqual(len(mounts), 28)
+        self.assertEqual(len(mounts), 29)
         for version, mount in enumerate(mounts, start=1):
             prefix = f"{version:04d}"
             self.assertIn(f"infra/migrations/{prefix}_", mount)
@@ -176,6 +179,26 @@ class MigrationContractTests(unittest.TestCase):
         self.assertIn("CHECK (NOT eligible_for_field_execution)", sql)
         self.assertIn("prepared mowing demo event requires its exact accepted sync event", sql)
         self.assertIn("prepared_mowing_demo_event_immutable", sql)
+
+    def test_mowing_post_service_measurement_is_separate_simulated_evidence(self) -> None:
+        sql = PREPARED_MOWING_POST_SERVICE_MEASUREMENT_MIGRATION.read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("CREATE TABLE prepared_mowing_post_service_measurement", sql)
+        self.assertIn("phase = 'post_service'", sql)
+        self.assertIn("measurement_scope = 'mowing_demo_post_service_only'", sql)
+        self.assertIn("data_status = 'simulated'", sql)
+        self.assertIn("quality_status = 'simulated_unverified'", sql)
+        self.assertIn("photo_status = 'not_collected'", sql)
+        self.assertIn("CHECK (NOT operational_approval_satisfied)", sql)
+        self.assertIn("CHECK (NOT authorizes_field_work)", sql)
+        self.assertIn("CHECK (NOT eligible_for_model_training)", sql)
+        self.assertIn("finish_event.operation = 'finish'", sql)
+        self.assertIn(
+            "prepared_mowing_post_service_measurement_point_key", sql
+        )
+        self.assertIn("prepared_mowing_post_service_measurement_immutable", sql)
 
     def test_recommendation_reviews_are_audited_and_append_only(self) -> None:
         sql = RECOMMENDATION_REVIEW_MIGRATION.read_text(encoding="utf-8")

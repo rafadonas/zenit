@@ -119,6 +119,34 @@ def mowing_demo_event(
     }
 
 
+def mowing_measurement_event(
+    *, captured_at: str = "2026-08-11T15:00:00-03:00"
+) -> dict:
+    return {
+        "event_id": str(EVENT_ID),
+        "entity_type": "mowing_measurement",
+        "operation": "create",
+        "payload": {
+            "mowing_order_id": str(MOWING_ORDER_ID),
+            "source_planning_approval_id": str(PLANNING_APPROVAL_ID),
+            "source_planned_point_id": str(POINT_ID),
+            "phase": "post_service",
+            "height_cm": 7.5,
+            "captured_at": captured_at,
+            "measurement_scope": "mowing_demo_post_service_only",
+            "location_status": "not_collected",
+            "photo_status": "not_collected",
+            "data_status": "simulated",
+            "quality_status": "simulated_unverified",
+            "operational_approval_satisfied": False,
+            "authorizes_field_work": False,
+            "eligible_for_field_execution": False,
+            "eligible_for_model_training": False,
+            "eligible_for_official_reporting": False,
+        },
+    }
+
+
 def photo_manifest_event() -> dict:
     return {
         "event_id": str(EVENT_ID),
@@ -183,6 +211,10 @@ class FakeMobileSyncRepository:
                 event.entity_type == "mowing_order"
                 and event.operation
                 in {"confirm", "start", "pause", "resume", "finish"}
+            )
+            or (
+                event.entity_type == "mowing_measurement"
+                and event.operation == "create"
             )
             or (event.entity_type == "photo" and event.operation == "prepare")
         )
@@ -417,6 +449,78 @@ def test_mowing_demo_start_requires_only_an_explicit_simulated_location() -> Non
     assert response.status_code == 422
 
 
+def test_sync_contract_accepts_separate_simulated_post_service_measurement() -> None:
+    response = request_with_overrides(
+        endpoint="/v1/sync/batch",
+        payload={
+            "device_id": str(DEVICE_ID),
+            "batch_id": str(BATCH_ID),
+            "base_sync_cursor": 0,
+            "events": [mowing_measurement_event()],
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["accepted"] == [
+        {"event_id": str(EVENT_ID), "persisted": True}
+    ]
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "operational_approval_satisfied",
+        "authorizes_field_work",
+        "eligible_for_field_execution",
+        "eligible_for_model_training",
+        "eligible_for_official_reporting",
+    ],
+)
+def test_mowing_measurement_rejects_every_operational_promotion(field: str) -> None:
+    event = mowing_measurement_event()
+    event["payload"][field] = True
+    response = request_with_overrides(
+        endpoint="/v1/sync/batch",
+        payload={
+            "device_id": str(DEVICE_ID),
+            "batch_id": str(BATCH_ID),
+            "base_sync_cursor": 0,
+            "events": [event],
+        },
+    )
+
+    assert response.status_code == 422
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("phase", "inspection"),
+        ("measurement_scope", "operational"),
+        ("location_status", "simulated"),
+        ("photo_status", "collected"),
+        ("data_status", "prepared"),
+        ("quality_status", "verified"),
+    ],
+)
+def test_mowing_measurement_rejects_ambiguous_evidence_labels(
+    field: str, value: str
+) -> None:
+    event = mowing_measurement_event()
+    event["payload"][field] = value
+    response = request_with_overrides(
+        endpoint="/v1/sync/batch",
+        payload={
+            "device_id": str(DEVICE_ID),
+            "batch_id": str(BATCH_ID),
+            "base_sync_cursor": 0,
+            "events": [event],
+        },
+    )
+
+    assert response.status_code == 422
+
+
 def test_sync_contract_accepts_only_unuploaded_unvalidated_photo_manifest() -> None:
     response = request_with_overrides(
         endpoint="/v1/sync/batch",
@@ -492,6 +596,23 @@ class MowingDemoValidationCursor:
         if "FROM prepared_mowing_demo_event" in self.query:
             return self.history
         raise AssertionError("unexpected fetchall query")
+
+
+class MowingMeasurementValidationCursor:
+    def __init__(self, target: tuple | None, *, existing: bool = False) -> None:
+        self.target = target
+        self.existing = existing
+        self.query = ""
+
+    async def execute(self, query: str, parameters: tuple) -> None:
+        self.query = query
+
+    async def fetchone(self) -> tuple | None:
+        if "FROM prepared_mowing_post_service_measurement" in self.query:
+            return (1,) if self.existing else None
+        if "FROM prepared_mowing_order mowing" in self.query:
+            return self.target
+        raise AssertionError("unexpected fetchone query")
 
 
 class PhotoValidationCursor:
@@ -683,6 +804,92 @@ def test_mowing_demo_rejects_a_client_time_that_moves_backwards() -> None:
     )
 
     assert result.code == "invalid_mowing_demo_time"
+
+
+ELIGIBLE_MOWING_MEASUREMENT_TARGET = (
+    ORDER_ID,
+    ORDER_ID,
+    "prepared",
+    "prepared",
+    "simulated",
+    "unassigned",
+    "unassigned",
+    "pending",
+    "pending",
+    True,
+    False,
+    False,
+    False,
+    False,
+    True,
+    True,
+    datetime(2026, 8, 11, 17, tzinfo=UTC),
+)
+
+
+def validate_mowing_measurement(
+    target: tuple | None,
+    *,
+    existing: bool = False,
+    captured_at: str = "2026-08-11T15:00:00-03:00",
+):
+    event = MobileSyncEventRequest.model_validate(
+        mowing_measurement_event(captured_at=captured_at)
+    )
+    return asyncio.run(
+        PostgresMobileSyncRepository._validate_mowing_post_service_measurement(
+            MowingMeasurementValidationCursor(  # type: ignore[arg-type]
+                target, existing=existing
+            ),
+            USER_ID,
+            event,
+        )
+    )
+
+
+def test_mowing_measurement_requires_finished_effective_safe_target() -> None:
+    target = ELIGIBLE_MOWING_MEASUREMENT_TARGET
+    assert validate_mowing_measurement(target) is None
+    assert (
+        validate_mowing_measurement(None).code
+        == "mowing_measurement_target_not_found"
+    )
+    assert (
+        validate_mowing_measurement((UUID(int=0), *target[1:])).code
+        == "mowing_measurement_point_mismatch"
+    )
+    assert (
+        validate_mowing_measurement((*target[:14], False, True, target[16])).code
+        == "road_access_denied"
+    )
+    assert (
+        validate_mowing_measurement((*target[:15], False, target[16])).code
+        == "planning_approval_not_effective"
+    )
+    assert (
+        validate_mowing_measurement((*target[:16], None)).code
+        == "mowing_rehearsal_not_finished"
+    )
+    assert (
+        validate_mowing_measurement((target[0], target[1], "active", *target[3:])).code
+        == "unsupported_mowing_measurement_state"
+    )
+
+
+def test_mowing_measurement_rejects_predated_or_duplicate_point() -> None:
+    assert (
+        validate_mowing_measurement(
+            ELIGIBLE_MOWING_MEASUREMENT_TARGET,
+            captured_at="2026-08-11T13:00:00-03:00",
+        ).code
+        == "mowing_measurement_time_invalid"
+    )
+    assert (
+        validate_mowing_measurement(
+            ELIGIBLE_MOWING_MEASUREMENT_TARGET, existing=True
+        ).code
+        == "mowing_measurement_already_recorded"
+    )
 
 
 def test_measurement_requires_prepared_and_non_official_labels() -> None:
