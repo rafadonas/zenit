@@ -9,6 +9,7 @@ import 'domain/demo_order_lifecycle.dart';
 import 'domain/measurement_draft.dart';
 import 'domain/mowing_demo_lifecycle.dart';
 import 'domain/mowing_post_service_measurement_draft.dart';
+import 'domain/mowing_post_service_photo_draft.dart';
 import 'domain/prepared_mowing_plan.dart';
 import 'domain/prepared_photo_draft.dart';
 import 'domain/prepared_work_order.dart';
@@ -304,6 +305,7 @@ class _PreparedMowingPlanPageState extends State<PreparedMowingPlanPage> {
   String? confirmation;
   List<MowingDemoLifecycleEvent> events = const [];
   List<MowingPostServiceMeasurementDraft> measurements = const [];
+  List<MowingPostServicePhotoDraft> photos = const [];
 
   PreparedMowingPlan get plan => widget.plan;
 
@@ -317,6 +319,9 @@ class _PreparedMowingPlanPageState extends State<PreparedMowingPlanPage> {
     final loaded = await widget.controller.readMowingLifecycleEvents(plan.id);
     final loadedMeasurements = await widget.controller
         .readMowingPostServiceMeasurements(plan.id);
+    final loadedPhotos = await widget.controller.readMowingPostServicePhotos(
+      plan.id,
+    );
     if (!mounted) return;
     for (final measurement in loadedMeasurements) {
       postServiceFields[measurement.sequence - 1].text = measurement.heightCm
@@ -325,6 +330,7 @@ class _PreparedMowingPlanPageState extends State<PreparedMowingPlanPage> {
     setState(() {
       events = loaded;
       measurements = loadedMeasurements;
+      photos = loadedPhotos;
       loading = false;
     });
   }
@@ -348,6 +354,20 @@ class _PreparedMowingPlanPageState extends State<PreparedMowingPlanPage> {
       ) &&
       measurements.every(
         (measurement) => measurement.syncState == DraftSyncState.localOnly,
+      ) &&
+      photos.isEmpty;
+
+  PreparedWorkOrder? get sourceOrder => widget.controller.orders
+      .where((order) => order.id == plan.sourceInspectionWorkOrderId)
+      .firstOrNull;
+
+  bool get canCapturePostServicePhotos =>
+      measurements.length == 3 &&
+      measurements.every(
+        (measurement) => const {
+          DraftSyncState.localOnly,
+          DraftSyncState.acknowledged,
+        }.contains(measurement.syncState),
       );
 
   Future<void> _transition(
@@ -376,6 +396,9 @@ class _PreparedMowingPlanPageState extends State<PreparedMowingPlanPage> {
             .length +
         measurements
             .where((item) => item.syncState == DraftSyncState.acknowledged)
+            .length +
+        photos
+            .where((photo) => photo.syncState == DraftSyncState.acknowledged)
             .length;
     final rejected =
         events
@@ -383,6 +406,9 @@ class _PreparedMowingPlanPageState extends State<PreparedMowingPlanPage> {
             .length +
         measurements
             .where((item) => item.syncState == DraftSyncState.rejected)
+            .length +
+        photos
+            .where((photo) => photo.syncState == DraftSyncState.rejected)
             .length;
     final conflicts =
         events
@@ -390,11 +416,14 @@ class _PreparedMowingPlanPageState extends State<PreparedMowingPlanPage> {
             .length +
         measurements
             .where((item) => item.syncState == DraftSyncState.conflict)
+            .length +
+        photos
+            .where((photo) => photo.syncState == DraftSyncState.conflict)
             .length;
     setState(() {
       syncing = false;
       confirmation = synced
-          ? 'Ensaio e medições persistidos: $acknowledged aceitos, $rejected rejeitados, $conflicts conflitos.'
+          ? 'Ensaio, medições e manifestos: $acknowledged aceitos, $rejected rejeitados, $conflicts conflitos.'
           : widget.controller.errorMessage;
     });
   }
@@ -415,6 +444,21 @@ class _PreparedMowingPlanPageState extends State<PreparedMowingPlanPage> {
     setState(
       () => confirmation = saved
           ? 'Três medições pós-serviço simuladas foram criptografadas no aparelho.'
+          : widget.controller.errorMessage,
+    );
+  }
+
+  Future<void> _capturePostServicePhoto(PlannedInspectionPoint point) async {
+    final captured = await widget.controller.captureMowingPostServicePhoto(
+      plan,
+      point,
+    );
+    if (!mounted) return;
+    if (captured) await _load();
+    if (!mounted) return;
+    setState(
+      () => confirmation = captured
+          ? 'Foto pós-serviço simulada criptografada; conteúdo não enviado.'
           : widget.controller.errorMessage,
     );
   }
@@ -605,7 +649,7 @@ class _PreparedMowingPlanPageState extends State<PreparedMowingPlanPage> {
                   ),
                   const SizedBox(height: 4),
                   const Text(
-                    'Entrada digitada e não verificada. GPS e fotos pós-serviço não são coletados.',
+                    'Entrada digitada e não verificada. A medição não embute GPS ou foto; imagens ficam em evidência separada.',
                   ),
                   const SizedBox(height: 10),
                   for (
@@ -626,7 +670,7 @@ class _PreparedMowingPlanPageState extends State<PreparedMowingPlanPage> {
                         labelText:
                             'Ponto ${index + 1} · altura pós-serviço (cm)',
                         helperText:
-                            'Mesmo ponto preparado da inspeção de origem · sem GPS/foto',
+                            'Mesmo ponto preparado da inspeção de origem · sem GPS',
                       ),
                     ),
                     const SizedBox(height: 10),
@@ -642,19 +686,76 @@ class _PreparedMowingPlanPageState extends State<PreparedMowingPlanPage> {
                     label: const Text('Salvar 3 medições simuladas'),
                   ),
                   const SizedBox(height: 10),
+                  Text(
+                    'Fotos pós-serviço simuladas',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Os bytes ficam criptografados somente no aparelho. A sincronização envia apenas checksum e metadados não validados.',
+                  ),
+                  const SizedBox(height: 8),
+                  if (sourceOrder case final PreparedWorkOrder order)
+                    for (final point in order.points)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                          photos.any(
+                                (photo) =>
+                                    photo.sourcePlannedPointId == point.id,
+                              )
+                              ? Icons.lock
+                              : Icons.camera_alt_outlined,
+                        ),
+                        title: Text('Ponto ${point.sequence}'),
+                        subtitle: Text(
+                          photos
+                                  .where(
+                                    (photo) =>
+                                        photo.sourcePlannedPointId == point.id,
+                                  )
+                                  .firstOrNull
+                                  ?.syncResultMessage ??
+                              'Sem GPS, régua não validada e conteúdo não enviado.',
+                        ),
+                        trailing: OutlinedButton(
+                          onPressed:
+                              syncing ||
+                                  widget.controller.busy ||
+                                  !canCapturePostServicePhotos ||
+                                  photos.any(
+                                    (photo) =>
+                                        photo.sourcePlannedPointId ==
+                                            point.id &&
+                                        photo.hasPersistentServerResult,
+                                  )
+                              ? null
+                              : () => _capturePostServicePhoto(point),
+                          child: Text(
+                            photos.any(
+                                  (photo) =>
+                                      photo.sourcePlannedPointId == point.id,
+                                )
+                                ? 'Refazer local'
+                                : 'Capturar',
+                          ),
+                        ),
+                      ),
+                  const SizedBox(height: 10),
                   OutlinedButton.icon(
                     onPressed:
                         syncing ||
                             widget.controller.busy ||
                             measurements.length != 3 ||
-                            measurements.every(
-                              (item) => item.hasPersistentServerResult,
+                            photos.length != 3 ||
+                            photos.every(
+                              (photo) => photo.hasPersistentServerResult,
                             )
                         ? null
                         : _sync,
                     icon: const Icon(Icons.sync),
                     label: const Text(
-                      'Sincronizar ensaio e medições simuladas',
+                      'Sincronizar medições e manifestos simulados',
                     ),
                   ),
                 ],
@@ -680,7 +781,20 @@ class _PreparedMowingPlanPageState extends State<PreparedMowingPlanPage> {
                     ),
                     subtitle: Text(
                       measurement.syncResultMessage ??
-                          'Simulada, não verificada, sem GPS/foto e não oficial.',
+                          'Altura simulada sem GPS ou imagem embutida e não oficial.',
+                    ),
+                  ),
+                for (final photo in photos)
+                  ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(_syncIcon(photo.syncState)),
+                    title: Text(
+                      'Foto pós-serviço ${photo.sequence}: ${_syncLabel(photo.syncState)}',
+                    ),
+                    subtitle: Text(
+                      photo.syncResultMessage ??
+                          'Criptografada localmente, não enviada e não validada.',
                     ),
                   ),
               ],

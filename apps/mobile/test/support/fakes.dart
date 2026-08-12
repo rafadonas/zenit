@@ -12,6 +12,7 @@ import 'package:zenit_mobile/domain/measurement_draft.dart';
 import 'package:zenit_mobile/domain/mobile_sync.dart';
 import 'package:zenit_mobile/domain/mowing_demo_lifecycle.dart';
 import 'package:zenit_mobile/domain/mowing_post_service_measurement_draft.dart';
+import 'package:zenit_mobile/domain/mowing_post_service_photo_draft.dart';
 import 'package:zenit_mobile/domain/prepared_mowing_plan.dart';
 import 'package:zenit_mobile/domain/prepared_photo_draft.dart';
 import 'package:zenit_mobile/domain/prepared_work_order.dart';
@@ -240,6 +241,8 @@ class MemoryVault implements OfflineVault {
   final Map<String, List<MowingDemoLifecycleEvent>> mowingLifecycleEvents = {};
   final Map<String, List<MowingPostServiceMeasurementDraft>>
   mowingPostServiceMeasurements = {};
+  final Map<String, List<MowingPostServicePhotoDraft>> mowingPostServicePhotos =
+      {};
   final Map<String, List<PreparedPhotoDraft>> photoDrafts = {};
   String? ownerUserId;
   PendingSyncBatch? pendingBatch;
@@ -256,6 +259,7 @@ class MemoryVault implements OfflineVault {
     lifecycleEvents.clear();
     mowingLifecycleEvents.clear();
     mowingPostServiceMeasurements.clear();
+    mowingPostServicePhotos.clear();
     photoDrafts.clear();
     ownerUserId = null;
     pendingBatch = null;
@@ -287,6 +291,11 @@ class MemoryVault implements OfflineVault {
       mowingPostServiceMeasurements[mowingOrderId] ?? const [];
 
   @override
+  Future<List<MowingPostServicePhotoDraft>> readMowingPostServicePhotos(
+    String mowingOrderId,
+  ) async => mowingPostServicePhotos[mowingOrderId] ?? const [];
+
+  @override
   Future<List<PreparedPhotoDraft>> readPhotoDrafts(String orderId) async =>
       photoDrafts[orderId] ?? const [];
 
@@ -302,9 +311,14 @@ class MemoryVault implements OfflineVault {
     for (final plan in mowingPlans) {
       final lifecycle = mowingLifecycleEvents[plan.id] ?? const [];
       final measurements = mowingPostServiceMeasurements[plan.id] ?? const [];
+      final photos = mowingPostServicePhotos[plan.id] ?? const [];
       if (pendingBatch?.orderId == plan.id ||
           lifecycle.any((event) => !event.hasPersistentServerResult) ||
-          measurements.any((item) => !item.hasPersistentServerResult)) {
+          measurements.any((item) => !item.hasPersistentServerResult) ||
+          photos.any(
+            (photo) =>
+                !photo.hasPersistentServerResult || photo.awaitsFutureUpload,
+          )) {
         retainedIds.add(plan.sourceInspectionWorkOrderId);
       }
     }
@@ -332,6 +346,12 @@ class MemoryVault implements OfflineVault {
     List<MowingPostServiceMeasurementDraft> values,
   ) async =>
       mowingPostServiceMeasurements[mowingOrderId] = List.unmodifiable(values);
+
+  @override
+  Future<void> replaceMowingPostServicePhotos(
+    String mowingOrderId,
+    List<MowingPostServicePhotoDraft> values,
+  ) async => mowingPostServicePhotos[mowingOrderId] = List.unmodifiable(values);
 
   @override
   Future<void> replaceLifecycleEvents(
@@ -377,6 +397,12 @@ class MemoryVault implements OfflineVault {
       mowingPostServiceMeasurements.values
           .expand((values) => values)
           .any((item) => !item.hasPersistentServerResult) ||
+      mowingPostServicePhotos.values
+          .expand((values) => values)
+          .any(
+            (photo) =>
+                !photo.hasPersistentServerResult || photo.awaitsFutureUpload,
+          ) ||
       photoDrafts.values
           .expand((values) => values)
           .any(
@@ -413,12 +439,14 @@ class MemoryVault implements OfflineVault {
     PendingSyncBatch batch,
     List<MowingDemoLifecycleEvent> lifecycleValues,
     List<MowingPostServiceMeasurementDraft> measurementValues,
+    List<MowingPostServicePhotoDraft> photoValues,
   ) async {
     pendingBatch = batch;
     mowingLifecycleEvents[batch.orderId] = List.unmodifiable(lifecycleValues);
     mowingPostServiceMeasurements[batch.orderId] = List.unmodifiable(
       measurementValues,
     );
+    mowingPostServicePhotos[batch.orderId] = List.unmodifiable(photoValues);
   }
 
   @override
@@ -426,12 +454,14 @@ class MemoryVault implements OfflineVault {
     String mowingOrderId,
     List<MowingDemoLifecycleEvent> lifecycleValues,
     List<MowingPostServiceMeasurementDraft> measurementValues,
+    List<MowingPostServicePhotoDraft> photoValues,
     int nextSyncCursor,
   ) async {
     mowingLifecycleEvents[mowingOrderId] = List.unmodifiable(lifecycleValues);
     mowingPostServiceMeasurements[mowingOrderId] = List.unmodifiable(
       measurementValues,
     );
+    mowingPostServicePhotos[mowingOrderId] = List.unmodifiable(photoValues);
     syncCursor = nextSyncCursor;
     pendingBatch = null;
   }

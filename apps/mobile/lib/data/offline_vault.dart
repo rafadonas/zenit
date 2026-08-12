@@ -8,6 +8,7 @@ import '../domain/demo_order_lifecycle.dart';
 import '../domain/mobile_sync.dart';
 import '../domain/mowing_demo_lifecycle.dart';
 import '../domain/mowing_post_service_measurement_draft.dart';
+import '../domain/mowing_post_service_photo_draft.dart';
 import '../domain/prepared_mowing_plan.dart';
 import '../domain/prepared_photo_draft.dart';
 import '../domain/prepared_work_order.dart';
@@ -30,6 +31,13 @@ abstract interface class OfflineVault {
   Future<void> replaceMowingPostServiceMeasurements(
     String mowingOrderId,
     List<MowingPostServiceMeasurementDraft> measurements,
+  );
+  Future<List<MowingPostServicePhotoDraft>> readMowingPostServicePhotos(
+    String mowingOrderId,
+  );
+  Future<void> replaceMowingPostServicePhotos(
+    String mowingOrderId,
+    List<MowingPostServicePhotoDraft> photos,
   );
   Future<List<MeasurementDraft>> readDrafts(String orderId);
   Future<void> replaceDrafts(String orderId, List<MeasurementDraft> drafts);
@@ -65,11 +73,13 @@ abstract interface class OfflineVault {
     PendingSyncBatch batch,
     List<MowingDemoLifecycleEvent> lifecycleEvents,
     List<MowingPostServiceMeasurementDraft> measurements,
+    List<MowingPostServicePhotoDraft> photos,
   );
   Future<void> completeMowingSyncBatch(
     String mowingOrderId,
     List<MowingDemoLifecycleEvent> lifecycleEvents,
     List<MowingPostServiceMeasurementDraft> measurements,
+    List<MowingPostServicePhotoDraft> photos,
     int nextSyncCursor,
   );
   Future<void> clearUserData();
@@ -132,9 +142,14 @@ class HiveOfflineVault implements OfflineVault {
     for (final plan in existingMowingPlans) {
       final lifecycle = await readMowingLifecycleEvents(plan.id);
       final measurements = await readMowingPostServiceMeasurements(plan.id);
+      final photos = await readMowingPostServicePhotos(plan.id);
       final hasUnacknowledgedMowingData =
           lifecycle.any((event) => !event.hasPersistentServerResult) ||
-          measurements.any((item) => !item.hasPersistentServerResult);
+          measurements.any((item) => !item.hasPersistentServerResult) ||
+          photos.any(
+            (photo) =>
+                !photo.hasPersistentServerResult || photo.awaitsFutureUpload,
+          );
       if (pending?.orderId == plan.id || hasUnacknowledgedMowingData) {
         allowedIds.add(plan.sourceInspectionWorkOrderId);
       }
@@ -224,6 +239,16 @@ class HiveOfflineVault implements OfflineVault {
         retainedIds.add(orderId);
       }
     }
+    for (final key in _openBox.keys.whereType<String>()) {
+      if (!key.startsWith('mowing_post_service_photos:')) continue;
+      final orderId = key.substring('mowing_post_service_photos:'.length);
+      final photos = await readMowingPostServicePhotos(orderId);
+      if (photos.any(
+        (photo) => !photo.hasPersistentServerResult || photo.awaitsFutureUpload,
+      )) {
+        retainedIds.add(orderId);
+      }
+    }
     final existing = await readMowingPlans();
     final merged = <String, PreparedMowingPlan>{
       for (final plan in existing)
@@ -240,6 +265,10 @@ class HiveOfflineVault implements OfflineVault {
           (key.startsWith('mowing_post_service_measurements:') &&
               !allowedIds.contains(
                 key.substring('mowing_post_service_measurements:'.length),
+              )) ||
+          (key.startsWith('mowing_post_service_photos:') &&
+              !allowedIds.contains(
+                key.substring('mowing_post_service_photos:'.length),
               )),
     );
     await _openBox.deleteAll(obsoleteKeys);
@@ -296,6 +325,31 @@ class HiveOfflineVault implements OfflineVault {
   ) => _openBox.put(
     _mowingMeasurementKey(mowingOrderId),
     jsonEncode(measurements.map((item) => item.toJson()).toList()),
+  );
+
+  @override
+  Future<List<MowingPostServicePhotoDraft>> readMowingPostServicePhotos(
+    String mowingOrderId,
+  ) async {
+    final encoded = _openBox.get(_mowingPhotoKey(mowingOrderId));
+    if (encoded == null) return const [];
+    final items = jsonDecode(encoded) as List<Object?>;
+    return items
+        .map(
+          (item) => MowingPostServicePhotoDraft.fromJson(
+            (item! as Map).cast<String, Object?>(),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  @override
+  Future<void> replaceMowingPostServicePhotos(
+    String mowingOrderId,
+    List<MowingPostServicePhotoDraft> photos,
+  ) => _openBox.put(
+    _mowingPhotoKey(mowingOrderId),
+    jsonEncode(photos.map((photo) => photo.toJson()).toList()),
   );
 
   @override
@@ -412,6 +466,16 @@ class HiveOfflineVault implements OfflineVault {
         return true;
       }
     }
+    for (final key in _openBox.keys.whereType<String>()) {
+      if (!key.startsWith('mowing_post_service_photos:')) continue;
+      final orderId = key.substring('mowing_post_service_photos:'.length);
+      final photos = await readMowingPostServicePhotos(orderId);
+      if (photos.any(
+        (photo) => !photo.hasPersistentServerResult || photo.awaitsFutureUpload,
+      )) {
+        return true;
+      }
+    }
     return false;
   }
 
@@ -477,12 +541,16 @@ class HiveOfflineVault implements OfflineVault {
     PendingSyncBatch batch,
     List<MowingDemoLifecycleEvent> lifecycleEvents,
     List<MowingPostServiceMeasurementDraft> measurements,
+    List<MowingPostServicePhotoDraft> photos,
   ) => _openBox.putAll({
     _mowingLifecycleKey(batch.orderId): jsonEncode(
       lifecycleEvents.map((event) => event.toJson()).toList(),
     ),
     _mowingMeasurementKey(batch.orderId): jsonEncode(
       measurements.map((item) => item.toJson()).toList(),
+    ),
+    _mowingPhotoKey(batch.orderId): jsonEncode(
+      photos.map((photo) => photo.toJson()).toList(),
     ),
     _pendingBatchKey: jsonEncode(batch.toJson()),
   });
@@ -492,6 +560,7 @@ class HiveOfflineVault implements OfflineVault {
     String mowingOrderId,
     List<MowingDemoLifecycleEvent> lifecycleEvents,
     List<MowingPostServiceMeasurementDraft> measurements,
+    List<MowingPostServicePhotoDraft> photos,
     int nextSyncCursor,
   ) async {
     await _openBox.putAll({
@@ -500,6 +569,9 @@ class HiveOfflineVault implements OfflineVault {
       ),
       _mowingMeasurementKey(mowingOrderId): jsonEncode(
         measurements.map((item) => item.toJson()).toList(),
+      ),
+      _mowingPhotoKey(mowingOrderId): jsonEncode(
+        photos.map((photo) => photo.toJson()).toList(),
       ),
       _syncCursorKey: nextSyncCursor.toString(),
     });
@@ -516,4 +588,6 @@ class HiveOfflineVault implements OfflineVault {
       'mowing_demo_lifecycle:$orderId';
   static String _mowingMeasurementKey(String orderId) =>
       'mowing_post_service_measurements:$orderId';
+  static String _mowingPhotoKey(String orderId) =>
+      'mowing_post_service_photos:$orderId';
 }

@@ -110,6 +110,7 @@ void main() {
       vault: vault,
       deviceIdentityStore: MemoryDeviceIdentityStore(),
       appVersion: 'test',
+      photoCapture: FakePhotoCapture(),
       clock: () => DateTime.utc(2026, 8, 12, 14),
     );
     await controller.initialize();
@@ -125,7 +126,7 @@ void main() {
     );
 
     expect(find.byType(TextField), findsNWidgets(3));
-    expect(find.textContaining('GPS e fotos pós-serviço'), findsOneWidget);
+    expect(find.textContaining('não embute GPS ou foto'), findsOneWidget);
     await tester.enterText(find.byType(TextField).at(0), '5');
     await tester.enterText(find.byType(TextField).at(1), '6,5');
     await tester.enterText(find.byType(TextField).at(2), '8');
@@ -143,5 +144,15 @@ void main() {
       find.textContaining('foram criptografadas no aparelho'),
       findsOneWidget,
     );
+    await tester.scrollUntilVisible(
+      find.text('Fotos pós-serviço simuladas'),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    expect(find.text('Capturar'), findsNWidgets(3));
+    await tester.tap(find.text('Capturar').first);
+    await tester.pumpAndSettle();
+    expect(await vault.readMowingPostServicePhotos(plan.id), hasLength(1));
+    expect(find.textContaining('conteúdo não enviado'), findsWidgets);
   });
 }

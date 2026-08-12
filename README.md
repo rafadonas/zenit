@@ -165,8 +165,10 @@ photos uncollected. The mobile capture screen sends a local lifecycle before
 the three heights in one idempotent batch, or only the heights when that
 lifecycle was already acknowledged. The API can now also persist one separate,
 checksum-bound post-service photo manifest per measured point, explicitly
-labelled simulated, unverified, unlocated, and not uploaded. No photo bytes,
-mobile photo capture, upload receipt, review, map update, or summary exists yet.
+labelled simulated, unverified, unlocated, and not uploaded. The mobile app now
+captures one later image per measured point into its encrypted vault and
+synchronizes only the separate manifest; the bytes remain on the device. No
+post-service upload receipt, review, map update, or summary exists yet.
 
 CI repeats this validation from an empty Compose volume after the Python,
 dashboard, and Flutter jobs pass. The Flutter job checks formatting, analysis,

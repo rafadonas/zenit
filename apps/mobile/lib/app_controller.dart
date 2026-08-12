@@ -11,6 +11,7 @@ import 'domain/measurement_draft.dart';
 import 'domain/mobile_sync.dart';
 import 'domain/mowing_demo_lifecycle.dart';
 import 'domain/mowing_post_service_measurement_draft.dart';
+import 'domain/mowing_post_service_photo_draft.dart';
 import 'domain/prepared_mowing_plan.dart';
 import 'domain/prepared_photo_draft.dart';
 import 'domain/prepared_work_order.dart';
@@ -172,6 +173,10 @@ class ZenitAppController extends ChangeNotifier {
   readMowingPostServiceMeasurements(String mowingOrderId) =>
       vault.readMowingPostServiceMeasurements(mowingOrderId);
 
+  Future<List<MowingPostServicePhotoDraft>> readMowingPostServicePhotos(
+    String mowingOrderId,
+  ) => vault.readMowingPostServicePhotos(mowingOrderId);
+
   Future<bool> confirmMowingDemo(PreparedMowingPlan plan) => _run(() async {
     await _prepareMowingDemoTransition(plan);
     final events = await vault.readMowingLifecycleEvents(plan.id);
@@ -324,6 +329,9 @@ class ZenitAppController extends ChangeNotifier {
         throw const MowingPostServiceNotReadyError();
       }
       final existing = await vault.readMowingPostServiceMeasurements(plan.id);
+      if ((await vault.readMowingPostServicePhotos(plan.id)).isNotEmpty) {
+        throw const MowingPostServiceMeasurementHasPhotoError();
+      }
       if (existing.any((item) => item.hasPersistentServerResult)) {
         throw const PersistedMowingPostServiceMeasurementEditError();
       }
@@ -357,12 +365,101 @@ class ZenitAppController extends ChangeNotifier {
     });
   }
 
+  Future<bool> captureMowingPostServicePhoto(
+    PreparedMowingPlan plan,
+    PlannedInspectionPoint point,
+  ) => _run(() async {
+    if (!plan.canRunDemoRehearsal) {
+      throw const MowingDemoNotEligibleError();
+    }
+    if (await vault.readPendingSyncBatch() != null) {
+      throw const PendingBatchEditError();
+    }
+    final sourceOrders = orders.where(
+      (order) => order.id == plan.sourceInspectionWorkOrderId,
+    );
+    if (sourceOrders.length != 1) {
+      throw const MowingDemoSourcePointError();
+    }
+    final matchingPoints = sourceOrders.single.points.where(
+      (candidate) => candidate.id == point.id,
+    );
+    if (matchingPoints.length != 1) {
+      throw const MowingDemoSourcePointError();
+    }
+    final sourcePoint = matchingPoints.single;
+    final events = await vault.readMowingLifecycleEvents(plan.id);
+    if (!_isCompleteMowingDemoSequence(events) ||
+        events.any(
+          (event) =>
+              event.mowingOrderId != plan.id ||
+              event.sourcePlanningApprovalId != plan.planningApprovalId ||
+              !const {
+                DraftSyncState.localOnly,
+                DraftSyncState.acknowledged,
+              }.contains(event.syncState),
+        )) {
+      throw const MowingPostServicePhotoNotReadyError();
+    }
+    final measurements = await vault.readMowingPostServiceMeasurements(plan.id);
+    final matchingMeasurements = measurements.where(
+      (measurement) =>
+          measurement.sourcePlannedPointId == point.id &&
+          measurement.mowingOrderId == plan.id &&
+          measurement.sourcePlanningApprovalId == plan.planningApprovalId,
+    );
+    if (matchingMeasurements.length != 1 ||
+        !const {
+          DraftSyncState.localOnly,
+          DraftSyncState.acknowledged,
+        }.contains(matchingMeasurements.single.syncState)) {
+      throw const MowingPostServicePhotoNotReadyError();
+    }
+    final existing = await vault.readMowingPostServicePhotos(plan.id);
+    final previous = existing
+        .where((photo) => photo.sourcePlannedPointId == point.id)
+        .firstOrNull;
+    if (previous?.hasPersistentServerResult == true) {
+      throw const PersistedMowingPostServicePhotoEditError();
+    }
+    final captured = await _photoCapture.capture();
+    if (captured == null) throw const PhotoCaptureCancelledError();
+    final capturedAt = _clock().toUtc();
+    if (capturedAt.isBefore(matchingMeasurements.single.capturedAt)) {
+      throw const InvalidMowingPostServicePhotoTimeError();
+    }
+    final planningApprovalId = plan.planningApprovalId;
+    if (planningApprovalId == null) {
+      throw const MowingDemoNotEligibleError();
+    }
+    final photo = MowingPostServicePhotoDraft(
+      eventId: _uuidFactory(),
+      photoId: _uuidFactory(),
+      mowingOrderId: plan.id,
+      sourcePlanningApprovalId: planningApprovalId,
+      sourcePlannedPointId: sourcePoint.id,
+      sequence: sourcePoint.sequence,
+      capturedAt: capturedAt,
+      checksumSha256: captured.checksumSha256,
+      mediaType: captured.mediaType,
+      bytes: captured.bytes,
+    );
+    await vault.replaceMowingPostServicePhotos(
+      plan.id,
+      [
+        ...existing.where((item) => item.sourcePlannedPointId != point.id),
+        photo,
+      ]..sort((left, right) => left.sequence.compareTo(right.sequence)),
+    );
+  });
+
   Future<bool> syncMowingDemo(PreparedMowingPlan plan) async {
     final current = session;
     if (current == null) return false;
     return _run(() async {
       var events = await vault.readMowingLifecycleEvents(plan.id);
       var measurements = await vault.readMowingPostServiceMeasurements(plan.id);
+      var photos = await vault.readMowingPostServicePhotos(plan.id);
       if (!_isCompleteMowingDemoSequence(events) ||
           events.any(
             (event) =>
@@ -398,6 +495,26 @@ class ZenitAppController extends ChangeNotifier {
               .containsAll(expectedPoints)) {
         throw const IncompleteMowingPostServiceMeasurementError();
       }
+      final measurementsByPoint = {
+        for (final measurement in measurements)
+          measurement.sourcePlannedPointId: measurement,
+      };
+      if (photos.length != 3 ||
+          photos.any(
+            (photo) =>
+                photo.mowingOrderId != plan.id ||
+                photo.sourcePlanningApprovalId != plan.planningApprovalId ||
+                !expectedPoints.contains(photo.sourcePlannedPointId) ||
+                photo.sequence !=
+                    measurementsByPoint[photo.sourcePlannedPointId]!.sequence ||
+                photo.capturedAt.isBefore(
+                  measurementsByPoint[photo.sourcePlannedPointId]!.capturedAt,
+                ),
+          ) ||
+          photos.map((photo) => photo.sourcePlannedPointId).toSet().length !=
+              3) {
+        throw const IncompleteMowingPostServicePhotoError();
+      }
       var pendingBatch = await vault.readPendingSyncBatch();
       if (pendingBatch == null) {
         final lifecycleStates = events.map((event) => event.syncState).toSet();
@@ -408,10 +525,20 @@ class ZenitAppController extends ChangeNotifier {
             }.contains(lifecycleStates.single)) {
           throw const PersistedMowingDemoEditError();
         }
-        if (measurements.any(
-          (item) => item.syncState != DraftSyncState.localOnly,
-        )) {
+        final measurementStates = measurements
+            .map((item) => item.syncState)
+            .toSet();
+        if (measurementStates.length != 1 ||
+            !const {
+              DraftSyncState.localOnly,
+              DraftSyncState.acknowledged,
+            }.contains(measurementStates.single)) {
           throw const PersistedMowingPostServiceMeasurementEditError();
+        }
+        if (photos.any(
+          (photo) => photo.syncState != DraftSyncState.localOnly,
+        )) {
+          throw const PersistedMowingPostServicePhotoEditError();
         }
         final localLifecycle = events
             .where((event) => event.syncState == DraftSyncState.localOnly)
@@ -423,7 +550,17 @@ class ZenitAppController extends ChangeNotifier {
           baseSyncCursor: await vault.readSyncCursor(),
           eventIds: [
             ...localLifecycle.map((event) => event.eventId),
-            ...measurements.map((item) => item.eventId),
+            for (final measurement in measurements) ...[
+              if (measurement.syncState == DraftSyncState.localOnly)
+                measurement.eventId,
+              photos
+                  .singleWhere(
+                    (photo) =>
+                        photo.sourcePlannedPointId ==
+                        measurement.sourcePlannedPointId,
+                  )
+                  .eventId,
+            ],
           ],
         );
         events = events
@@ -438,7 +575,17 @@ class ZenitAppController extends ChangeNotifier {
             .toList();
         measurements = measurements
             .map(
-              (item) => item.copyWith(
+              (item) => item.syncState == DraftSyncState.localOnly
+                  ? item.copyWith(
+                      syncState: DraftSyncState.pending,
+                      clearResult: true,
+                    )
+                  : item,
+            )
+            .toList();
+        photos = photos
+            .map(
+              (photo) => photo.copyWith(
                 syncState: DraftSyncState.pending,
                 clearResult: true,
               ),
@@ -448,6 +595,7 @@ class ZenitAppController extends ChangeNotifier {
           pendingBatch,
           events,
           measurements,
+          photos,
         );
       } else if (pendingBatch.orderId != plan.id) {
         throw const AnotherOrderPendingError();
@@ -459,6 +607,9 @@ class ZenitAppController extends ChangeNotifier {
         ...measurements
             .where((item) => item.syncState == DraftSyncState.pending)
             .map((item) => item.eventId),
+        ...photos
+            .where((photo) => photo.syncState == DraftSyncState.pending)
+            .map((photo) => photo.eventId),
       };
       if (pendingBatch.eventIds.length != pendingEventIds.length ||
           pendingBatch.eventIds.toSet().length != pendingEventIds.length ||
@@ -470,15 +621,27 @@ class ZenitAppController extends ChangeNotifier {
         pendingBatch.deviceId,
         appVersion,
       );
-      final result = await gateway
-          .syncBatch(current.accessToken, pendingBatch, [
-            ...events
-                .where((event) => event.syncState == DraftSyncState.pending)
-                .map((event) => event.toSyncEventJson()),
-            ...measurements
-                .where((item) => item.syncState == DraftSyncState.pending)
-                .map((item) => item.toSyncEventJson()),
-          ]);
+      final result = await gateway.syncBatch(
+        current.accessToken,
+        pendingBatch,
+        [
+          ...events
+              .where((event) => event.syncState == DraftSyncState.pending)
+              .map((event) => event.toSyncEventJson()),
+          for (final measurement in measurements) ...[
+            if (measurement.syncState == DraftSyncState.pending)
+              measurement.toSyncEventJson(),
+            ...photos
+                .where(
+                  (photo) =>
+                      photo.syncState == DraftSyncState.pending &&
+                      photo.sourcePlannedPointId ==
+                          measurement.sourcePlannedPointId,
+                )
+                .map((photo) => photo.toSyncEventJson()),
+          ],
+        ],
+      );
       final coveredEventIds = {
         ...result.acceptedEventIds,
         ...result.rejectedEvents.keys,
@@ -504,6 +667,13 @@ class ZenitAppController extends ChangeNotifier {
               (item) => item.syncState == DraftSyncState.pending
                   ? _completeMowingPostServiceMeasurement(item, result)
                   : item,
+            )
+            .toList(),
+        photos
+            .map(
+              (photo) => photo.syncState == DraftSyncState.pending
+                  ? _completeMowingPostServicePhoto(photo, result)
+                  : photo,
             )
             .toList(),
         result.nextSyncCursor,
@@ -575,6 +745,34 @@ class ZenitAppController extends ChangeNotifier {
     }
     final conflict = result.conflictingEvents[measurement.eventId]!;
     return measurement.copyWith(
+      syncState: DraftSyncState.conflict,
+      syncResultCode: conflict.code,
+      syncResultMessage: conflict.message,
+    );
+  }
+
+  MowingPostServicePhotoDraft _completeMowingPostServicePhoto(
+    MowingPostServicePhotoDraft photo,
+    MobileSyncResult result,
+  ) {
+    if (result.acceptedEventIds.contains(photo.eventId)) {
+      return photo.copyWith(
+        syncState: DraftSyncState.acknowledged,
+        syncResultCode: 'persisted',
+        syncResultMessage:
+            'Manifesto persistido; conteúdo criptografado ainda não enviado.',
+      );
+    }
+    final rejection = result.rejectedEvents[photo.eventId];
+    if (rejection != null) {
+      return photo.copyWith(
+        syncState: DraftSyncState.rejected,
+        syncResultCode: rejection.code,
+        syncResultMessage: rejection.message,
+      );
+    }
+    final conflict = result.conflictingEvents[photo.eventId]!;
+    return photo.copyWith(
       syncState: DraftSyncState.conflict,
       syncResultCode: conflict.code,
       syncResultMessage: conflict.message,
@@ -1141,4 +1339,36 @@ class InvalidMowingPostServiceMeasurementTimeError
     extends MobileWorkflowException {
   const InvalidMowingPostServiceMeasurementTimeError()
     : super('A medição pós-serviço não pode ser anterior ao fim do ensaio.');
+}
+
+class MowingPostServicePhotoNotReadyError extends MobileWorkflowException {
+  const MowingPostServicePhotoNotReadyError()
+    : super(
+        'Salve a medição simulada do ponto antes de capturar sua foto pós-serviço.',
+      );
+}
+
+class IncompleteMowingPostServicePhotoError extends MobileWorkflowException {
+  const IncompleteMowingPostServicePhotoError()
+    : super(
+        'Capture uma foto pós-serviço simulada para cada um dos três pontos.',
+      );
+}
+
+class PersistedMowingPostServicePhotoEditError extends MobileWorkflowException {
+  const PersistedMowingPostServicePhotoEditError()
+    : super('O manifesto da foto pós-serviço já tem resultado persistente.');
+}
+
+class InvalidMowingPostServicePhotoTimeError extends MobileWorkflowException {
+  const InvalidMowingPostServicePhotoTimeError()
+    : super('A foto pós-serviço não pode ser anterior à medição do ponto.');
+}
+
+class MowingPostServiceMeasurementHasPhotoError
+    extends MobileWorkflowException {
+  const MowingPostServiceMeasurementHasPhotoError()
+    : super(
+        'Remova ou conclua as fotos antes de alterar as medições vinculadas.',
+      );
 }
