@@ -1,0 +1,488 @@
+from __future__ import annotations
+
+import hashlib
+from datetime import datetime
+from typing import Annotated, Literal, Protocol
+from uuid import UUID
+
+import psycopg
+from fastapi import APIRouter, Depends, Header, HTTPException, status
+from pydantic import BaseModel, Field
+
+from zenit_api.auth import AuthenticatedUser, get_current_user
+from zenit_api.config import get_settings
+from zenit_api.photo_reviews import (
+    PhotoReviewIdempotencyConflictError,
+    PhotoReviewPermissionError,
+    PhotoReviewPolicyUnavailableError,
+    PhotoReviewRequest,
+    PhotoReviewSupersessionError,
+    PhotoReviewTargetNotFoundError,
+)
+
+
+class MowingPhotoReviewResponse(BaseModel):
+    review_id: UUID
+    photo_id: UUID
+    decision: Literal["accepted", "rejected", "inconclusive"]
+    quality_status: Literal["accepted", "rejected", "inconclusive"]
+    ruler_status: Literal["visible", "not_visible", "inconclusive"]
+    rationale: str | None
+    supersedes_review_id: UUID | None
+    review_policy_version: str
+    policy_data_status: Literal["prepared"] = "prepared"
+    reviewed_at: datetime
+    phase: Literal["post_service"] = "post_service"
+    photo_scope: Literal["mowing_demo_post_service_only"] = "mowing_demo_post_service_only"
+    location_status: Literal["not_collected"] = "not_collected"
+    data_status: Literal["simulated"] = "simulated"
+    operational_approval_satisfied: Literal[False] = False
+    eligible_for_field_evidence: Literal[False] = False
+    eligible_for_field_execution: Literal[False] = False
+    eligible_for_model_training: Literal[False] = False
+    eligible_for_official_reporting: Literal[False] = False
+    authorizes_field_work: Literal[False] = False
+
+
+class MowingPhotoReviewQueueItem(BaseModel):
+    photo_id: UUID
+    mowing_order_id: UUID
+    source_inspection_work_order_id: UUID
+    road_code: str
+    segment_index: int
+    zone_type: Literal["left", "right", "median", "special"]
+    planned_point_sequence: int
+    captured_at: datetime
+    uploaded_at: datetime
+    media_type: Literal["image/jpeg", "image/png"]
+    byte_size: int
+    latest_review_id: UUID | None
+    latest_decision: Literal["accepted", "rejected", "inconclusive"] | None
+    latest_quality_status: Literal["accepted", "rejected", "inconclusive"] | None
+    latest_ruler_status: Literal["visible", "not_visible", "inconclusive"] | None
+    latest_rationale: str | None
+    latest_reviewed_at: datetime | None
+    latest_review_policy_version: str | None
+    review_state: Literal["awaiting_review", "review_recorded"]
+    phase: Literal["post_service"] = "post_service"
+    photo_scope: Literal["mowing_demo_post_service_only"] = "mowing_demo_post_service_only"
+    location_status: Literal["not_collected"] = "not_collected"
+    data_status: Literal["simulated"] = "simulated"
+    operational_approval_satisfied: Literal[False] = False
+    eligible_for_field_evidence: Literal[False] = False
+    eligible_for_field_execution: Literal[False] = False
+    eligible_for_model_training: Literal[False] = False
+    eligible_for_official_reporting: Literal[False] = False
+    authorizes_field_work: Literal[False] = False
+
+
+class MowingPhotoReviewQueue(BaseModel):
+    items: list[MowingPhotoReviewQueueItem]
+    result_count: int
+    limit: int
+    truncated: bool
+    warning: str = (
+        "Post-service photo review remains simulated and does not validate height, "
+        "mowing, effectiveness, completion, field work, training, or official reporting."
+    )
+
+
+class MowingPhotoReviewWriter(Protocol):
+    async def record(
+        self,
+        *,
+        photo_id: UUID,
+        actor: AuthenticatedUser,
+        idempotency_key: str,
+        review: PhotoReviewRequest,
+    ) -> MowingPhotoReviewResponse: ...
+
+
+class MowingPhotoReviewQueueReader(Protocol):
+    async def list_for_actor(
+        self,
+        *,
+        actor: AuthenticatedUser,
+        limit: int,
+    ) -> MowingPhotoReviewQueue: ...
+
+
+class PostgresMowingPhotoReviewRepository:
+    def __init__(self, database_url: str, policy_version: str) -> None:
+        self._database_url = database_url.replace("postgresql+psycopg://", "postgresql://", 1)
+        self._policy_version = policy_version
+
+    async def record(
+        self,
+        *,
+        photo_id: UUID,
+        actor: AuthenticatedUser,
+        idempotency_key: str,
+        review: PhotoReviewRequest,
+    ) -> MowingPhotoReviewResponse:
+        key_hash = hashlib.sha256(idempotency_key.encode()).hexdigest()
+        connection = await psycopg.AsyncConnection.connect(self._database_url)
+        async with connection, connection.cursor() as cursor:
+            existing = await self._find_existing(cursor, key_hash)
+            if existing is not None:
+                self._assert_replay(existing, photo_id, actor, review)
+                return self._response(existing)
+
+            await cursor.execute(
+                "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                (f"prepared-mowing-photo-review:{photo_id}",),
+            )
+            await cursor.execute(
+                """
+                SELECT axis.road_id
+                FROM prepared_mowing_post_service_photo_upload_receipt receipt
+                JOIN prepared_mowing_post_service_photo_manifest manifest
+                  ON manifest.photo_id = receipt.photo_id
+                JOIN prepared_mowing_order mowing
+                  ON mowing.id = manifest.mowing_order_id
+                JOIN work_order inspection
+                  ON inspection.id = mowing.source_inspection_work_order_id
+                JOIN segment_zone zone ON zone.id = inspection.segment_zone_id
+                JOIN road_segment segment ON segment.id = zone.road_segment_id
+                JOIN road_axis_candidate axis
+                  ON axis.id = segment.road_axis_candidate_id
+                WHERE receipt.photo_id = %s
+                  AND receipt.phase = 'post_service'
+                  AND receipt.photo_scope = 'mowing_demo_post_service_only'
+                  AND receipt.content_status = 'uploaded_unverified'
+                  AND receipt.ruler_status = 'not_validated'
+                  AND receipt.location_status = 'not_collected'
+                  AND receipt.quality_status = 'simulated_unverified'
+                  AND receipt.data_status = 'simulated'
+                  AND NOT receipt.operational_approval_satisfied
+                  AND NOT receipt.authorizes_field_work
+                  AND NOT receipt.eligible_for_field_execution
+                  AND NOT receipt.eligible_for_model_training
+                  AND NOT receipt.eligible_for_official_reporting
+                """,
+                (photo_id,),
+            )
+            target = await cursor.fetchone()
+            if target is None:
+                raise PhotoReviewTargetNotFoundError
+
+            await cursor.execute(
+                """
+                SELECT id, version, allowed_roles, data_status
+                FROM prepared_mowing_post_service_photo_review_policy
+                WHERE version = %s
+                  AND requires_authenticated_identity
+                  AND NOT authorizes_field_work
+                  AND data_status = 'prepared'
+                """,
+                (self._policy_version,),
+            )
+            policy = await cursor.fetchone()
+            if policy is None:
+                raise PhotoReviewPolicyUnavailableError
+
+            await cursor.execute(
+                """
+                SELECT role
+                FROM road_user_role
+                WHERE user_id = %s
+                  AND road_id = %s
+                  AND role = ANY(%s)
+                  AND data_status <> 'simulated'
+                ORDER BY CASE role WHEN 'manager' THEN 0 ELSE 1 END
+                LIMIT 1
+                """,
+                (actor.id, target[0], policy[2]),
+            )
+            if await cursor.fetchone() is None:
+                raise PhotoReviewPermissionError
+
+            await cursor.execute(
+                """
+                SELECT review.id
+                FROM prepared_mowing_post_service_photo_human_review review
+                WHERE review.photo_id = %s
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM prepared_mowing_post_service_photo_human_review newer
+                      WHERE newer.supersedes_review_id = review.id
+                  )
+                """,
+                (photo_id,),
+            )
+            effective = await cursor.fetchone()
+            effective_id = effective[0] if effective is not None else None
+            if review.supersedes_review_id != effective_id:
+                raise PhotoReviewSupersessionError
+
+            await cursor.execute(
+                """
+                INSERT INTO prepared_mowing_post_service_photo_human_review (
+                    photo_id, supersedes_review_id, reviewer_user_id,
+                    review_policy_id, idempotency_key, decision,
+                    quality_status, ruler_status, rationale, source_channel,
+                    phase, photo_scope, location_status, data_status,
+                    operational_approval_satisfied, eligible_for_field_evidence,
+                    eligible_for_field_execution, eligible_for_model_training,
+                    eligible_for_official_reporting, authorizes_field_work
+                ) VALUES (
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, 'api',
+                    'post_service', 'mowing_demo_post_service_only',
+                    'not_collected', 'simulated', false, false, false, false,
+                    false, false
+                )
+                ON CONFLICT (idempotency_key) DO NOTHING
+                RETURNING id, photo_id, decision, quality_status, ruler_status,
+                          rationale, supersedes_review_id, reviewer_user_id,
+                          review_policy_id, reviewed_at
+                """,
+                (
+                    photo_id,
+                    review.supersedes_review_id,
+                    actor.id,
+                    policy[0],
+                    key_hash,
+                    review.decision,
+                    review.quality_status,
+                    review.ruler_status,
+                    review.rationale,
+                ),
+            )
+            inserted = await cursor.fetchone()
+            if inserted is None:
+                existing = await self._find_existing(cursor, key_hash)
+                if existing is None:
+                    raise RuntimeError("idempotent mowing photo review insert returned no row")
+                self._assert_replay(existing, photo_id, actor, review)
+                return self._response(existing)
+            return self._response((*inserted, policy[1], policy[3]))
+
+    async def list_for_actor(
+        self,
+        *,
+        actor: AuthenticatedUser,
+        limit: int,
+    ) -> MowingPhotoReviewQueue:
+        connection = await psycopg.AsyncConnection.connect(self._database_url)
+        async with connection, connection.cursor() as cursor:
+            await cursor.execute(
+                """
+                SELECT receipt.photo_id, manifest.mowing_order_id,
+                       mowing.source_inspection_work_order_id, road.code,
+                       segment.segment_index, zone.zone_type, point.sequence,
+                       manifest.client_captured_at, receipt.uploaded_at,
+                       receipt.media_type, receipt.byte_size,
+                       latest.id, latest.decision, latest.quality_status,
+                       latest.ruler_status, latest.rationale, latest.reviewed_at,
+                       policy.version
+                FROM prepared_mowing_post_service_photo_upload_receipt receipt
+                JOIN prepared_mowing_post_service_photo_manifest manifest
+                  ON manifest.photo_id = receipt.photo_id
+                JOIN prepared_mowing_order mowing
+                  ON mowing.id = manifest.mowing_order_id
+                JOIN work_order_planned_point point
+                  ON point.id = manifest.source_planned_point_id
+                JOIN work_order inspection
+                  ON inspection.id = mowing.source_inspection_work_order_id
+                JOIN segment_zone zone ON zone.id = inspection.segment_zone_id
+                JOIN road_segment segment ON segment.id = zone.road_segment_id
+                JOIN road_axis_candidate axis
+                  ON axis.id = segment.road_axis_candidate_id
+                JOIN road ON road.id = axis.road_id
+                LEFT JOIN LATERAL (
+                    SELECT review.*
+                    FROM prepared_mowing_post_service_photo_human_review review
+                    WHERE review.photo_id = receipt.photo_id
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM prepared_mowing_post_service_photo_human_review newer
+                          WHERE newer.supersedes_review_id = review.id
+                      )
+                    ORDER BY review.reviewed_at DESC, review.id DESC
+                    LIMIT 1
+                ) latest ON true
+                LEFT JOIN prepared_mowing_post_service_photo_review_policy policy
+                  ON policy.id = latest.review_policy_id
+                WHERE receipt.phase = 'post_service'
+                  AND receipt.photo_scope = 'mowing_demo_post_service_only'
+                  AND receipt.content_status = 'uploaded_unverified'
+                  AND receipt.ruler_status = 'not_validated'
+                  AND receipt.location_status = 'not_collected'
+                  AND receipt.quality_status = 'simulated_unverified'
+                  AND receipt.data_status = 'simulated'
+                  AND NOT receipt.operational_approval_satisfied
+                  AND NOT receipt.authorizes_field_work
+                  AND NOT receipt.eligible_for_field_execution
+                  AND NOT receipt.eligible_for_model_training
+                  AND NOT receipt.eligible_for_official_reporting
+                  AND EXISTS (
+                      SELECT 1 FROM road_user_role assignment
+                      WHERE assignment.user_id = %s
+                        AND assignment.road_id = road.id
+                        AND assignment.role IN ('manager', 'supervisor')
+                        AND assignment.data_status <> 'simulated'
+                  )
+                ORDER BY receipt.uploaded_at DESC, receipt.photo_id
+                LIMIT %s
+                """,
+                (actor.id, limit + 1),
+            )
+            rows = await cursor.fetchall()
+        truncated = len(rows) > limit
+        visible = rows[:limit]
+        return MowingPhotoReviewQueue(
+            items=[self._queue_item(row) for row in visible],
+            result_count=len(visible),
+            limit=limit,
+            truncated=truncated,
+        )
+
+    async def _find_existing(self, cursor: psycopg.AsyncCursor[tuple], key_hash: str):
+        await cursor.execute(
+            """
+            SELECT review.id, review.photo_id, review.decision,
+                   review.quality_status, review.ruler_status, review.rationale,
+                   review.supersedes_review_id, review.reviewer_user_id,
+                   review.review_policy_id, review.reviewed_at,
+                   policy.version, policy.data_status
+            FROM prepared_mowing_post_service_photo_human_review review
+            JOIN prepared_mowing_post_service_photo_review_policy policy
+              ON policy.id = review.review_policy_id
+            WHERE review.idempotency_key = %s
+            """,
+            (key_hash,),
+        )
+        return await cursor.fetchone()
+
+    @staticmethod
+    def _assert_replay(
+        row: tuple,
+        photo_id: UUID,
+        actor: AuthenticatedUser,
+        review: PhotoReviewRequest,
+    ) -> None:
+        expected = (
+            photo_id,
+            review.decision,
+            review.quality_status,
+            review.ruler_status,
+            review.rationale,
+            review.supersedes_review_id,
+            actor.id,
+        )
+        if row[1:8] != expected:
+            raise PhotoReviewIdempotencyConflictError
+
+    @staticmethod
+    def _response(row: tuple) -> MowingPhotoReviewResponse:
+        return MowingPhotoReviewResponse(
+            review_id=row[0],
+            photo_id=row[1],
+            decision=row[2],
+            quality_status=row[3],
+            ruler_status=row[4],
+            rationale=row[5],
+            supersedes_review_id=row[6],
+            reviewed_at=row[9],
+            review_policy_version=row[10],
+            policy_data_status=row[11],
+        )
+
+    @staticmethod
+    def _queue_item(row: tuple) -> MowingPhotoReviewQueueItem:
+        return MowingPhotoReviewQueueItem(
+            photo_id=row[0],
+            mowing_order_id=row[1],
+            source_inspection_work_order_id=row[2],
+            road_code=row[3],
+            segment_index=row[4],
+            zone_type=row[5],
+            planned_point_sequence=row[6],
+            captured_at=row[7],
+            uploaded_at=row[8],
+            media_type=row[9],
+            byte_size=row[10],
+            latest_review_id=row[11],
+            latest_decision=row[12],
+            latest_quality_status=row[13],
+            latest_ruler_status=row[14],
+            latest_rationale=row[15],
+            latest_reviewed_at=row[16],
+            latest_review_policy_version=row[17],
+            review_state="review_recorded" if row[11] else "awaiting_review",
+        )
+
+
+async def get_mowing_photo_review_writer() -> MowingPhotoReviewWriter:
+    settings = get_settings()
+    return PostgresMowingPhotoReviewRepository(
+        settings.database_url,
+        settings.prepared_mowing_photo_review_policy_version,
+    )
+
+
+async def get_mowing_photo_review_queue_reader() -> MowingPhotoReviewQueueReader:
+    settings = get_settings()
+    return PostgresMowingPhotoReviewRepository(
+        settings.database_url,
+        settings.prepared_mowing_photo_review_policy_version,
+    )
+
+
+router = APIRouter(prefix="/v1/mowing-media", tags=["mowing-media"])
+queue_router = APIRouter(
+    prefix="/v1/mowing-photo-review-queue",
+    tags=["mowing-media"],
+)
+
+
+@queue_router.get("", response_model=MowingPhotoReviewQueue)
+async def list_mowing_photo_review_queue(
+    actor: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    reader: Annotated[
+        MowingPhotoReviewQueueReader,
+        Depends(get_mowing_photo_review_queue_reader),
+    ],
+    limit: Annotated[int, Field(ge=1, le=100)] = 50,
+) -> MowingPhotoReviewQueue:
+    return await reader.list_for_actor(actor=actor, limit=limit)
+
+
+@router.post("/{photo_id}/reviews", response_model=MowingPhotoReviewResponse)
+async def record_mowing_photo_review(
+    photo_id: UUID,
+    review: PhotoReviewRequest,
+    idempotency_key: Annotated[
+        str,
+        Header(alias="Idempotency-Key", min_length=8, max_length=200),
+    ],
+    actor: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    writer: Annotated[MowingPhotoReviewWriter, Depends(get_mowing_photo_review_writer)],
+) -> MowingPhotoReviewResponse:
+    try:
+        return await writer.record(
+            photo_id=photo_id,
+            actor=actor,
+            idempotency_key=idempotency_key,
+            review=review,
+        )
+    except PhotoReviewTargetNotFoundError:
+        raise HTTPException(
+            status_code=404, detail="Simulated post-service photo not found"
+        ) from None
+    except PhotoReviewPermissionError:
+        raise HTTPException(status_code=403, detail="Reviewer lacks a role for this road") from None
+    except PhotoReviewPolicyUnavailableError:
+        raise HTTPException(
+            status_code=503, detail="Mowing photo review policy is unavailable"
+        ) from None
+    except PhotoReviewIdempotencyConflictError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Idempotency-Key was already used for a different mowing photo review",
+        ) from None
+    except PhotoReviewSupersessionError:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Superseded review must be the effective review for the same photo",
+        ) from None

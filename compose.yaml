@@ -43,6 +43,7 @@ services:
       - ./infra/migrations/0030_prepared_mowing_post_service_photo_manifest.sql:/docker-entrypoint-initdb.d/0030.sql:ro
       - ./infra/migrations/0031_prepared_mowing_post_service_photo_upload_receipt.sql:/docker-entrypoint-initdb.d/0031.sql:ro
       - ./infra/migrations/0032_prepared_mowing_post_service_photo_access_audit.sql:/docker-entrypoint-initdb.d/0032.sql:ro
+      - ./infra/migrations/0033_prepared_mowing_post_service_photo_human_review.sql:/docker-entrypoint-initdb.d/0033.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -90,6 +91,7 @@ services:
       PREPARED_MOWING_RESOURCE_POLICY_VERSION: ${PREPARED_MOWING_RESOURCE_POLICY_VERSION:-prepared-mowing-resource-plan-v1}
       PREPARED_MOWING_READINESS_POLICY_VERSION: ${PREPARED_MOWING_READINESS_POLICY_VERSION:-prepared-mowing-readiness-v1}
       PREPARED_MOWING_APPROVAL_POLICY_VERSION: ${PREPARED_MOWING_APPROVAL_POLICY_VERSION:-prepared-mowing-planning-approval-v1}
+      PREPARED_MOWING_PHOTO_REVIEW_POLICY_VERSION: ${PREPARED_MOWING_PHOTO_REVIEW_POLICY_VERSION:-prepared-mowing-post-service-photo-review-v1}
       OBJECT_STORAGE_ENDPOINT: ${OBJECT_STORAGE_ENDPOINT:-http://minio:9000}
       OBJECT_STORAGE_ACCESS_KEY: ${OBJECT_STORAGE_ACCESS_KEY:-zenit}
       OBJECT_STORAGE_SECRET_KEY: ${OBJECT_STORAGE_SECRET_KEY:-change_me}
