@@ -154,7 +154,10 @@ Managers can now inspect an authenticated, road-scoped read projection of each
 simulated mowing rehearsal in the dashboard. The timeline revalidates event
 ordering, timestamps, and every execution block, and labels a terminal event
 only as `rehearsal_only_no_field_completion_claim`; it is not post-service
-evidence or real mowing completion.
+evidence or real mowing completion. The same projection now exposes zero to
+three raw post-service heights in source-point order, with their simulated and
+unverified labels. It derives no class, average, reduction, effectiveness, or
+threshold result.
 The sync boundary now also has a separate foundation for one simulated,
 unverified post-service height per source point after the rehearsal finish.
 These records do not reuse inspection measurements and explicitly keep GPS and
@@ -386,9 +389,12 @@ GET /v1/prepared-mowing-rehearsals?limit=50
 
 It returns only actor-accessible, non-operational prepared orders and derives
 the rehearsal state and timeline from immutable events. It excludes actor,
-device, and coordinate details and never claims field execution, post-service
-height, or official completion. See
-`docs/decisions/ADR-0034-read-only-prepared-mowing-rehearsal-history.md`.
+device, and coordinate details. The response includes raw simulated,
+unverified post-service heights when present, but never claims verified
+vegetation evidence, field execution, mowing effectiveness, or official
+completion. See
+`docs/decisions/ADR-0034-read-only-prepared-mowing-rehearsal-history.md` and
+`docs/decisions/ADR-0037-read-only-simulated-mowing-post-service-history.md`.
 
 The public, read-only management queue is available at:
 

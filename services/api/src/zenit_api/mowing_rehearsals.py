@@ -2,20 +2,28 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal
 from typing import Annotated, Literal, Protocol
 from uuid import UUID
 
 import psycopg
 from fastapi import APIRouter, Depends, Query
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from zenit_api.auth import AuthenticatedUser, get_current_user
 from zenit_api.config import get_settings
 
 RehearsalState = Literal["not_started", "confirmed", "in_progress", "paused", "finished"]
+REHEARSAL_HISTORY_WARNING = (
+    "This history contains only a simulated mowing rehearsal and simulated, "
+    "unverified typed post-service heights. It is not verified vegetation evidence, "
+    "field execution, mowing efficacy, or official completion."
+)
 
 
 class PreparedMowingRehearsalEvent(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     event_id: UUID
     event_sequence: int = Field(ge=1)
     source_planning_approval_id: UUID
@@ -39,6 +47,31 @@ class PreparedMowingRehearsalEvent(BaseModel):
         return self
 
 
+class PreparedMowingPostServiceMeasurement(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    event_id: UUID
+    source_planning_approval_id: UUID
+    source_planned_point_id: UUID
+    source_point_sequence: int = Field(ge=1, le=3)
+    phase: Literal["post_service"]
+    height_cm: Decimal = Field(ge=0, le=1000, max_digits=7, decimal_places=2)
+    client_captured_at: datetime
+    measurement_scope: Literal["mowing_demo_post_service_only"]
+    location_status: Literal["not_collected"]
+    photo_status: Literal["not_collected"]
+    data_status: Literal["simulated"]
+    quality_status: Literal["simulated_unverified"]
+    evidence_claim_status: Literal["simulated_unverified_no_field_completion_claim"] = (
+        "simulated_unverified_no_field_completion_claim"
+    )
+    operational_approval_satisfied: Literal[False] = False
+    authorizes_field_work: Literal[False] = False
+    eligible_for_field_execution: Literal[False] = False
+    eligible_for_model_training: Literal[False] = False
+    eligible_for_official_reporting: Literal[False] = False
+
+
 @dataclass(frozen=True)
 class RehearsalMetrics:
     state: RehearsalState
@@ -56,8 +89,13 @@ def derive_rehearsal_metrics(
     started_at: datetime | None = None
     finished_at: datetime | None = None
     pause_count = 0
+    planning_approval_id: UUID | None = None
 
     for event in events:
+        if planning_approval_id is None:
+            planning_approval_id = event.source_planning_approval_id
+        elif event.source_planning_approval_id != planning_approval_id:
+            raise ValueError("rehearsal planning approval must remain stable")
         if previous is not None:
             if event.event_sequence <= previous.event_sequence:
                 raise ValueError("rehearsal event sequence must increase")
@@ -110,6 +148,8 @@ def derive_rehearsal_metrics(
 
 
 class PreparedMowingRehearsalSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     mowing_order_id: UUID
     road_code: str
     segment_index: int = Field(ge=0)
@@ -131,6 +171,9 @@ class PreparedMowingRehearsalSummary(BaseModel):
     eligible_for_model_training: Literal[False] = False
     eligible_for_official_reporting: Literal[False] = False
     events: list[PreparedMowingRehearsalEvent]
+    post_service_measurements: list[PreparedMowingPostServiceMeasurement] = Field(
+        default_factory=list
+    )
 
     @model_validator(mode="after")
     def validate_derived_metrics(self) -> PreparedMowingRehearsalSummary:
@@ -153,18 +196,48 @@ class PreparedMowingRehearsalSummary(BaseModel):
         )
         if actual != expected:
             raise ValueError("rehearsal summary does not match its immutable events")
+        measurements = self.post_service_measurements
+        if len(measurements) > 3:
+            raise ValueError("post-service measurement projection exceeds three points")
+        sequences = [measurement.source_point_sequence for measurement in measurements]
+        if sequences != sorted(sequences) or len(sequences) != len(set(sequences)):
+            raise ValueError("post-service measurements must be uniquely point-ordered")
+        if len({measurement.event_id for measurement in measurements}) != len(measurements):
+            raise ValueError("post-service measurement event IDs must be unique")
+        if len({measurement.source_planned_point_id for measurement in measurements}) != len(
+            measurements
+        ):
+            raise ValueError("post-service measurement source points must be unique")
+        if measurements:
+            if metrics.state != "finished" or metrics.finished_at is None:
+                raise ValueError("post-service measurements require a finished rehearsal")
+            planning_approval_ids = {event.source_planning_approval_id for event in self.events}
+            if len(planning_approval_ids) != 1 or any(
+                measurement.source_planning_approval_id not in planning_approval_ids
+                for measurement in measurements
+            ):
+                raise ValueError(
+                    "post-service measurements must match the rehearsal planning approval"
+                )
+            if any(
+                measurement.client_captured_at < metrics.finished_at for measurement in measurements
+            ):
+                raise ValueError("post-service measurement cannot predate rehearsal finish")
         return self
 
 
 class PreparedMowingRehearsalCollection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     items: list[PreparedMowingRehearsalSummary]
     result_count: int = Field(ge=0)
     limit: int = Field(ge=1, le=100)
     truncated: bool
-    warning: str = (
-        "This history describes a simulated mowing rehearsal only. It is not field "
-        "execution, post-service height evidence, or official completion."
-    )
+    warning: Literal[
+        "This history contains only a simulated mowing rehearsal and simulated, "
+        "unverified typed post-service heights. It is not verified vegetation evidence, "
+        "field execution, mowing efficacy, or official completion."
+    ] = REHEARSAL_HISTORY_WARNING
 
     @model_validator(mode="after")
     def validate_result_count(self) -> PreparedMowingRehearsalCollection:
@@ -190,7 +263,8 @@ class PostgresPreparedMowingRehearsalReader:
         async with connection, connection.cursor() as cursor:
             await cursor.execute(
                 """
-                SELECT mowing.id, road.code, segment.segment_index, zone.zone_type
+                SELECT mowing.id, road.code, segment.segment_index, zone.zone_type,
+                       inspection.id
                 FROM prepared_mowing_order mowing
                 JOIN work_order inspection
                   ON inspection.id = mowing.source_inspection_work_order_id
@@ -267,6 +341,59 @@ class PostgresPreparedMowingRehearsalReader:
             )
             for row in await cursor.fetchall()
         ]
+        await cursor.execute(
+            """
+            SELECT measurement.event_id,
+                   measurement.source_planning_approval_id,
+                   measurement.source_planned_point_id,
+                   point.sequence,
+                   point.work_order_id,
+                   measurement.phase,
+                   measurement.height_cm,
+                   measurement.client_captured_at,
+                   measurement.measurement_scope,
+                   measurement.location_status,
+                   measurement.photo_status,
+                   measurement.data_status,
+                   measurement.quality_status,
+                   measurement.operational_approval_satisfied,
+                   measurement.authorizes_field_work,
+                   measurement.eligible_for_field_execution,
+                   measurement.eligible_for_model_training,
+                   measurement.eligible_for_official_reporting
+            FROM prepared_mowing_post_service_measurement measurement
+            JOIN work_order_planned_point point
+              ON point.id = measurement.source_planned_point_id
+            WHERE measurement.mowing_order_id = %s
+            ORDER BY point.sequence, measurement.measurement_sequence
+            """,
+            (target[0],),
+        )
+        measurement_rows = await cursor.fetchall()
+        if any(row[4] != target[4] for row in measurement_rows):
+            raise ValueError("post-service measurement source order does not match")
+        measurements = [
+            PreparedMowingPostServiceMeasurement(
+                event_id=row[0],
+                source_planning_approval_id=row[1],
+                source_planned_point_id=row[2],
+                source_point_sequence=row[3],
+                phase=row[5],
+                height_cm=row[6],
+                client_captured_at=row[7],
+                measurement_scope=row[8],
+                location_status=row[9],
+                photo_status=row[10],
+                data_status=row[11],
+                quality_status=row[12],
+                operational_approval_satisfied=row[13],
+                authorizes_field_work=row[14],
+                eligible_for_field_execution=row[15],
+                eligible_for_model_training=row[16],
+                eligible_for_official_reporting=row[17],
+            )
+            for row in measurement_rows
+        ]
         metrics = derive_rehearsal_metrics(events)
         return PreparedMowingRehearsalSummary(
             mowing_order_id=target[0],
@@ -280,6 +407,7 @@ class PostgresPreparedMowingRehearsalReader:
             finished_at=metrics.finished_at,
             recorded_span_seconds=metrics.recorded_span_seconds,
             events=events,
+            post_service_measurements=measurements,
         )
 
 

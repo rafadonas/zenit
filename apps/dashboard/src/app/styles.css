@@ -287,6 +287,16 @@ h1 { margin-bottom: 8px; font: 600 clamp(2.1rem, 4vw, 3.2rem)/1 Georgia, serif; 
 .rehearsal-timeline div { display: grid; gap: 1px; }
 .rehearsal-timeline strong { font-size: .64rem; }
 .rehearsal-timeline time, .rehearsal-timeline li > span, .rehearsal-empty { color: var(--muted); font-size: .56rem; }
+.mowing-post-service-history { display: grid; gap: 8px; padding-top: 10px; border-top: 1px solid rgb(77 94 128 / 18%); }
+.mowing-post-service-history > div { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+.mowing-post-service-history > div > strong { font-size: .68rem; }
+.mowing-post-service-history ol { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.mowing-post-service-history li { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 7px 8px; border-radius: 6px; background: white; }
+.mowing-post-service-history li div { display: grid; gap: 1px; }
+.mowing-post-service-history li strong { font-size: .62rem; }
+.mowing-post-service-history li time, .mowing-post-service-history li > span, .mowing-post-service-history p, .mowing-post-service-history small { color: var(--muted); font-size: .56rem; }
+.mowing-post-service-history li > span { color: #4d3d78; font-weight: 750; }
+.mowing-post-service-history p { margin: 0; }
 .proposal-review-form { margin-top: 10px; border-color: #dfb875; background: #fffaf0; }
 .login-shell { min-height: 100vh; display: grid; place-items: center; padding: 30px; }
 .login-card { width: min(460px, 100%); padding: 34px; border: 1px solid var(--line); border-radius: 18px; background: var(--card); box-shadow: var(--shadow); }

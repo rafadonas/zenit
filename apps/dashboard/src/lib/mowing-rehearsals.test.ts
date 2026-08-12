@@ -21,6 +21,29 @@ function event(operation: string, sequence: number, seconds: number) {
   };
 }
 
+function measurement(sequence = 1) {
+  return {
+    event_id: `measurement-${sequence}`,
+    source_planning_approval_id: "approval-1",
+    source_planned_point_id: `point-${sequence}`,
+    source_point_sequence: sequence,
+    phase: "post_service",
+    height_cm: "7.50",
+    client_captured_at: new Date(Date.UTC(2026, 7, 11, 20, 1, 0)).toISOString(),
+    measurement_scope: "mowing_demo_post_service_only",
+    location_status: "not_collected",
+    photo_status: "not_collected",
+    data_status: "simulated",
+    quality_status: "simulated_unverified",
+    evidence_claim_status: "simulated_unverified_no_field_completion_claim",
+    operational_approval_satisfied: false,
+    authorizes_field_work: false,
+    eligible_for_field_execution: false,
+    eligible_for_model_training: false,
+    eligible_for_official_reporting: false,
+  };
+}
+
 function collection() {
   const events = [
     event("confirm", 10, 0),
@@ -50,11 +73,12 @@ function collection() {
       eligible_for_model_training: false,
       eligible_for_official_reporting: false,
       events,
+      post_service_measurements: [measurement()],
     }],
     result_count: 1,
     limit: 50,
     truncated: false,
-    warning: "Simulated rehearsal only.",
+    warning: "This history contains only a simulated mowing rehearsal and simulated, unverified typed post-service heights. It is not verified vegetation evidence, field execution, mowing efficacy, or official completion.",
   };
 }
 
@@ -81,5 +105,27 @@ describe("prepared mowing rehearsal history safety contract", () => {
     const location = collection();
     location.items[0]!.events[1]!.location_status = "not_collected";
     expect(isPreparedMowingRehearsalCollection(location)).toBe(false);
+  });
+
+  it("rejects promoted or inconsistent post-service measurements", () => {
+    const promoted = collection();
+    promoted.items[0]!.post_service_measurements[0]!.eligible_for_official_reporting = true;
+    expect(isPreparedMowingRehearsalCollection(promoted)).toBe(false);
+
+    const predated = collection();
+    predated.items[0]!.post_service_measurements[0]!.client_captured_at =
+      new Date(Date.UTC(2026, 7, 11, 20, 0, 40)).toISOString();
+    expect(isPreparedMowingRehearsalCollection(predated)).toBe(false);
+
+    const mismatchedApproval = collection();
+    mismatchedApproval.items[0]!.post_service_measurements[0]!.source_planning_approval_id =
+      "approval-2";
+    expect(isPreparedMowingRehearsalCollection(mismatchedApproval)).toBe(false);
+
+    const identityLeak = collection();
+    Object.assign(identityLeak.items[0]!.post_service_measurements[0]!, {
+      device_id: "device-1",
+    });
+    expect(isPreparedMowingRehearsalCollection(identityLeak)).toBe(false);
   });
 });
