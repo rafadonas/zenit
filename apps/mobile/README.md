@@ -15,6 +15,8 @@ Current P0 slice:
   persisted alongside the measurements;
 - separate mowing rehearsal (`confirm`, simulated-point `start`, balanced
   `pause`/`resume`, and `finish`) persisted and synchronized without real GPS;
+- exactly three post-service mowing heights captured after `finish` as separate
+  simulated, unverified drafts and synchronized after the ordered lifecycle;
 - one camera photo per planned point copied into the encrypted vault with a
   verified local SHA-256; only its prepared manifest enters sync;
 - persistent event and batch UUIDs created before network delivery;
@@ -45,6 +47,16 @@ Every event is labelled `simulated`, `demo_only`, and
 or official reporting. Any promoted flag, broken provenance link, missing
 source point, stale planning approval, or invalid sequence makes the client
 fail closed.
+
+After a valid rehearsal reaches `finish`, the app can encrypt exactly one
+post-service height for each of the three source planned points. These drafts
+are separate from inspection measurements and fixed to `simulated`,
+`simulated_unverified`, and `mowing_demo_post_service_only`; GPS and photos are
+explicitly not collected. A fully local rehearsal sends its ordered lifecycle
+before the heights in one idempotent batch, while a previously acknowledged
+rehearsal sends only the new measurements. Neither path proves vegetation
+condition, mowing completion, location, or photo evidence. See
+`docs/decisions/ADR-0036-mobile-simulated-mowing-post-service-measurements.md`.
 
 Run checks from this directory with the repository-local Flutter SDK:
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zenit_mobile/app_controller.dart';
+import 'package:zenit_mobile/domain/mowing_demo_lifecycle.dart';
 import 'package:zenit_mobile/main.dart';
 
 import 'support/fakes.dart';
@@ -67,5 +68,80 @@ void main() {
     expect(find.text('Retomar ensaio'), findsOneWidget);
     expect(find.text('3. Finalizar ensaio'), findsOneWidget);
     expect(find.byType(FilledButton), findsNothing);
+  });
+
+  testWidgets('captures three guarded post-service mowing heights', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 2400);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final plan = preparedMowingPlan();
+    final vault = MemoryVault()
+      ..mowingLifecycleEvents[plan.id] = [
+        MowingDemoLifecycleEvent(
+          eventId: '10000000-0000-4000-8000-000000000001',
+          mowingOrderId: plan.id,
+          sourcePlanningApprovalId: plan.planningApprovalId!,
+          operation: MowingDemoOperation.confirm,
+          occurredAt: DateTime.utc(2026, 8, 12, 13),
+        ),
+        MowingDemoLifecycleEvent(
+          eventId: '10000000-0000-4000-8000-000000000002',
+          mowingOrderId: plan.id,
+          sourcePlanningApprovalId: plan.planningApprovalId!,
+          operation: MowingDemoOperation.start,
+          occurredAt: DateTime.utc(2026, 8, 12, 13),
+          simulatedLatitude: preparedOrder().points.first.latitude,
+          simulatedLongitude: preparedOrder().points.first.longitude,
+        ),
+        MowingDemoLifecycleEvent(
+          eventId: '10000000-0000-4000-8000-000000000003',
+          mowingOrderId: plan.id,
+          sourcePlanningApprovalId: plan.planningApprovalId!,
+          operation: MowingDemoOperation.finish,
+          occurredAt: DateTime.utc(2026, 8, 12, 13),
+        ),
+      ];
+    final controller = ZenitAppController(
+      gateway: FakeGateway(orders: [preparedOrder()], mowingPlans: [plan]),
+      sessionStore: MemorySessionStore()..value = validSession(),
+      vault: vault,
+      deviceIdentityStore: MemoryDeviceIdentityStore(),
+      appVersion: 'test',
+      clock: () => DateTime.utc(2026, 8, 12, 14),
+    );
+    await controller.initialize();
+
+    await tester.pumpWidget(ZenitApp(controller: controller));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('NÃO EXECUTÁVEL'));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('Medições pós-serviço simuladas'),
+      400,
+      scrollable: find.byType(Scrollable).last,
+    );
+
+    expect(find.byType(TextField), findsNWidgets(3));
+    expect(find.textContaining('GPS e fotos pós-serviço'), findsOneWidget);
+    await tester.enterText(find.byType(TextField).at(0), '5');
+    await tester.enterText(find.byType(TextField).at(1), '6,5');
+    await tester.enterText(find.byType(TextField).at(2), '8');
+    await tester.scrollUntilVisible(
+      find.text('Salvar 3 medições simuladas'),
+      200,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.text('Salvar 3 medições simuladas'));
+    await tester.pumpAndSettle();
+
+    final measurements = await vault.readMowingPostServiceMeasurements(plan.id);
+    expect(measurements.map((item) => item.heightCm), [5, 6.5, 8]);
+    expect(
+      find.textContaining('foram criptografadas no aparelho'),
+      findsOneWidget,
+    );
   });
 }

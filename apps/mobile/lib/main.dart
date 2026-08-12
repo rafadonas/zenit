@@ -8,6 +8,7 @@ import 'data/zenit_gateway.dart';
 import 'domain/demo_order_lifecycle.dart';
 import 'domain/measurement_draft.dart';
 import 'domain/mowing_demo_lifecycle.dart';
+import 'domain/mowing_post_service_measurement_draft.dart';
 import 'domain/prepared_mowing_plan.dart';
 import 'domain/prepared_photo_draft.dart';
 import 'domain/prepared_work_order.dart';
@@ -247,7 +248,7 @@ class OrdersPage extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Consulta offline. Confirmar, iniciar, rastrear e concluir permanecem bloqueados.',
+            'Consulta offline com ensaio explicitamente simulado; nenhum controle autoriza execução real.',
           ),
           const SizedBox(height: 8),
           if (controller.mowingPlans.isEmpty)
@@ -297,10 +298,12 @@ class PreparedMowingPlanPage extends StatefulWidget {
 }
 
 class _PreparedMowingPlanPageState extends State<PreparedMowingPlanPage> {
+  final postServiceFields = List.generate(3, (_) => TextEditingController());
   bool loading = true;
   bool syncing = false;
   String? confirmation;
   List<MowingDemoLifecycleEvent> events = const [];
+  List<MowingPostServiceMeasurementDraft> measurements = const [];
 
   PreparedMowingPlan get plan => widget.plan;
 
@@ -312,12 +315,40 @@ class _PreparedMowingPlanPageState extends State<PreparedMowingPlanPage> {
 
   Future<void> _load() async {
     final loaded = await widget.controller.readMowingLifecycleEvents(plan.id);
+    final loadedMeasurements = await widget.controller
+        .readMowingPostServiceMeasurements(plan.id);
     if (!mounted) return;
+    for (final measurement in loadedMeasurements) {
+      postServiceFields[measurement.sequence - 1].text = measurement.heightCm
+          .toString();
+    }
     setState(() {
       events = loaded;
+      measurements = loadedMeasurements;
       loading = false;
     });
   }
+
+  @override
+  void dispose() {
+    for (final field in postServiceFields) {
+      field.dispose();
+    }
+    super.dispose();
+  }
+
+  bool get canEditPostServiceMeasurements =>
+      events.isNotEmpty &&
+      events.last.operation == MowingDemoOperation.finish &&
+      events.every(
+        (event) => const {
+          DraftSyncState.localOnly,
+          DraftSyncState.acknowledged,
+        }.contains(event.syncState),
+      ) &&
+      measurements.every(
+        (measurement) => measurement.syncState == DraftSyncState.localOnly,
+      );
 
   Future<void> _transition(
     Future<bool> Function(PreparedMowingPlan) action,
@@ -339,21 +370,53 @@ class _PreparedMowingPlanPageState extends State<PreparedMowingPlanPage> {
     if (!mounted) return;
     await _load();
     if (!mounted) return;
-    final acknowledged = events
-        .where((event) => event.syncState == DraftSyncState.acknowledged)
-        .length;
-    final rejected = events
-        .where((event) => event.syncState == DraftSyncState.rejected)
-        .length;
-    final conflicts = events
-        .where((event) => event.syncState == DraftSyncState.conflict)
-        .length;
+    final acknowledged =
+        events
+            .where((event) => event.syncState == DraftSyncState.acknowledged)
+            .length +
+        measurements
+            .where((item) => item.syncState == DraftSyncState.acknowledged)
+            .length;
+    final rejected =
+        events
+            .where((event) => event.syncState == DraftSyncState.rejected)
+            .length +
+        measurements
+            .where((item) => item.syncState == DraftSyncState.rejected)
+            .length;
+    final conflicts =
+        events
+            .where((event) => event.syncState == DraftSyncState.conflict)
+            .length +
+        measurements
+            .where((item) => item.syncState == DraftSyncState.conflict)
+            .length;
     setState(() {
       syncing = false;
       confirmation = synced
-          ? 'Ensaio persistido: $acknowledged aceitos, $rejected rejeitados, $conflicts conflitos.'
+          ? 'Ensaio e medições persistidos: $acknowledged aceitos, $rejected rejeitados, $conflicts conflitos.'
           : widget.controller.errorMessage;
     });
+  }
+
+  Future<void> _savePostServiceMeasurements() async {
+    final heights = postServiceFields
+        .map((field) => double.tryParse(field.text.replaceAll(',', '.')))
+        .toList();
+    if (heights.any((height) => height == null)) {
+      setState(() => confirmation = 'Preencha as três alturas pós-serviço.');
+      return;
+    }
+    final saved = await widget.controller
+        .saveThreeMowingPostServiceMeasurements(plan, heights.cast<double>());
+    if (!mounted) return;
+    if (saved) await _load();
+    if (!mounted) return;
+    setState(
+      () => confirmation = saved
+          ? 'Três medições pós-serviço simuladas foram criptografadas no aparelho.'
+          : widget.controller.errorMessage,
+    );
   }
 
   @override
@@ -536,17 +599,63 @@ class _PreparedMowingPlanPageState extends State<PreparedMowingPlanPage> {
                 if (events.isNotEmpty &&
                     events.last.operation == MowingDemoOperation.finish) ...[
                   const SizedBox(height: 10),
+                  Text(
+                    'Medições pós-serviço simuladas',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Entrada digitada e não verificada. GPS e fotos pós-serviço não são coletados.',
+                  ),
+                  const SizedBox(height: 10),
+                  for (
+                    var index = 0;
+                    index < postServiceFields.length;
+                    index++
+                  ) ...[
+                    TextField(
+                      controller: postServiceFields[index],
+                      readOnly:
+                          syncing ||
+                          widget.controller.busy ||
+                          !canEditPostServiceMeasurements,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: InputDecoration(
+                        labelText:
+                            'Ponto ${index + 1} · altura pós-serviço (cm)',
+                        helperText:
+                            'Mesmo ponto preparado da inspeção de origem · sem GPS/foto',
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                  FilledButton.icon(
+                    onPressed:
+                        syncing ||
+                            widget.controller.busy ||
+                            !canEditPostServiceMeasurements
+                        ? null
+                        : _savePostServiceMeasurements,
+                    icon: const Icon(Icons.lock),
+                    label: const Text('Salvar 3 medições simuladas'),
+                  ),
+                  const SizedBox(height: 10),
                   OutlinedButton.icon(
                     onPressed:
                         syncing ||
                             widget.controller.busy ||
-                            events.every(
-                              (event) => event.hasPersistentServerResult,
+                            measurements.length != 3 ||
+                            measurements.every(
+                              (item) => item.hasPersistentServerResult,
                             )
                         ? null
                         : _sync,
                     icon: const Icon(Icons.sync),
-                    label: const Text('Sincronizar ensaio simulado'),
+                    label: const Text(
+                      'Sincronizar ensaio e medições simuladas',
+                    ),
                   ),
                 ],
                 for (final event in events)
@@ -561,6 +670,19 @@ class _PreparedMowingPlanPageState extends State<PreparedMowingPlanPage> {
                         ? null
                         : Text(event.syncResultMessage!),
                   ),
+                for (final measurement in measurements)
+                  ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(_syncIcon(measurement.syncState)),
+                    title: Text(
+                      'Pós-serviço ${measurement.sequence}: ${measurement.heightCm} cm · ${_syncLabel(measurement.syncState)}',
+                    ),
+                    subtitle: Text(
+                      measurement.syncResultMessage ??
+                          'Simulada, não verificada, sem GPS/foto e não oficial.',
+                    ),
+                  ),
               ],
               if (confirmation case final message?) ...[
                 const SizedBox(height: 8),
@@ -568,7 +690,7 @@ class _PreparedMowingPlanPageState extends State<PreparedMowingPlanPage> {
               ],
               const SizedBox(height: 16),
               const Text(
-                'Todos os eventos são simulados, inelegíveis para treinamento e relatório oficial, e nunca autorizam roçada.',
+                'Todos os eventos e alturas pós-serviço são simulados, não verificados, inelegíveis para treinamento e relatório oficial, e nunca autorizam roçada.',
               ),
             ],
           ),

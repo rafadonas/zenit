@@ -10,6 +10,7 @@ import 'domain/demo_order_lifecycle.dart';
 import 'domain/measurement_draft.dart';
 import 'domain/mobile_sync.dart';
 import 'domain/mowing_demo_lifecycle.dart';
+import 'domain/mowing_post_service_measurement_draft.dart';
 import 'domain/prepared_mowing_plan.dart';
 import 'domain/prepared_photo_draft.dart';
 import 'domain/prepared_work_order.dart';
@@ -95,8 +96,8 @@ class ZenitAppController extends ChangeNotifier {
       await vault.replaceMowingPlans(downloaded.mowingPlans);
       await sessionStore.write(authenticated);
       session = authenticated;
-      orders = downloaded.orders;
-      mowingPlans = downloaded.mowingPlans;
+      orders = await vault.readOrders();
+      mowingPlans = await vault.readMowingPlans();
     });
   }
 
@@ -110,8 +111,8 @@ class ZenitAppController extends ChangeNotifier {
         );
         await vault.replaceOrders(downloaded.orders);
         await vault.replaceMowingPlans(downloaded.mowingPlans);
-        orders = downloaded.orders;
-        mowingPlans = downloaded.mowingPlans;
+        orders = await vault.readOrders();
+        mowingPlans = await vault.readMowingPlans();
         notifyListeners();
         return true;
       } catch (error) {
@@ -125,8 +126,8 @@ class ZenitAppController extends ChangeNotifier {
       final downloaded = await _downloadPreparedSnapshots(current.accessToken);
       await vault.replaceOrders(downloaded.orders);
       await vault.replaceMowingPlans(downloaded.mowingPlans);
-      orders = downloaded.orders;
-      mowingPlans = downloaded.mowingPlans;
+      orders = await vault.readOrders();
+      mowingPlans = await vault.readMowingPlans();
     });
   }
 
@@ -166,6 +167,10 @@ class ZenitAppController extends ChangeNotifier {
   Future<List<MowingDemoLifecycleEvent>> readMowingLifecycleEvents(
     String mowingOrderId,
   ) => vault.readMowingLifecycleEvents(mowingOrderId);
+
+  Future<List<MowingPostServiceMeasurementDraft>>
+  readMowingPostServiceMeasurements(String mowingOrderId) =>
+      vault.readMowingPostServiceMeasurements(mowingOrderId);
 
   Future<bool> confirmMowingDemo(PreparedMowingPlan plan) => _run(() async {
     await _prepareMowingDemoTransition(plan);
@@ -275,11 +280,89 @@ class ZenitAppController extends ChangeNotifier {
     );
   }
 
+  Future<bool> saveThreeMowingPostServiceMeasurements(
+    PreparedMowingPlan plan,
+    List<double> heights,
+  ) async {
+    if (heights.length != 3 ||
+        heights.any(
+          (height) => !height.isFinite || height < 0 || height > 1000,
+        )) {
+      errorMessage = 'Informe três alturas válidas entre 0 e 1000 cm.';
+      notifyListeners();
+      return false;
+    }
+    return _run(() async {
+      if (!plan.canRunDemoRehearsal) {
+        throw const MowingDemoNotEligibleError();
+      }
+      if (await vault.readPendingSyncBatch() != null) {
+        throw const PendingBatchEditError();
+      }
+      final sourceOrders = orders.where(
+        (order) => order.id == plan.sourceInspectionWorkOrderId,
+      );
+      if (sourceOrders.length != 1) {
+        throw const MowingDemoSourcePointError();
+      }
+      final sourceOrder = sourceOrders.single;
+      final events = await vault.readMowingLifecycleEvents(plan.id);
+      if (!_isCompleteMowingDemoSequence(events) ||
+          events.any(
+            (event) =>
+                event.mowingOrderId != plan.id ||
+                event.sourcePlanningApprovalId != plan.planningApprovalId,
+          )) {
+        throw const MowingPostServiceNotReadyError();
+      }
+      final lifecycleStates = events.map((event) => event.syncState).toSet();
+      if (lifecycleStates.length != 1 ||
+          !const {
+            DraftSyncState.localOnly,
+            DraftSyncState.acknowledged,
+          }.contains(lifecycleStates.single)) {
+        throw const MowingPostServiceNotReadyError();
+      }
+      final existing = await vault.readMowingPostServiceMeasurements(plan.id);
+      if (existing.any((item) => item.hasPersistentServerResult)) {
+        throw const PersistedMowingPostServiceMeasurementEditError();
+      }
+      if (existing.any((item) => item.syncState == DraftSyncState.pending)) {
+        throw const PendingBatchEditError();
+      }
+      final planningApprovalId = plan.planningApprovalId;
+      if (planningApprovalId == null) {
+        throw const MowingDemoNotEligibleError();
+      }
+      final capturedAt = _clock().toUtc();
+      if (capturedAt.isBefore(events.last.occurredAt)) {
+        throw const InvalidMowingPostServiceMeasurementTimeError();
+      }
+      final existingByPoint = {
+        for (final item in existing) item.sourcePlannedPointId: item,
+      };
+      final measurements = List.generate(3, (index) {
+        final point = sourceOrder.points[index];
+        return MowingPostServiceMeasurementDraft(
+          eventId: existingByPoint[point.id]?.eventId ?? _uuidFactory(),
+          mowingOrderId: plan.id,
+          sourcePlanningApprovalId: planningApprovalId,
+          sourcePlannedPointId: point.id,
+          sequence: point.sequence,
+          heightCm: heights[index],
+          capturedAt: capturedAt,
+        );
+      });
+      await vault.replaceMowingPostServiceMeasurements(plan.id, measurements);
+    });
+  }
+
   Future<bool> syncMowingDemo(PreparedMowingPlan plan) async {
     final current = session;
     if (current == null) return false;
     return _run(() async {
       var events = await vault.readMowingLifecycleEvents(plan.id);
+      var measurements = await vault.readMowingPostServiceMeasurements(plan.id);
       if (!_isCompleteMowingDemoSequence(events) ||
           events.any(
             (event) =>
@@ -288,36 +371,98 @@ class ZenitAppController extends ChangeNotifier {
           )) {
         throw const IncompleteMowingDemoLifecycleError();
       }
+      final sourceOrders = orders.where(
+        (order) => order.id == plan.sourceInspectionWorkOrderId,
+      );
+      if (sourceOrders.length != 1) {
+        throw const MowingDemoSourcePointError();
+      }
+      final expectedPoints = {
+        for (final point in sourceOrders.single.points) point.id,
+      };
+      if (measurements.length != 3 ||
+          measurements.any(
+            (item) =>
+                item.mowingOrderId != plan.id ||
+                item.sourcePlanningApprovalId != plan.planningApprovalId ||
+                item.capturedAt.isBefore(events.last.occurredAt),
+          ) ||
+          measurements
+                  .map((item) => item.sourcePlannedPointId)
+                  .toSet()
+                  .length !=
+              3 ||
+          !measurements
+              .map((item) => item.sourcePlannedPointId)
+              .toSet()
+              .containsAll(expectedPoints)) {
+        throw const IncompleteMowingPostServiceMeasurementError();
+      }
       var pendingBatch = await vault.readPendingSyncBatch();
       if (pendingBatch == null) {
-        if (events.any(
-          (event) => event.syncState != DraftSyncState.localOnly,
-        )) {
+        final lifecycleStates = events.map((event) => event.syncState).toSet();
+        if (lifecycleStates.length != 1 ||
+            !const {
+              DraftSyncState.localOnly,
+              DraftSyncState.acknowledged,
+            }.contains(lifecycleStates.single)) {
           throw const PersistedMowingDemoEditError();
         }
+        if (measurements.any(
+          (item) => item.syncState != DraftSyncState.localOnly,
+        )) {
+          throw const PersistedMowingPostServiceMeasurementEditError();
+        }
+        final localLifecycle = events
+            .where((event) => event.syncState == DraftSyncState.localOnly)
+            .toList(growable: false);
         pendingBatch = PendingSyncBatch(
           batchId: _uuidFactory(),
           deviceId: await deviceIdentityStore.readOrCreate(),
           orderId: plan.id,
           baseSyncCursor: await vault.readSyncCursor(),
-          eventIds: events.map((event) => event.eventId).toList(),
+          eventIds: [
+            ...localLifecycle.map((event) => event.eventId),
+            ...measurements.map((item) => item.eventId),
+          ],
         );
         events = events
             .map(
-              (event) => event.copyWith(
+              (event) => event.syncState == DraftSyncState.localOnly
+                  ? event.copyWith(
+                      syncState: DraftSyncState.pending,
+                      clearResult: true,
+                    )
+                  : event,
+            )
+            .toList();
+        measurements = measurements
+            .map(
+              (item) => item.copyWith(
                 syncState: DraftSyncState.pending,
                 clearResult: true,
               ),
             )
             .toList();
-        await vault.savePendingMowingSyncBatch(pendingBatch, events);
+        await vault.savePendingMowingSyncBatch(
+          pendingBatch,
+          events,
+          measurements,
+        );
       } else if (pendingBatch.orderId != plan.id) {
         throw const AnotherOrderPendingError();
       }
-      final eventIds = events.map((event) => event.eventId).toList();
-      if (pendingBatch.eventIds.length != eventIds.length ||
-          pendingBatch.eventIds.toSet().length != eventIds.length ||
-          !eventIds.toSet().containsAll(pendingBatch.eventIds)) {
+      final pendingEventIds = {
+        ...events
+            .where((event) => event.syncState == DraftSyncState.pending)
+            .map((event) => event.eventId),
+        ...measurements
+            .where((item) => item.syncState == DraftSyncState.pending)
+            .map((item) => item.eventId),
+      };
+      if (pendingBatch.eventIds.length != pendingEventIds.length ||
+          pendingBatch.eventIds.toSet().length != pendingEventIds.length ||
+          !pendingEventIds.containsAll(pendingBatch.eventIds)) {
         throw const CorruptedPendingBatchError();
       }
       await gateway.registerDevice(
@@ -325,11 +470,15 @@ class ZenitAppController extends ChangeNotifier {
         pendingBatch.deviceId,
         appVersion,
       );
-      final result = await gateway.syncBatch(
-        current.accessToken,
-        pendingBatch,
-        events.map((event) => event.toSyncEventJson()).toList(),
-      );
+      final result = await gateway
+          .syncBatch(current.accessToken, pendingBatch, [
+            ...events
+                .where((event) => event.syncState == DraftSyncState.pending)
+                .map((event) => event.toSyncEventJson()),
+            ...measurements
+                .where((item) => item.syncState == DraftSyncState.pending)
+                .map((item) => item.toSyncEventJson()),
+          ]);
       final coveredEventIds = {
         ...result.acceptedEventIds,
         ...result.rejectedEvents.keys,
@@ -344,7 +493,18 @@ class ZenitAppController extends ChangeNotifier {
       await vault.completeMowingSyncBatch(
         plan.id,
         events
-            .map((event) => _completeMowingLifecycleEvent(event, result))
+            .map(
+              (event) => event.syncState == DraftSyncState.pending
+                  ? _completeMowingLifecycleEvent(event, result)
+                  : event,
+            )
+            .toList(),
+        measurements
+            .map(
+              (item) => item.syncState == DraftSyncState.pending
+                  ? _completeMowingPostServiceMeasurement(item, result)
+                  : item,
+            )
             .toList(),
         result.nextSyncCursor,
       );
@@ -388,6 +548,33 @@ class ZenitAppController extends ChangeNotifier {
     }
     final conflict = result.conflictingEvents[event.eventId]!;
     return event.copyWith(
+      syncState: DraftSyncState.conflict,
+      syncResultCode: conflict.code,
+      syncResultMessage: conflict.message,
+    );
+  }
+
+  MowingPostServiceMeasurementDraft _completeMowingPostServiceMeasurement(
+    MowingPostServiceMeasurementDraft measurement,
+    MobileSyncResult result,
+  ) {
+    if (result.acceptedEventIds.contains(measurement.eventId)) {
+      return measurement.copyWith(
+        syncState: DraftSyncState.acknowledged,
+        syncResultCode: 'persisted',
+        syncResultMessage: 'Medição simulada e não verificada persistida.',
+      );
+    }
+    final rejection = result.rejectedEvents[measurement.eventId];
+    if (rejection != null) {
+      return measurement.copyWith(
+        syncState: DraftSyncState.rejected,
+        syncResultCode: rejection.code,
+        syncResultMessage: rejection.message,
+      );
+    }
+    final conflict = result.conflictingEvents[measurement.eventId]!;
+    return measurement.copyWith(
       syncState: DraftSyncState.conflict,
       syncResultCode: conflict.code,
       syncResultMessage: conflict.message,
@@ -927,4 +1114,31 @@ class PersistedMowingDemoEditError extends MobileWorkflowException {
 class InvalidMowingDemoTimeError extends MobileWorkflowException {
   const InvalidMowingDemoTimeError()
     : super('O relógio do aparelho retrocedeu durante o ensaio.');
+}
+
+class MowingPostServiceNotReadyError extends MobileWorkflowException {
+  const MowingPostServiceNotReadyError()
+    : super(
+        'Finalize um ensaio local válido ou confirmado antes das medições pós-serviço.',
+      );
+}
+
+class IncompleteMowingPostServiceMeasurementError
+    extends MobileWorkflowException {
+  const IncompleteMowingPostServiceMeasurementError()
+    : super(
+        'Salve uma medição pós-serviço simulada para cada um dos três pontos.',
+      );
+}
+
+class PersistedMowingPostServiceMeasurementEditError
+    extends MobileWorkflowException {
+  const PersistedMowingPostServiceMeasurementEditError()
+    : super('A medição pós-serviço já tem resultado persistente e é imutável.');
+}
+
+class InvalidMowingPostServiceMeasurementTimeError
+    extends MobileWorkflowException {
+  const InvalidMowingPostServiceMeasurementTimeError()
+    : super('A medição pós-serviço não pode ser anterior ao fim do ensaio.');
 }

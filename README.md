@@ -139,10 +139,12 @@ Uploaded objects remain encrypted, unvalidated, and non-official. The
 app also downloads the prepared mowing-planning chain into the encrypted vault
 for offline review. The mobile app can prepare and synchronize an explicitly
 simulated mowing rehearsal with confirmation, start at an estimated prepared
-point, balanced pause/resume, and finish. Candidate resources, manual readiness,
-and a planning decision remain explicitly non-executable; the rehearsal has no
-real GPS, mowing, dispatch, tracking, or operational approval. The app persists
-event/batch UUIDs, registers
+point, balanced pause/resume, finish, and exactly three separate post-service
+heights. The heights are encrypted for offline use, explicitly simulated and
+unverified, linked to the source planned points, and collected without GPS or
+photos. Candidate resources, manual readiness, and a planning decision remain
+explicitly non-executable; the rehearsal has no real GPS, mowing, dispatch,
+tracking, or operational approval. The app persists event/batch UUIDs, registers
 its logical device, sends the exact idempotent batch, and retains local events
 until a persistent accepted/rejected/conflict result arrives. The API has an
 append-only, idempotent prepared-sync foundation with authenticated device
@@ -156,7 +158,10 @@ evidence or real mowing completion.
 The sync boundary now also has a separate foundation for one simulated,
 unverified post-service height per source point after the rehearsal finish.
 These records do not reuse inspection measurements and explicitly keep GPS and
-photos uncollected; no mobile capture screen or post-service summary exists yet.
+photos uncollected. The mobile capture screen sends a local lifecycle before
+the three heights in one idempotent batch, or only the heights when that
+lifecycle was already acknowledged. No post-service photo, review, map update,
+or summary exists yet.
 
 CI repeats this validation from an empty Compose volume after the Python,
 dashboard, and Flutter jobs pass. The Flutter job checks formatting, analysis,
@@ -366,9 +371,11 @@ The mobile client can cache this prepared mowing-planning chain for offline,
 guarded demonstration. It validates provenance links and every execution block
 before accepting a snapshot; planning approval never becomes operational
 approval. Eligible snapshots can drive only the encrypted simulated rehearsal
-described in ADR-0031, with persistent UUIDs and idempotent sync. See
+described in ADR-0031, followed by three separate simulated and unverified
+post-service heights with persistent UUIDs and idempotent sync. See
 `docs/decisions/ADR-0030-read-only-prepared-mowing-mobile.md` and
-`docs/decisions/ADR-0032-mobile-prepared-mowing-demo-orchestration.md`.
+`docs/decisions/ADR-0032-mobile-prepared-mowing-demo-orchestration.md`, plus
+`docs/decisions/ADR-0036-mobile-simulated-mowing-post-service-measurements.md`.
 
 The authenticated management projection for synchronized rehearsals is
 available at:

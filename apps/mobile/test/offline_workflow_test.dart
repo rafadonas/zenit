@@ -40,11 +40,22 @@ void main() {
       expect(await controller.pauseMowingDemo(plan), isTrue);
       expect(await controller.resumeMowingDemo(plan), isTrue);
       expect(await controller.finishMowingDemo(plan), isTrue);
+      expect(
+        await controller.saveThreeMowingPostServiceMeasurements(plan, [
+          7,
+          8,
+          9,
+        ]),
+        isTrue,
+      );
       expect(await controller.syncMowingDemo(plan), isFalse);
 
       final firstBatch = vault.pendingBatch!;
       final pendingEvents = await vault.readMowingLifecycleEvents(plan.id);
-      expect(firstBatch.eventIds, hasLength(5));
+      final pendingMeasurements = await vault.readMowingPostServiceMeasurements(
+        plan.id,
+      );
+      expect(firstBatch.eventIds, hasLength(8));
       expect(pendingEvents.map((event) => event.operation), [
         MowingDemoOperation.confirm,
         MowingDemoOperation.start,
@@ -60,6 +71,14 @@ void main() {
         ),
         isTrue,
       );
+      expect(pendingMeasurements, hasLength(3));
+      expect(pendingMeasurements.map((item) => item.heightCm), [7, 8, 9]);
+      expect(
+        pendingMeasurements.every(
+          (item) => item.syncState == DraftSyncState.pending,
+        ),
+        isTrue,
+      );
       expect(await vault.hasUnacknowledgedEvents(), isTrue);
 
       gateway.syncFailure = null;
@@ -72,15 +91,42 @@ void main() {
         'pause',
         'resume',
         'finish',
+        'create',
+        'create',
+        'create',
       ]);
-      final payloads = gateway.lastEvents!.map(
-        (event) => (event['payload']! as Map).cast<String, Object?>(),
-      );
+      final lifecyclePayloads = gateway.lastEvents!
+          .take(5)
+          .map((event) => (event['payload']! as Map).cast<String, Object?>());
       expect(
-        payloads.every(
+        lifecyclePayloads.every(
           (payload) =>
               payload['data_status'] == 'simulated' &&
               payload['rehearsal_scope'] == 'mowing_demo_rehearsal_only' &&
+              payload['operational_approval_satisfied'] == false &&
+              payload['authorizes_field_work'] == false &&
+              payload['eligible_for_field_execution'] == false &&
+              payload['eligible_for_model_training'] == false &&
+              payload['eligible_for_official_reporting'] == false,
+        ),
+        isTrue,
+      );
+      expect(
+        gateway.lastEvents!.skip(5).map((event) => event['entity_type']),
+        everyElement('mowing_measurement'),
+      );
+      final measurementPayloads = gateway.lastEvents!
+          .skip(5)
+          .map((event) => (event['payload']! as Map).cast<String, Object?>());
+      expect(
+        measurementPayloads.every(
+          (payload) =>
+              payload['phase'] == 'post_service' &&
+              payload['measurement_scope'] == 'mowing_demo_post_service_only' &&
+              payload['location_status'] == 'not_collected' &&
+              payload['photo_status'] == 'not_collected' &&
+              payload['data_status'] == 'simulated' &&
+              payload['quality_status'] == 'simulated_unverified' &&
               payload['operational_approval_satisfied'] == false &&
               payload['authorizes_field_work'] == false &&
               payload['eligible_for_field_execution'] == false &&
@@ -97,6 +143,131 @@ void main() {
         )).every((event) => event.syncState == DraftSyncState.acknowledged),
         isTrue,
       );
+      expect(
+        (await vault.readMowingPostServiceMeasurements(
+          plan.id,
+        )).every((item) => item.syncState == DraftSyncState.acknowledged),
+        isTrue,
+      );
+    },
+  );
+
+  test(
+    'acknowledged mowing lifecycle syncs only new post-service measurements',
+    () async {
+      final order = preparedOrder();
+      final plan = preparedMowingPlan();
+      final vault = MemoryVault();
+      final gateway = FakeGateway(orders: [order], mowingPlans: [plan]);
+      final controller = ZenitAppController(
+        gateway: gateway,
+        sessionStore: MemorySessionStore(),
+        vault: vault,
+        deviceIdentityStore: MemoryDeviceIdentityStore(),
+        appVersion: 'test',
+        uuidFactory: _uuidFactory(),
+        clock: () => DateTime.utc(2026, 8, 11, 14),
+      );
+      await controller.initialize();
+      await controller.login('field@example.test', 'secret');
+
+      expect(await controller.confirmMowingDemo(plan), isTrue);
+      expect(await controller.startMowingDemo(plan), isTrue);
+      expect(await controller.finishMowingDemo(plan), isTrue);
+      final lifecycle = await vault.readMowingLifecycleEvents(plan.id);
+      await vault.replaceMowingLifecycleEvents(
+        plan.id,
+        lifecycle
+            .map(
+              (event) => event.copyWith(
+                syncState: DraftSyncState.acknowledged,
+                syncResultCode: 'persisted',
+              ),
+            )
+            .toList(),
+      );
+
+      expect(
+        await controller.saveThreeMowingPostServiceMeasurements(plan, [
+          5,
+          6,
+          7,
+        ]),
+        isTrue,
+      );
+      expect(await controller.syncMowingDemo(plan), isTrue);
+
+      expect(gateway.lastBatch!.eventIds, hasLength(3));
+      expect(
+        gateway.lastEvents!.map((event) => event['entity_type']),
+        everyElement('mowing_measurement'),
+      );
+      expect(
+        (await vault.readMowingLifecycleEvents(
+          plan.id,
+        )).every((event) => event.syncState == DraftSyncState.acknowledged),
+        isTrue,
+      );
+    },
+  );
+
+  test('refresh retains mowing point provenance required by a retry', () async {
+    final order = preparedOrder();
+    final plan = preparedMowingPlan();
+    final vault = MemoryVault()
+      ..orders = [order]
+      ..mowingPlans = [plan]
+      ..mowingLifecycleEvents[plan.id] = [
+        MowingDemoLifecycleEvent(
+          eventId: '10000000-0000-4000-8000-000000000001',
+          mowingOrderId: plan.id,
+          sourcePlanningApprovalId: plan.planningApprovalId!,
+          operation: MowingDemoOperation.confirm,
+          occurredAt: DateTime.utc(2026, 8, 12, 14),
+        ),
+      ];
+    final controller = ZenitAppController(
+      gateway: FakeGateway(orders: const [], mowingPlans: [plan]),
+      sessionStore: MemorySessionStore()..value = validSession(),
+      vault: vault,
+      deviceIdentityStore: MemoryDeviceIdentityStore(),
+      appVersion: 'test',
+    );
+
+    await controller.initialize();
+
+    expect(vault.orders.single.id, plan.sourceInspectionWorkOrderId);
+    expect(controller.orders.single.id, plan.sourceInspectionWorkOrderId);
+  });
+
+  test(
+    'mowing post-service measurements require a finished rehearsal',
+    () async {
+      final order = preparedOrder();
+      final plan = preparedMowingPlan();
+      final controller = ZenitAppController(
+        gateway: FakeGateway(orders: [order], mowingPlans: [plan]),
+        sessionStore: MemorySessionStore(),
+        vault: MemoryVault(),
+        deviceIdentityStore: MemoryDeviceIdentityStore(),
+        appVersion: 'test',
+        uuidFactory: _uuidFactory(),
+        clock: () => DateTime.utc(2026, 8, 11, 14),
+      );
+      await controller.initialize();
+      await controller.login('field@example.test', 'secret');
+      await controller.confirmMowingDemo(plan);
+      await controller.startMowingDemo(plan);
+
+      expect(
+        await controller.saveThreeMowingPostServiceMeasurements(plan, [
+          5,
+          6,
+          7,
+        ]),
+        isFalse,
+      );
+      expect(controller.errorMessage, contains('Finalize um ensaio'));
     },
   );
 
