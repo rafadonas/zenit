@@ -11,6 +11,7 @@ from zenit_api.inspection_summaries import collection_router as inspection_summa
 from zenit_api.inspection_summaries import router as inspection_summaries_router
 from zenit_api.media import router as media_router
 from zenit_api.mobile_sync import router as mobile_sync_router
+from zenit_api.mowing_media import router as mowing_media_router
 from zenit_api.mowing_orders import router as mowing_orders_router
 from zenit_api.mowing_planning_approvals import router as mowing_planning_approvals_router
 from zenit_api.mowing_readiness import router as mowing_readiness_router
@@ -55,6 +56,7 @@ app.include_router(recommendation_reviews_router)
 app.include_router(work_orders_router)
 app.include_router(mobile_sync_router)
 app.include_router(media_router)
+app.include_router(mowing_media_router)
 app.include_router(mowing_orders_router)
 app.include_router(mowing_rehearsals_router)
 app.include_router(mowing_planning_approvals_router)

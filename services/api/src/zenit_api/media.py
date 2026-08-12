@@ -108,6 +108,8 @@ class PrivateMediaStore:
         content: bytes,
         media_type: str,
         checksum_sha256: str,
+        object_prefix: str = "prepared-photos",
+        data_status: str = "prepared",
     ) -> StoredObject:
         if not self._client.bucket_exists(self._bucket):
             try:
@@ -116,7 +118,7 @@ class PrivateMediaStore:
                 if error.code != "BucketAlreadyOwnedByYou":
                     raise
         self._client.set_bucket_versioning(self._bucket, VersioningConfig(ENABLED))
-        name = f"prepared-photos/{photo_id}/{checksum_sha256}.aesgcm"
+        name = f"{object_prefix}/{photo_id}/{checksum_sha256}.aesgcm"
 
         try:
             existing = self._client.stat_object(self._bucket, name)
@@ -163,7 +165,7 @@ class PrivateMediaStore:
                 "nonce-bytes": str(len(cipher.nonce)),
                 "tag-bytes": str(len(tag)),
                 "photo-id": str(photo_id),
-                "data-status": "prepared",
+                "data-status": data_status,
             },
         )
         if not result.version_id:

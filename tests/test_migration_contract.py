@@ -59,6 +59,9 @@ PREPARED_MOWING_POST_SERVICE_MEASUREMENT_MIGRATION = Path(
 PREPARED_MOWING_POST_SERVICE_PHOTO_MIGRATION = Path(
     "infra/migrations/0030_prepared_mowing_post_service_photo_manifest.sql"
 )
+PREPARED_MOWING_POST_SERVICE_PHOTO_UPLOAD_MIGRATION = Path(
+    "infra/migrations/0031_prepared_mowing_post_service_photo_upload_receipt.sql"
+)
 
 
 class MigrationContractTests(unittest.TestCase):
@@ -161,7 +164,7 @@ class MigrationContractTests(unittest.TestCase):
         mounts = [
             line.strip() for line in compose.splitlines() if "/docker-entrypoint-initdb.d/" in line
         ]
-        self.assertEqual(len(mounts), 30)
+        self.assertEqual(len(mounts), 31)
         for version, mount in enumerate(mounts, start=1):
             prefix = f"{version:04d}"
             self.assertIn(f"infra/migrations/{prefix}_", mount)
@@ -222,6 +225,25 @@ class MigrationContractTests(unittest.TestCase):
         self.assertIn("newer.supersedes_assessment_id = assessment.id", sql)
         self.assertIn("prepared_mowing_post_service_photo_point_key", sql)
         self.assertIn("prepared_mowing_post_service_photo_manifest_immutable", sql)
+
+    def test_mowing_post_service_upload_is_encrypted_simulated_and_immutable(self) -> None:
+        sql = PREPARED_MOWING_POST_SERVICE_PHOTO_UPLOAD_MIGRATION.read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn(
+            "CREATE TABLE prepared_mowing_post_service_photo_upload_receipt", sql
+        )
+        self.assertIn("object_version_id text NOT NULL", sql)
+        self.assertIn("simulated-mowing-post-service-photos/%", sql)
+        self.assertIn("encryption_method = 'APP-AES256-GCM'", sql)
+        self.assertIn("content_status = 'uploaded_unverified'", sql)
+        self.assertIn("quality_status = 'simulated_unverified'", sql)
+        self.assertIn("data_status = 'simulated'", sql)
+        self.assertIn("CHECK (NOT eligible_for_model_training)", sql)
+        self.assertIn(
+            "prepared_mowing_post_service_photo_upload_receipt_immutable", sql
+        )
 
     def test_recommendation_reviews_are_audited_and_append_only(self) -> None:
         sql = RECOMMENDATION_REVIEW_MIGRATION.read_text(encoding="utf-8")

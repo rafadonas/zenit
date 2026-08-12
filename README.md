@@ -167,8 +167,10 @@ lifecycle was already acknowledged. The API can now also persist one separate,
 checksum-bound post-service photo manifest per measured point, explicitly
 labelled simulated, unverified, unlocated, and not uploaded. The mobile app now
 captures one later image per measured point into its encrypted vault and
-synchronizes only the separate manifest; the bytes remain on the device. No
-post-service upload receipt, review, map update, or summary exists yet.
+synchronizes only the separate manifest. The API now has a separate verified,
+AES-256-GCM encrypted upload boundary and immutable simulated receipt, but the
+mobile app does not call it yet. No post-service retrieval, review, map update,
+or summary exists yet.
 
 CI repeats this validation from an empty Compose volume after the Python,
 dashboard, and Flutter jobs pass. The Flutter job checks formatting, analysis,
@@ -181,8 +183,8 @@ credentials.
 ## Database migrations and ingestion
 
 Apply migrations in numeric order before importing sources. The current local
-development database must have migrations `0001` through `0030` applied. On the first
-startup of a new Compose volume, Postgres applies these thirty up migrations in
+development database must have migrations `0001` through `0031` applied. On the first
+startup of a new Compose volume, Postgres applies these thirty-one up migrations in
 order through `/docker-entrypoint-initdb.d`; existing volumes are never modified
 by that initialization mechanism. The explicit commands below remain useful
 for non-Compose environments and controlled upgrades of existing databases.
@@ -248,6 +250,8 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0029_prepared_mowing_post_service_measurement.sql
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0030_prepared_mowing_post_service_photo_manifest.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
+  < infra/migrations/0031_prepared_mowing_post_service_photo_upload_receipt.sql
 ```
 
 Migration `0008` starts the Sprint 4 management foundation with immutable,
@@ -382,6 +386,12 @@ only `not_uploaded`, unvalidated, no-location metadata and cannot claim server
 possession, image quality, field execution, training eligibility, or official
 reporting. See
 `docs/decisions/ADR-0038-simulated-mowing-post-service-photo-manifest-foundation.md`.
+
+Migration `0031` adds an immutable verified-possession receipt for the exact
+post-service bytes. The API encrypts them with AES-256-GCM before a separate
+versioned object namespace, while every simulated, unverified, non-operational,
+non-training, and non-official label remains fixed. See
+`docs/decisions/ADR-0040-verified-encrypted-simulated-mowing-photo-upload.md`.
 
 The mobile client can cache this prepared mowing-planning chain for offline,
 guarded demonstration. It validates provenance links and every execution block
