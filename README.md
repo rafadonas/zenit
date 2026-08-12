@@ -118,6 +118,8 @@ campo e inelegível para relatório oficial.
   integridade e evento de acesso imutável.
 - Fila autenticada e revisão humana append-only de qualidade e visibilidade da
   régua, sob política própria e ainda simulada.
+- Resumo pós-serviço simulado, gerado somente com três medições digitadas e três
+  revisões visuais aceitas, sem transformar foto em altura ou conclusão.
 - Histórico gerencial somente leitura do ensaio e das alturas brutas.
 
 Ainda não existem conclusão de roçada validada, atualização do mapa/histórico
@@ -385,6 +387,8 @@ POST /v1/mowing-media/{photo_id}
 GET  /v1/mowing-media/{photo_id}
 POST /v1/mowing-media/{photo_id}/reviews
 GET  /v1/mowing-photo-review-queue
+POST /v1/prepared-mowing-orders/{mowing_order_id}/post-service-summary
+GET  /v1/prepared-mowing-post-service-summaries
 ```
 
 Recursos são referências candidatas; clima e segurança são declarações manuais
