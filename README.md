@@ -368,6 +368,10 @@ O resumo exige ciclo finalizado, três medições e três revisões efetivamente
 aceitas. Seus agregados vêm das medições digitadas, não das fotos. Uma violação
 do limite produz `mowing_review`, nunca autorização de roçada.
 
+O histórico de ensaio também informa, por ponto, se a foto pós-serviço simulada
+aguarda revisão ou possui uma decisão visual registrada. Esse status não altera
+as medições e não representa conclusão de roçada.
+
 ### Planejamento e ensaio de roçada
 
 ```text

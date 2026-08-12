@@ -74,6 +74,7 @@ function collection() {
       eligible_for_official_reporting: false,
       events,
       post_service_measurements: [measurement()],
+      post_service_photo_reviews: [],
     }],
     result_count: 1,
     limit: 50,

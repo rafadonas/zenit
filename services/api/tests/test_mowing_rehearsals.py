@@ -11,6 +11,7 @@ from zenit_api.auth import AuthenticatedUser, get_current_user
 from zenit_api.main import app
 from zenit_api.mowing_rehearsals import (
     PreparedMowingPostServiceMeasurement,
+    PreparedMowingPostServicePhotoReview,
     PreparedMowingRehearsalCollection,
     PreparedMowingRehearsalEvent,
     PreparedMowingRehearsalSummary,
@@ -130,6 +131,31 @@ def test_exposes_raw_simulated_measurement_without_deriving_a_result() -> None:
     assert not hasattr(result, "n1_count")
 
 
+def test_exposes_photo_review_state_without_promoting_visual_review() -> None:
+    photo = PreparedMowingPostServicePhotoReview(
+        photo_id=UUID("97000000-0000-4000-8000-000000000001"),
+        source_planned_point_id=POINT_ID,
+        source_point_sequence=1,
+        review_state="review_recorded",
+        latest_review_id=UUID("97000000-0000-4000-8000-000000000002"),
+        latest_decision="accepted",
+        latest_quality_status="accepted",
+        latest_ruler_status="visible",
+        latest_reviewed_at=STARTED_AT + timedelta(seconds=120),
+        phase="post_service",
+        photo_scope="mowing_demo_post_service_only",
+        location_status="not_collected",
+        data_status="simulated",
+    )
+    result = summary(measurements=[measurement()]).model_copy(
+        update={"post_service_photo_reviews": [photo]}
+    )
+    assert result.post_service_photo_reviews[0].review_state == "review_recorded"
+    assert result.post_service_photo_reviews[0].latest_ruler_status == "visible"
+    assert result.authorizes_field_work is False
+    assert not hasattr(result, "effectiveness")
+
+
 def test_rejects_an_invalid_or_time_reversed_event_history() -> None:
     with pytest.raises(ValueError, match="invalid prepared mowing rehearsal sequence"):
         derive_rehearsal_metrics([event("confirm", 1, 0), event("finish", 2, 5)])
@@ -224,6 +250,7 @@ def test_lists_actor_scoped_rehearsal_history_without_identity_or_location() -> 
     assert "actor" not in response.text
     assert "device" not in response.text
     assert "not verified vegetation evidence" in payload["warning"]
+    assert payload["items"][0]["post_service_photo_reviews"] == []
 
 
 def test_rehearsal_history_requires_authentication() -> None:

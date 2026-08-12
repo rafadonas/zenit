@@ -43,6 +43,27 @@ export interface PreparedMowingPostServiceMeasurement {
   eligible_for_official_reporting: false;
 }
 
+export interface PreparedMowingPostServicePhotoReview {
+  photo_id: string;
+  source_planned_point_id: string;
+  source_point_sequence: 1 | 2 | 3;
+  review_state: "awaiting_review" | "review_recorded";
+  latest_review_id: string | null;
+  latest_decision: "accepted" | "rejected" | "inconclusive" | null;
+  latest_quality_status: "accepted" | "rejected" | "inconclusive" | null;
+  latest_ruler_status: "visible" | "not_visible" | "inconclusive" | null;
+  latest_reviewed_at: string | null;
+  phase: "post_service";
+  photo_scope: "mowing_demo_post_service_only";
+  location_status: "not_collected";
+  data_status: "simulated";
+  eligible_for_field_evidence: false;
+  eligible_for_field_execution: false;
+  eligible_for_model_training: false;
+  eligible_for_official_reporting: false;
+  authorizes_field_work: false;
+}
+
 export interface PreparedMowingRehearsalSummary {
   mowing_order_id: string;
   road_code: string;
@@ -64,6 +85,7 @@ export interface PreparedMowingRehearsalSummary {
   eligible_for_official_reporting: false;
   events: PreparedMowingRehearsalEvent[];
   post_service_measurements: PreparedMowingPostServiceMeasurement[];
+  post_service_photo_reviews: PreparedMowingPostServicePhotoReview[];
 }
 
 export interface PreparedMowingRehearsalCollection {
@@ -136,6 +158,23 @@ function isMeasurement(value: unknown): value is PreparedMowingPostServiceMeasur
     value.eligible_for_official_reporting === false;
 }
 
+function isPhotoReview(value: unknown): value is PreparedMowingPostServicePhotoReview {
+  if (!isRecord(value) || hasSensitiveProjectionField(value)) return false;
+  const recorded = value.review_state === "review_recorded";
+  return typeof value.photo_id === "string" && typeof value.source_planned_point_id === "string" &&
+    [1, 2, 3].includes(Number(value.source_point_sequence)) && Number.isInteger(value.source_point_sequence) &&
+    (recorded ? typeof value.latest_review_id === "string" && typeof value.latest_reviewed_at === "string" :
+      value.review_state === "awaiting_review" && value.latest_review_id === null && value.latest_reviewed_at === null) &&
+    (value.latest_decision === null || ["accepted", "rejected", "inconclusive"].includes(String(value.latest_decision))) &&
+    (value.latest_quality_status === null || ["accepted", "rejected", "inconclusive"].includes(String(value.latest_quality_status))) &&
+    (value.latest_ruler_status === null || ["visible", "not_visible", "inconclusive"].includes(String(value.latest_ruler_status))) &&
+    value.phase === "post_service" && value.photo_scope === "mowing_demo_post_service_only" &&
+    value.location_status === "not_collected" && value.data_status === "simulated" &&
+    value.eligible_for_field_evidence === false && value.eligible_for_field_execution === false &&
+    value.eligible_for_model_training === false && value.eligible_for_official_reporting === false &&
+    value.authorizes_field_work === false;
+}
+
 function derivedMetrics(events: PreparedMowingRehearsalEvent[]) {
   let previous: PreparedMowingRehearsalEvent | undefined;
   let startedAt: string | null = null;
@@ -182,17 +221,21 @@ function derivedMetrics(events: PreparedMowingRehearsalEvent[]) {
 function isSummary(value: unknown): value is PreparedMowingRehearsalSummary {
   if (!isRecord(value) || !Array.isArray(value.events) || !value.events.every(isEvent) ||
     !Array.isArray(value.post_service_measurements) ||
-    !value.post_service_measurements.every(isMeasurement)) {
+    !value.post_service_measurements.every(isMeasurement) ||
+    !Array.isArray(value.post_service_photo_reviews) ||
+    !value.post_service_photo_reviews.every(isPhotoReview)) {
     return false;
   }
   const metrics = derivedMetrics(value.events);
   if (metrics === null) return false;
   const measurements = value.post_service_measurements;
+  const photoReviews = value.post_service_photo_reviews;
   if (measurements.length > 3) return false;
   const sequences = measurements.map((measurement) => measurement.source_point_sequence);
   const eventIds = measurements.map((measurement) => measurement.event_id);
   const pointIds = measurements.map((measurement) => measurement.source_planned_point_id);
   const planningApprovalIds = new Set(value.events.map((event) => event.source_planning_approval_id));
+  const photoSequences = photoReviews.map((review) => review.source_point_sequence);
   const finishedMilliseconds = timestamp(metrics.finishedAt);
   if (sequences.some((sequence, index) => index > 0 && sequence <= sequences[index - 1]!) ||
     new Set(eventIds).size !== eventIds.length || new Set(pointIds).size !== pointIds.length ||
@@ -218,7 +261,8 @@ function isSummary(value: unknown): value is PreparedMowingRehearsalSummary {
     value.operational_approval_satisfied === false && value.authorizes_field_work === false &&
     value.eligible_for_field_execution === false &&
     value.eligible_for_model_training === false &&
-    value.eligible_for_official_reporting === false;
+    value.eligible_for_official_reporting === false &&
+    photoSequences.every((sequence, index) => index === 0 || sequence > photoSequences[index - 1]!);
 }
 
 export function isPreparedMowingRehearsalCollection(

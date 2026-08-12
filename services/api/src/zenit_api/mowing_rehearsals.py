@@ -72,6 +72,29 @@ class PreparedMowingPostServiceMeasurement(BaseModel):
     eligible_for_official_reporting: Literal[False] = False
 
 
+class PreparedMowingPostServicePhotoReview(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    photo_id: UUID
+    source_planned_point_id: UUID
+    source_point_sequence: int = Field(ge=1, le=3)
+    review_state: Literal["awaiting_review", "review_recorded"]
+    latest_review_id: UUID | None
+    latest_decision: Literal["accepted", "rejected", "inconclusive"] | None
+    latest_quality_status: Literal["accepted", "rejected", "inconclusive"] | None
+    latest_ruler_status: Literal["visible", "not_visible", "inconclusive"] | None
+    latest_reviewed_at: datetime | None
+    phase: Literal["post_service"]
+    photo_scope: Literal["mowing_demo_post_service_only"]
+    location_status: Literal["not_collected"]
+    data_status: Literal["simulated"]
+    eligible_for_field_evidence: Literal[False] = False
+    eligible_for_field_execution: Literal[False] = False
+    eligible_for_model_training: Literal[False] = False
+    eligible_for_official_reporting: Literal[False] = False
+    authorizes_field_work: Literal[False] = False
+
+
 @dataclass(frozen=True)
 class RehearsalMetrics:
     state: RehearsalState
@@ -174,6 +197,9 @@ class PreparedMowingRehearsalSummary(BaseModel):
     post_service_measurements: list[PreparedMowingPostServiceMeasurement] = Field(
         default_factory=list
     )
+    post_service_photo_reviews: list[PreparedMowingPostServicePhotoReview] = Field(
+        default_factory=list
+    )
 
     @model_validator(mode="after")
     def validate_derived_metrics(self) -> PreparedMowingRehearsalSummary:
@@ -223,6 +249,16 @@ class PreparedMowingRehearsalSummary(BaseModel):
                 measurement.client_captured_at < metrics.finished_at for measurement in measurements
             ):
                 raise ValueError("post-service measurement cannot predate rehearsal finish")
+        photo_reviews = self.post_service_photo_reviews
+        if len(photo_reviews) > 3:
+            raise ValueError("post-service photo review projection exceeds three points")
+        photo_sequences = [review.source_point_sequence for review in photo_reviews]
+        if photo_sequences != sorted(photo_sequences) or len(photo_sequences) != len(
+            set(photo_sequences)
+        ):
+            raise ValueError("post-service photo reviews must be uniquely point-ordered")
+        if len({review.photo_id for review in photo_reviews}) != len(photo_reviews):
+            raise ValueError("post-service photo review IDs must be unique")
         return self
 
 
@@ -394,6 +430,64 @@ class PostgresPreparedMowingRehearsalReader:
             )
             for row in measurement_rows
         ]
+        await cursor.execute(
+            """
+            SELECT manifest.photo_id, manifest.source_planned_point_id,
+                   point.sequence, latest.id, latest.decision,
+                   latest.quality_status, latest.ruler_status, latest.reviewed_at
+            FROM prepared_mowing_post_service_photo_manifest manifest
+            JOIN work_order_planned_point point
+              ON point.id = manifest.source_planned_point_id
+            JOIN prepared_mowing_post_service_photo_upload_receipt receipt
+              ON receipt.photo_id = manifest.photo_id
+            LEFT JOIN LATERAL (
+                SELECT review.id, review.decision, review.quality_status,
+                       review.ruler_status, review.reviewed_at
+                FROM prepared_mowing_post_service_photo_human_review review
+                WHERE review.photo_id = manifest.photo_id
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM prepared_mowing_post_service_photo_human_review newer
+                      WHERE newer.supersedes_review_id = review.id
+                  )
+                ORDER BY review.reviewed_at DESC, review.id DESC
+                LIMIT 1
+            ) latest ON true
+            WHERE manifest.mowing_order_id = %s
+              AND manifest.phase = 'post_service'
+              AND manifest.photo_scope = 'mowing_demo_post_service_only'
+              AND receipt.phase = 'post_service'
+              AND receipt.photo_scope = 'mowing_demo_post_service_only'
+              AND receipt.data_status = 'simulated'
+              AND receipt.location_status = 'not_collected'
+            ORDER BY point.sequence, manifest.photo_id
+            """,
+            (target[0],),
+        )
+        photo_review_rows = await cursor.fetchall()
+        if any(
+            row[1] not in {measurement.source_planned_point_id for measurement in measurements}
+            for row in photo_review_rows
+        ):
+            raise ValueError("post-service photo review source point does not match measurement")
+        photo_reviews = [
+            PreparedMowingPostServicePhotoReview(
+                photo_id=row[0],
+                source_planned_point_id=row[1],
+                source_point_sequence=row[2],
+                review_state="review_recorded" if row[3] is not None else "awaiting_review",
+                latest_review_id=row[3],
+                latest_decision=row[4],
+                latest_quality_status=row[5],
+                latest_ruler_status=row[6],
+                latest_reviewed_at=row[7],
+                phase="post_service",
+                photo_scope="mowing_demo_post_service_only",
+                location_status="not_collected",
+                data_status="simulated",
+            )
+            for row in photo_review_rows
+        ]
         metrics = derive_rehearsal_metrics(events)
         return PreparedMowingRehearsalSummary(
             mowing_order_id=target[0],
@@ -408,6 +502,7 @@ class PostgresPreparedMowingRehearsalReader:
             recorded_span_seconds=metrics.recorded_span_seconds,
             events=events,
             post_service_measurements=measurements,
+            post_service_photo_reviews=photo_reviews,
         )
 
 
