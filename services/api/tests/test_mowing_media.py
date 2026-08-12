@@ -16,7 +16,9 @@ from zenit_api.media import (
 )
 from zenit_api.mowing_media import (
     MowingPostServiceMediaService,
+    MowingPostServicePhotoContent,
     MowingPostServicePhotoUploadResponse,
+    get_mowing_media_reader,
     get_mowing_media_writer,
 )
 
@@ -48,6 +50,21 @@ class FakeMowingMediaWriter:
             checksum_sha256=values["checksum_sha256"],
             byte_size=len(JPEG),
             media_type="image/jpeg",
+        )
+
+
+class FakeMowingMediaReader:
+    def __init__(self, failure: Exception | None = None) -> None:
+        self.failure = failure
+
+    async def retrieve(self, **values) -> MowingPostServicePhotoContent:
+        if self.failure is not None:
+            raise self.failure
+        assert values == {"actor": ACTOR, "photo_id": PHOTO_ID}
+        return MowingPostServicePhotoContent(
+            content=JPEG,
+            media_type="image/jpeg",
+            checksum_sha256=hashlib.sha256(JPEG).hexdigest(),
         )
 
 
@@ -119,6 +136,61 @@ def test_upload_hides_manifest_and_reports_content_conflict() -> None:
 
 def test_upload_requires_authentication() -> None:
     assert request_upload(authenticated=False).status_code == 401
+
+
+def request_retrieval(*, failure: Exception | None = None, authenticated: bool = True):
+    async def fake_actor() -> AuthenticatedUser:
+        return ACTOR
+
+    async def fake_reader() -> FakeMowingMediaReader:
+        return FakeMowingMediaReader(failure)
+
+    async def request():
+        if authenticated:
+            app.dependency_overrides[get_current_user] = fake_actor
+        app.dependency_overrides[get_mowing_media_reader] = fake_reader
+        try:
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                return await client.get(f"/v1/mowing-media/{PHOTO_ID}")
+        finally:
+            app.dependency_overrides.clear()
+
+    return asyncio.run(request())
+
+
+def test_retrieval_returns_only_simulated_unverified_content_without_cache() -> None:
+    response = request_retrieval()
+
+    assert response.status_code == 200
+    assert response.content == JPEG
+    assert response.headers["content-type"] == "image/jpeg"
+    assert response.headers["cache-control"] == "no-store, private"
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["x-zenit-phase"] == "post_service"
+    assert response.headers["x-zenit-photo-scope"] == "mowing_demo_post_service_only"
+    assert response.headers["x-zenit-content-status"] == "uploaded_unverified"
+    assert response.headers["x-zenit-ruler-status"] == "not_validated"
+    assert response.headers["x-zenit-location-status"] == "not_collected"
+    assert response.headers["x-zenit-quality-status"] == "simulated_unverified"
+    assert response.headers["x-zenit-data-status"] == "simulated"
+    assert response.headers["x-zenit-operational-approval-satisfied"] == "false"
+    assert response.headers["x-zenit-authorizes-field-work"] == "false"
+    assert response.headers["x-zenit-eligible-for-field-execution"] == "false"
+    assert response.headers["x-zenit-eligible-for-model-training"] == "false"
+    assert response.headers["x-zenit-eligible-for-official-reporting"] == "false"
+
+
+def test_retrieval_hides_unauthorized_photo_and_reports_integrity_failure() -> None:
+    missing = request_retrieval(failure=PhotoManifestNotFoundError())
+    corrupt = request_retrieval(failure=PhotoContentMismatchError())
+
+    assert missing.status_code == 404
+    assert corrupt.status_code == 409
+
+
+def test_retrieval_requires_authentication() -> None:
+    assert request_retrieval(authenticated=False).status_code == 401
 
 
 class FakeCursor:
@@ -278,3 +350,45 @@ def test_service_idempotency_decrypts_and_matches_existing_version(
                 checksum_sha256=checksum,
             )
         )
+
+
+def test_service_retrieval_verifies_exact_version_and_records_access(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    checksum = hashlib.sha256(JPEG).hexdigest()
+    cursor = FakeCursor(
+        receipt=(
+            f"simulated-mowing-post-service-photos/{PHOTO_ID}/{checksum}.aesgcm",
+            "version-1",
+            checksum,
+            len(JPEG),
+            "image/jpeg",
+        )
+    )
+    store = FakeStore(existing=JPEG)
+
+    async def connect(database_url: str) -> FakeConnection:
+        return FakeConnection(cursor)
+
+    async def run_inline(function, **values):
+        return function(**values)
+
+    monkeypatch.setattr(psycopg.AsyncConnection, "connect", connect)
+    monkeypatch.setattr(asyncio, "to_thread", run_inline)
+    service = MowingPostServiceMediaService(Settings(), store=store)  # type: ignore[arg-type]
+    result = asyncio.run(service.retrieve(actor=ACTOR, photo_id=PHOTO_ID))
+
+    assert result.content == JPEG
+    assert result.checksum_sha256 == checksum
+    assert store.get_values == {
+        "name": f"simulated-mowing-post-service-photos/{PHOTO_ID}/{checksum}.aesgcm",
+        "version_id": "version-1",
+    }
+    assert any(
+        "INSERT INTO prepared_mowing_post_service_photo_access_event" in query
+        for query, _ in cursor.executions
+    )
+
+    store.existing = b"different-content"
+    with pytest.raises(PhotoContentMismatchError):
+        asyncio.run(service.retrieve(actor=ACTOR, photo_id=PHOTO_ID))

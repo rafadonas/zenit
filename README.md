@@ -114,10 +114,12 @@ campo e inelegível para relatório oficial.
   aceitação dos três manifestos.
 - Recibo imutável do conteúdo criptografado, ainda marcado como simulado,
   não localizado, não validado e não operacional.
+- Recuperação autorizada da versão exata, com descriptografia, verificação de
+  integridade e evento de acesso imutável.
 - Histórico gerencial somente leitura do ensaio e das alturas brutas.
 
-Ainda não existem recuperação/revisão das fotos pós-serviço, conclusão de
-roçada validada, atualização do mapa/histórico ou resumo pós-serviço.
+Ainda não existem revisão humana das fotos pós-serviço, conclusão de roçada
+validada, atualização do mapa/histórico ou resumo pós-serviço.
 
 ## Arquitetura do repositório
 
@@ -210,7 +212,7 @@ antes de alterar AOI ou período.
 
 ## Banco de dados e migrações
 
-O banco atual exige as migrações `0001` a `0031`, sempre em ordem numérica. Um
+O banco atual exige as migrações `0001` a `0032`, sempre em ordem numérica. Um
 volume novo do Compose executa todas automaticamente por
 `/docker-entrypoint-initdb.d`. Volumes existentes não são atualizados por esse
 mecanismo.
@@ -235,7 +237,7 @@ As migrações preservam uma evolução append-only:
 - `0015`–`0021`: upload/revisão de mídia, resumo preparado e exportação
   auditada;
 - `0022`–`0027`: proposta pós-inspeção, revisão e planejamento de roçada;
-- `0028`–`0031`: ensaio simulado, medições e fotos pós-serviço.
+- `0028`–`0032`: ensaio simulado, medições, fotos e acesso auditado pós-serviço.
 
 Decisões detalhadas e invariantes de cada etapa estão em
 [`docs/decisions`](docs/decisions).
@@ -371,6 +373,7 @@ POST /v1/prepared-mowing-orders/{id}/readiness-assessments
 POST /v1/prepared-mowing-orders/{id}/planning-approvals
 GET  /v1/prepared-mowing-rehearsals
 POST /v1/mowing-media/{photo_id}
+GET  /v1/mowing-media/{photo_id}
 ```
 
 Recursos são referências candidatas; clima e segurança são declarações manuais
@@ -381,6 +384,8 @@ O upload pós-serviço só ocorre após aceitação dos três manifestos. O apli
 persiste cada recibo antes de avançar e retoma apenas fotos não confirmadas. A
 resposta permanece `simulated`, `uploaded_unverified`, `not_validated`,
 `not_collected` e inelegível para execução, treinamento e relatório oficial.
+Na recuperação, a API revalida o papel atual na rodovia, descriptografa a
+versão exata, confere tamanho/SHA-256 e registra o acesso antes da entrega.
 
 ### Prévia NDVI local
 
@@ -471,7 +476,7 @@ arquivos brutos ou credenciais de provedores.
   por decoder/malware e controles completos de privacidade.
 - Não há GPS real, despacho, rastreamento, execução de roçada ou aprovação
   operacional.
-- Fotos pós-serviço ainda não possuem recuperação auditada nem revisão humana.
+- Fotos pós-serviço ainda não possuem revisão humana.
 - O mapa e o histórico ainda não são atualizados com um resultado pós-roçada.
 - Não existe relatório operacional oficial; os resumos atuais são preparados e
   simulados.

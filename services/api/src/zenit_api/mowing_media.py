@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+from dataclasses import dataclass
 from typing import Annotated, Literal, Protocol
 from uuid import UUID
 
 import psycopg
-from fastapi import APIRouter, Depends, File, Header, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Header, HTTPException, Response, UploadFile
 from pydantic import BaseModel
 
 from zenit_api.auth import AuthenticatedUser, get_current_user
@@ -25,9 +26,7 @@ class MowingPostServicePhotoUploadResponse(BaseModel):
     byte_size: int
     media_type: Literal["image/jpeg", "image/png"]
     phase: Literal["post_service"] = "post_service"
-    photo_scope: Literal["mowing_demo_post_service_only"] = (
-        "mowing_demo_post_service_only"
-    )
+    photo_scope: Literal["mowing_demo_post_service_only"] = "mowing_demo_post_service_only"
     content_status: Literal["uploaded_unverified"] = "uploaded_unverified"
     ruler_status: Literal["not_validated"] = "not_validated"
     location_status: Literal["not_collected"] = "not_collected"
@@ -41,6 +40,13 @@ class MowingPostServicePhotoUploadResponse(BaseModel):
     persisted: Literal[True] = True
 
 
+@dataclass(frozen=True)
+class MowingPostServicePhotoContent:
+    content: bytes
+    media_type: Literal["image/jpeg", "image/png"]
+    checksum_sha256: str
+
+
 class MowingMediaWriter(Protocol):
     async def upload(
         self,
@@ -52,6 +58,15 @@ class MowingMediaWriter(Protocol):
         media_type: str,
         checksum_sha256: str,
     ) -> MowingPostServicePhotoUploadResponse: ...
+
+
+class MowingMediaReader(Protocol):
+    async def retrieve(
+        self,
+        *,
+        actor: AuthenticatedUser,
+        photo_id: UUID,
+    ) -> MowingPostServicePhotoContent: ...
 
 
 class MowingPostServiceMediaService:
@@ -197,6 +212,97 @@ class MowingPostServiceMediaService:
             )
         return _response(photo_id, checksum_sha256, len(content), media_type)
 
+    async def retrieve(
+        self,
+        *,
+        actor: AuthenticatedUser,
+        photo_id: UUID,
+    ) -> MowingPostServicePhotoContent:
+        connection = await psycopg.AsyncConnection.connect(self._database_url)
+        async with connection, connection.cursor() as cursor:
+            await cursor.execute(
+                """
+                SELECT receipt.object_name, receipt.object_version_id,
+                       receipt.checksum_sha256, receipt.byte_size,
+                       receipt.media_type
+                FROM prepared_mowing_post_service_photo_upload_receipt receipt
+                JOIN prepared_mowing_post_service_photo_manifest manifest
+                  ON manifest.photo_id = receipt.photo_id
+                JOIN prepared_mowing_order mowing
+                  ON mowing.id = manifest.mowing_order_id
+                JOIN work_order inspection
+                  ON inspection.id = mowing.source_inspection_work_order_id
+                JOIN segment_zone zone ON zone.id = inspection.segment_zone_id
+                JOIN road_segment segment ON segment.id = zone.road_segment_id
+                JOIN road_axis_candidate axis
+                  ON axis.id = segment.road_axis_candidate_id
+                JOIN app_user actor ON actor.id = %s
+                WHERE receipt.photo_id = %s
+                  AND actor.status = 'active'
+                  AND receipt.phase = 'post_service'
+                  AND receipt.photo_scope = 'mowing_demo_post_service_only'
+                  AND receipt.content_status = 'uploaded_unverified'
+                  AND receipt.ruler_status = 'not_validated'
+                  AND receipt.location_status = 'not_collected'
+                  AND receipt.quality_status = 'simulated_unverified'
+                  AND receipt.data_status = 'simulated'
+                  AND NOT receipt.operational_approval_satisfied
+                  AND NOT receipt.authorizes_field_work
+                  AND NOT receipt.eligible_for_field_execution
+                  AND NOT receipt.eligible_for_model_training
+                  AND NOT receipt.eligible_for_official_reporting
+                  AND EXISTS (
+                      SELECT 1 FROM road_user_role assignment
+                      WHERE assignment.user_id = actor.id
+                        AND assignment.road_id = axis.road_id
+                        AND assignment.role IN ('manager', 'supervisor')
+                        AND assignment.data_status <> 'simulated'
+                  )
+                """,
+                (actor.id, photo_id),
+            )
+            receipt = await cursor.fetchone()
+        if receipt is None:
+            raise PhotoManifestNotFoundError
+        content = await asyncio.to_thread(
+            self._store.get_verified,
+            name=receipt[0],
+            version_id=receipt[1],
+        )
+        if len(content) != receipt[3] or hashlib.sha256(content).hexdigest() != receipt[2]:
+            raise PhotoContentMismatchError
+        await self._record_retrieval(
+            actor=actor,
+            photo_id=photo_id,
+            checksum_sha256=receipt[2],
+            byte_size=receipt[3],
+        )
+        return MowingPostServicePhotoContent(
+            content=content,
+            media_type=receipt[4],
+            checksum_sha256=receipt[2],
+        )
+
+    async def _record_retrieval(
+        self,
+        *,
+        actor: AuthenticatedUser,
+        photo_id: UUID,
+        checksum_sha256: str,
+        byte_size: int,
+    ) -> None:
+        connection = await psycopg.AsyncConnection.connect(self._database_url)
+        async with connection, connection.cursor() as cursor:
+            await cursor.execute(
+                """
+                INSERT INTO prepared_mowing_post_service_photo_access_event (
+                    photo_id, actor_user_id, access_purpose, source_channel,
+                    checksum_sha256, byte_size
+                ) VALUES (%s, %s, 'human_review', 'api', %s, %s)
+                """,
+                (photo_id, actor.id, checksum_sha256, byte_size),
+            )
+
 
 def _response(
     photo_id: UUID,
@@ -216,7 +322,56 @@ async def get_mowing_media_writer() -> MowingPostServiceMediaService:
     return MowingPostServiceMediaService(get_settings())
 
 
+async def get_mowing_media_reader() -> MowingPostServiceMediaService:
+    return MowingPostServiceMediaService(get_settings())
+
+
 router = APIRouter(tags=["mowing-media"])
+
+
+@router.get("/v1/mowing-media/{photo_id}", response_class=Response)
+async def retrieve_mowing_post_service_photo(
+    photo_id: UUID,
+    actor: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    reader: Annotated[MowingMediaReader, Depends(get_mowing_media_reader)],
+) -> Response:
+    try:
+        photo = await reader.retrieve(actor=actor, photo_id=photo_id)
+    except PhotoManifestNotFoundError:
+        raise HTTPException(
+            status_code=404,
+            detail="simulated post-service photo not found",
+        ) from None
+    except PhotoContentMismatchError:
+        raise HTTPException(
+            status_code=409,
+            detail="stored post-service photo integrity check failed",
+        ) from None
+    extension = "jpg" if photo.media_type == "image/jpeg" else "png"
+    return Response(
+        content=photo.content,
+        media_type=photo.media_type,
+        headers={
+            "Cache-Control": "no-store, private",
+            "Content-Disposition": (
+                f'inline; filename="simulated-post-service-{photo_id}.{extension}"'
+            ),
+            "X-Content-Type-Options": "nosniff",
+            "X-Zenit-Checksum-SHA256": photo.checksum_sha256,
+            "X-Zenit-Phase": "post_service",
+            "X-Zenit-Photo-Scope": "mowing_demo_post_service_only",
+            "X-Zenit-Content-Status": "uploaded_unverified",
+            "X-Zenit-Ruler-Status": "not_validated",
+            "X-Zenit-Location-Status": "not_collected",
+            "X-Zenit-Quality-Status": "simulated_unverified",
+            "X-Zenit-Data-Status": "simulated",
+            "X-Zenit-Operational-Approval-Satisfied": "false",
+            "X-Zenit-Authorizes-Field-Work": "false",
+            "X-Zenit-Eligible-For-Field-Execution": "false",
+            "X-Zenit-Eligible-For-Model-Training": "false",
+            "X-Zenit-Eligible-For-Official-Reporting": "false",
+        },
+    )
 
 
 @router.post(
