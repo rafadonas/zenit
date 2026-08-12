@@ -137,6 +137,9 @@ ou resumo pós-serviço.
 | `data` | Entradas locais, manifestos e produtos derivados |
 | `docs` | Arquitetura, decisões e relatórios de qualidade |
 
+O dashboard mantém a fila de fotos de inspeção em `/photo-reviews` e a fila
+separada de fotos pós-serviço simuladas em `/mowing-photo-reviews`.
+
 ## Início rápido
 
 ### Pré-requisitos
