@@ -56,6 +56,9 @@ PREPARED_MOWING_DEMO_LIFECYCLE_MIGRATION = Path(
 PREPARED_MOWING_POST_SERVICE_MEASUREMENT_MIGRATION = Path(
     "infra/migrations/0029_prepared_mowing_post_service_measurement.sql"
 )
+PREPARED_MOWING_POST_SERVICE_PHOTO_MIGRATION = Path(
+    "infra/migrations/0030_prepared_mowing_post_service_photo_manifest.sql"
+)
 
 
 class MigrationContractTests(unittest.TestCase):
@@ -158,7 +161,7 @@ class MigrationContractTests(unittest.TestCase):
         mounts = [
             line.strip() for line in compose.splitlines() if "/docker-entrypoint-initdb.d/" in line
         ]
-        self.assertEqual(len(mounts), 29)
+        self.assertEqual(len(mounts), 30)
         for version, mount in enumerate(mounts, start=1):
             prefix = f"{version:04d}"
             self.assertIn(f"infra/migrations/{prefix}_", mount)
@@ -199,6 +202,26 @@ class MigrationContractTests(unittest.TestCase):
             "prepared_mowing_post_service_measurement_point_key", sql
         )
         self.assertIn("prepared_mowing_post_service_measurement_immutable", sql)
+
+    def test_mowing_post_service_photo_is_a_separate_unuploaded_manifest(self) -> None:
+        sql = PREPARED_MOWING_POST_SERVICE_PHOTO_MIGRATION.read_text(encoding="utf-8")
+
+        self.assertIn("CREATE TABLE prepared_mowing_post_service_photo_manifest", sql)
+        self.assertIn("phase = 'post_service'", sql)
+        self.assertIn("photo_scope = 'mowing_demo_post_service_only'", sql)
+        self.assertIn("content_status = 'not_uploaded'", sql)
+        self.assertIn("ruler_status = 'not_validated'", sql)
+        self.assertIn("location_status = 'not_collected'", sql)
+        self.assertIn("data_status = 'simulated'", sql)
+        self.assertIn("quality_status = 'simulated_unverified'", sql)
+        self.assertIn("CHECK (NOT eligible_for_model_training)", sql)
+        self.assertIn("prepared_mowing_post_service_measurement measurement", sql)
+        self.assertIn("prevent_cross_scope_photo_id_reuse", sql)
+        self.assertIn("prepared_field_photo_manifest_cross_scope_photo_id", sql)
+        self.assertIn("newer.supersedes_plan_id = plan.id", sql)
+        self.assertIn("newer.supersedes_assessment_id = assessment.id", sql)
+        self.assertIn("prepared_mowing_post_service_photo_point_key", sql)
+        self.assertIn("prepared_mowing_post_service_photo_manifest_immutable", sql)
 
     def test_recommendation_reviews_are_audited_and_append_only(self) -> None:
         sql = RECOMMENDATION_REVIEW_MIGRATION.read_text(encoding="utf-8")

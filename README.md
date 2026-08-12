@@ -163,8 +163,10 @@ unverified post-service height per source point after the rehearsal finish.
 These records do not reuse inspection measurements and explicitly keep GPS and
 photos uncollected. The mobile capture screen sends a local lifecycle before
 the three heights in one idempotent batch, or only the heights when that
-lifecycle was already acknowledged. No post-service photo, review, map update,
-or summary exists yet.
+lifecycle was already acknowledged. The API can now also persist one separate,
+checksum-bound post-service photo manifest per measured point, explicitly
+labelled simulated, unverified, unlocated, and not uploaded. No photo bytes,
+mobile photo capture, upload receipt, review, map update, or summary exists yet.
 
 CI repeats this validation from an empty Compose volume after the Python,
 dashboard, and Flutter jobs pass. The Flutter job checks formatting, analysis,
@@ -177,8 +179,8 @@ credentials.
 ## Database migrations and ingestion
 
 Apply migrations in numeric order before importing sources. The current local
-development database must have migrations `0001` through `0029` applied. On the first
-startup of a new Compose volume, Postgres applies these twenty-nine up migrations in
+development database must have migrations `0001` through `0030` applied. On the first
+startup of a new Compose volume, Postgres applies these thirty up migrations in
 order through `/docker-entrypoint-initdb.d`; existing volumes are never modified
 by that initialization mechanism. The explicit commands below remain useful
 for non-Compose environments and controlled upgrades of existing databases.
@@ -242,6 +244,8 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0028_prepared_mowing_demo_lifecycle.sql
 docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
   < infra/migrations/0029_prepared_mowing_post_service_measurement.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
+  < infra/migrations/0030_prepared_mowing_post_service_photo_manifest.sql
 ```
 
 Migration `0008` starts the Sprint 4 management foundation with immutable,
@@ -369,6 +373,13 @@ point after the rehearsal finish. The new sync event remains unverified,
 collects neither GPS nor photo, and cannot authorize work, training, or official
 reporting. See
 `docs/decisions/ADR-0035-simulated-mowing-post-service-measurement-foundation.md`.
+
+Migration `0030` adds one separate checksum-bound post-service photo manifest
+per mowing-order/source-point pair after its simulated measurement. It records
+only `not_uploaded`, unvalidated, no-location metadata and cannot claim server
+possession, image quality, field execution, training eligibility, or official
+reporting. See
+`docs/decisions/ADR-0038-simulated-mowing-post-service-photo-manifest-foundation.md`.
 
 The mobile client can cache this prepared mowing-planning chain for offline,
 guarded demonstration. It validates provenance links and every execution block

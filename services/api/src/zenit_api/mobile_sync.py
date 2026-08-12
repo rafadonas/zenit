@@ -172,6 +172,38 @@ class PreparedPhotoManifestPayload(BaseModel):
         return value
 
 
+class PreparedMowingPostServicePhotoManifestPayload(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    photo_id: UUID
+    mowing_order_id: UUID
+    source_planning_approval_id: UUID
+    source_planned_point_id: UUID
+    phase: Literal["post_service"]
+    captured_at: datetime
+    checksum_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    byte_size: int = Field(gt=0, le=26_214_400)
+    media_type: Literal["image/jpeg", "image/png"]
+    photo_scope: Literal["mowing_demo_post_service_only"]
+    content_status: Literal["not_uploaded"]
+    ruler_status: Literal["not_validated"]
+    location_status: Literal["not_collected"]
+    data_status: Literal["simulated"]
+    quality_status: Literal["simulated_unverified"]
+    operational_approval_satisfied: Literal[False]
+    authorizes_field_work: Literal[False]
+    eligible_for_field_execution: Literal[False]
+    eligible_for_model_training: Literal[False]
+    eligible_for_official_reporting: Literal[False]
+
+    @field_validator("captured_at")
+    @classmethod
+    def require_timezone(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("captured_at must include a UTC offset")
+        return value
+
+
 class MobileSyncEventRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -242,6 +274,9 @@ class MobileSyncEventRequest(BaseModel):
             self.payload = measurement.model_dump(mode="json")
         if self.entity_type == "photo" and self.operation == "prepare":
             photo = PreparedPhotoManifestPayload.model_validate(self.payload)
+            self.payload = photo.model_dump(mode="json")
+        if self.entity_type == "mowing_photo" and self.operation == "prepare":
+            photo = PreparedMowingPostServicePhotoManifestPayload.model_validate(self.payload)
             self.payload = photo.model_dump(mode="json")
         return self
 
@@ -435,7 +470,8 @@ class PostgresMobileSyncRepository:
                 {
                     str(event.payload["photo_id"])
                     for event in request.events
-                    if event.entity_type == "photo" and event.operation == "prepare"
+                    if event.entity_type in {"photo", "mowing_photo"}
+                    and event.operation == "prepare"
                 }
             )
             for photo_id in photo_ids:
@@ -463,6 +499,7 @@ class PostgresMobileSyncRepository:
                         event.entity_type == "mowing_measurement"
                         and event.operation == "create"
                     )
+                    or (event.entity_type == "mowing_photo" and event.operation == "prepare")
                 }
             )
             for mowing_order_id in mowing_order_ids:
@@ -711,6 +748,37 @@ class PostgresMobileSyncRepository:
                             photo.media_type,
                         ),
                     )
+                elif event.entity_type == "mowing_photo":
+                    photo = PreparedMowingPostServicePhotoManifestPayload.model_validate(
+                        event.payload
+                    )
+                    await cursor.execute(
+                        """
+                        INSERT INTO prepared_mowing_post_service_photo_manifest (
+                            event_id, photo_id, mowing_order_id,
+                            source_planning_approval_id, source_planned_point_id,
+                            actor_user_id, device_id, phase, client_captured_at,
+                            checksum_sha256, byte_size, media_type, photo_scope
+                        ) VALUES (
+                            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                        )
+                        """,
+                        (
+                            event.event_id,
+                            photo.photo_id,
+                            photo.mowing_order_id,
+                            photo.source_planning_approval_id,
+                            photo.source_planned_point_id,
+                            actor.id,
+                            request.device_id,
+                            photo.phase,
+                            photo.captured_at,
+                            photo.checksum_sha256,
+                            photo.byte_size,
+                            photo.media_type,
+                            photo.photo_scope,
+                        ),
+                    )
                 else:
                     raise AssertionError("validated sync event has no persistence handler")
                 accepted.append(AcceptedSyncEventResponse(event_id=event.event_id))
@@ -825,6 +893,10 @@ class PostgresMobileSyncRepository:
             )
         if event.entity_type == "mowing_measurement" and event.operation == "create":
             return await PostgresMobileSyncRepository._validate_mowing_post_service_measurement(
+                cursor, actor_id, event
+            )
+        if event.entity_type == "mowing_photo" and event.operation == "prepare":
+            return await PostgresMobileSyncRepository._validate_mowing_post_service_photo(
                 cursor, actor_id, event
             )
         if event.entity_type == "photo" and event.operation == "prepare":
@@ -1221,6 +1293,120 @@ class PostgresMobileSyncRepository:
                 event_id=event.event_id,
                 code="mowing_measurement_already_recorded",
                 message="post-service measurement already exists for this source point",
+            )
+        return None
+
+    @staticmethod
+    async def _validate_mowing_post_service_photo(
+        cursor: psycopg.AsyncCursor[tuple],
+        actor_id: UUID,
+        event: MobileSyncEventRequest,
+    ) -> RejectedSyncEventResponse | None:
+        photo = PreparedMowingPostServicePhotoManifestPayload.model_validate(event.payload)
+        await cursor.execute(
+            """
+            SELECT 1 FROM prepared_field_photo_manifest WHERE photo_id = %s
+            UNION ALL
+            SELECT 1 FROM prepared_mowing_post_service_photo_manifest WHERE photo_id = %s
+            LIMIT 1
+            """,
+            (photo.photo_id, photo.photo_id),
+        )
+        if await cursor.fetchone() is not None:
+            return RejectedSyncEventResponse(
+                event_id=event.event_id,
+                code="photo_id_reused",
+                message="photo_id was already persisted by another event",
+            )
+        await cursor.execute(
+            """
+            SELECT measurement.mowing_order_id,
+                   measurement.source_planning_approval_id,
+                   measurement.source_planned_point_id,
+                   measurement.client_captured_at,
+                   mowing.status, mowing.data_status, mowing.location_status,
+                   mowing.requires_operational_approval,
+                   mowing.authorizes_field_work,
+                   mowing.eligible_for_field_execution,
+                   mowing.eligible_for_official_reporting,
+                   EXISTS (
+                       SELECT 1 FROM road_user_role assignment
+                       WHERE assignment.user_id = %s
+                         AND assignment.road_id = axis.road_id
+                         AND assignment.role IN ('manager', 'supervisor')
+                         AND assignment.data_status <> 'simulated'
+                   ),
+                   NOT EXISTS (
+                       SELECT 1 FROM prepared_mowing_planning_approval newer
+                       WHERE newer.supersedes_approval_id = approval.id
+                   ) AND NOT EXISTS (
+                       SELECT 1 FROM prepared_mowing_readiness_assessment newer
+                       WHERE newer.supersedes_assessment_id = assessment.id
+                   ) AND NOT EXISTS (
+                       SELECT 1 FROM prepared_mowing_resource_plan newer
+                       WHERE newer.supersedes_plan_id = plan.id
+                   ) AND NOT EXISTS (
+                       SELECT 1 FROM prepared_post_inspection_review correction
+                       WHERE correction.supersedes_review_id = mowing.source_review_id
+                   )
+            FROM prepared_mowing_post_service_measurement measurement
+            JOIN prepared_mowing_order mowing ON mowing.id = measurement.mowing_order_id
+            JOIN prepared_mowing_planning_approval approval
+              ON approval.id = measurement.source_planning_approval_id
+            JOIN prepared_mowing_readiness_assessment assessment
+              ON assessment.id = approval.readiness_assessment_id
+            JOIN prepared_mowing_resource_plan plan
+              ON plan.id = assessment.resource_plan_id
+             AND plan.mowing_order_id = mowing.id
+            JOIN work_order inspection
+              ON inspection.id = mowing.source_inspection_work_order_id
+            JOIN segment_zone zone ON zone.id = inspection.segment_zone_id
+            JOIN road_segment segment ON segment.id = zone.road_segment_id
+            JOIN road_axis_candidate axis ON axis.id = segment.road_axis_candidate_id
+            WHERE measurement.mowing_order_id = %s
+              AND measurement.source_planned_point_id = %s
+            """,
+            (actor_id, photo.mowing_order_id, photo.source_planned_point_id),
+        )
+        target = await cursor.fetchone()
+        if target is None:
+            return RejectedSyncEventResponse(
+                event_id=event.event_id,
+                code="mowing_photo_target_not_found",
+                message="post-service measurement target was not found",
+            )
+        if (
+            target[1] != photo.source_planning_approval_id
+            or target[2] != photo.source_planned_point_id
+        ):
+            return RejectedSyncEventResponse(
+                event_id=event.event_id,
+                code="mowing_photo_provenance_mismatch",
+                message="photo does not match the post-service measurement provenance",
+            )
+        if target[4:11] != ("prepared", "prepared", "simulated", True, False, False, False):
+            return RejectedSyncEventResponse(
+                event_id=event.event_id,
+                code="unsupported_mowing_photo_state",
+                message="post-service photos require a non-operational prepared target",
+            )
+        if not target[11]:
+            return RejectedSyncEventResponse(
+                event_id=event.event_id,
+                code="road_access_denied",
+                message="actor no longer has an eligible role for this road",
+            )
+        if not target[12]:
+            return RejectedSyncEventResponse(
+                event_id=event.event_id,
+                code="planning_approval_not_effective",
+                message="post-service photo requires effective prepared planning",
+            )
+        if photo.captured_at < target[3]:
+            return RejectedSyncEventResponse(
+                event_id=event.event_id,
+                code="mowing_photo_time_invalid",
+                message="post-service photo cannot predate its measurement",
             )
         return None
 
