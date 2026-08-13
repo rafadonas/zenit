@@ -1,17 +1,26 @@
 from __future__ import annotations
 
+import csv
 import hashlib
+from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
+from io import StringIO
 from typing import Annotated, Literal, Protocol
 from uuid import UUID
 
 import psycopg
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from zenit_api.auth import AuthenticatedUser, get_current_user
 from zenit_api.config import get_settings
+
+MOWING_POST_SERVICE_SUMMARY_CSV_VERSION = "simulated-mowing-post-service-summary-csv-v1"
+MOWING_POST_SERVICE_SUMMARY_EXPORT_NOTICE = (
+    "SIMULATED MOWING POST-SERVICE EXPORT - NOT FIELD EVIDENCE - "
+    "NOT AN OFFICIAL REPORT - DOES NOT AUTHORIZE FIELD WORK"
+)
 
 
 class MowingPostServiceSummaryRequest(BaseModel):
@@ -63,6 +72,26 @@ class MowingPostServiceSummaryCollection(BaseModel):
     )
 
 
+class MowingPostServiceSummaryExportRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    export_purpose: str = Field(min_length=1, max_length=2000)
+
+    @field_validator("export_purpose")
+    @classmethod
+    def normalize_purpose(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("export purpose cannot be blank")
+        return value
+
+
+@dataclass(frozen=True)
+class MowingPostServiceSummaryExportContent:
+    content: bytes
+    checksum_sha256: str
+    schema_version: str = MOWING_POST_SERVICE_SUMMARY_CSV_VERSION
+
+
 class SummaryError(Exception):
     pass
 
@@ -91,6 +120,14 @@ class SummaryAlreadyExists(SummaryError):
     pass
 
 
+class SummaryExportNotFound(SummaryError):
+    pass
+
+
+class SummaryExportIdempotencyConflict(SummaryError):
+    pass
+
+
 class MowingSummaryWriter(Protocol):
     async def create(
         self,
@@ -106,6 +143,92 @@ class MowingSummaryReader(Protocol):
     async def list_for_actor(
         self, *, actor: AuthenticatedUser, limit: int
     ) -> MowingPostServiceSummaryCollection: ...
+
+
+class MowingSummaryExporter(Protocol):
+    async def export_csv(
+        self,
+        *,
+        summary_id: UUID,
+        actor: AuthenticatedUser,
+        idempotency_key: str,
+        request: MowingPostServiceSummaryExportRequest,
+    ) -> MowingPostServiceSummaryExportContent: ...
+
+
+def _safe_csv_text(value: str) -> str:
+    if value.startswith(("\t", "\r", "\n")) or value.lstrip().startswith(("=", "+", "-", "@")):
+        return f"'{value}"
+    return value
+
+
+def build_mowing_post_service_summary_csv(
+    summary: MowingPostServiceSummaryResponse,
+    export_purpose: str,
+) -> bytes:
+    output = StringIO(newline="")
+    writer = csv.writer(output, lineterminator="\r\n")
+    writer.writerow(
+        [
+            "export_notice",
+            "export_schema_version",
+            "export_purpose",
+            "summary_id",
+            "mowing_order_id",
+            "summary_policy_version",
+            "generation_rationale",
+            "measurement_count",
+            "accepted_photo_review_count",
+            "minimum_height_cm",
+            "mean_height_cm",
+            "maximum_height_cm",
+            "n1_count",
+            "n2_count",
+            "n3_count",
+            "phase",
+            "summary_scope",
+            "location_status",
+            "data_status",
+            "evidence_status",
+            "eligible_for_field_evidence",
+            "eligible_for_field_execution",
+            "eligible_for_model_training",
+            "eligible_for_official_reporting",
+            "authorizes_field_work",
+            "summary_generated_at",
+        ]
+    )
+    writer.writerow(
+        [
+            MOWING_POST_SERVICE_SUMMARY_EXPORT_NOTICE,
+            MOWING_POST_SERVICE_SUMMARY_CSV_VERSION,
+            _safe_csv_text(export_purpose),
+            summary.summary_id,
+            summary.mowing_order_id,
+            summary.summary_policy_version,
+            _safe_csv_text(summary.generation_rationale),
+            summary.measurement_count,
+            summary.accepted_photo_review_count,
+            summary.minimum_height_cm,
+            summary.mean_height_cm,
+            summary.maximum_height_cm,
+            summary.n1_count,
+            summary.n2_count,
+            summary.n3_count,
+            summary.phase,
+            summary.summary_scope,
+            summary.location_status,
+            summary.data_status,
+            summary.evidence_status,
+            summary.eligible_for_field_evidence,
+            summary.eligible_for_field_execution,
+            summary.eligible_for_model_training,
+            summary.eligible_for_official_reporting,
+            summary.authorizes_field_work,
+            summary.generated_at.isoformat(),
+        ]
+    )
+    return output.getvalue().encode("utf-8-sig")
 
 
 class PostgresMowingSummaryRepository:
@@ -196,6 +319,123 @@ class PostgresMowingSummaryRepository:
             items=items, result_count=len(items), limit=limit, truncated=len(rows) > limit
         )
 
+    async def export_csv(
+        self,
+        *,
+        summary_id: UUID,
+        actor: AuthenticatedUser,
+        idempotency_key: str,
+        request: MowingPostServiceSummaryExportRequest,
+    ) -> MowingPostServiceSummaryExportContent:
+        key_hash = hashlib.sha256(idempotency_key.encode()).hexdigest()
+        connection = await psycopg.AsyncConnection.connect(self._database_url)
+        async with connection, connection.cursor() as cursor:
+            summary = await self._authorized_export_summary(cursor, summary_id, actor)
+            if summary is None:
+                raise SummaryExportNotFound
+            content = build_mowing_post_service_summary_csv(summary, request.export_purpose)
+            checksum = hashlib.sha256(content).hexdigest()
+            existing = await self._export_by_key(cursor, key_hash)
+            if existing is not None:
+                self._assert_export_replay(
+                    existing, summary_id, actor, request.export_purpose, checksum, len(content)
+                )
+                return MowingPostServiceSummaryExportContent(
+                    content=content, checksum_sha256=checksum
+                )
+            await cursor.execute(
+                """
+                INSERT INTO prepared_mowing_post_service_summary_export_event (
+                    summary_id, actor_user_id, idempotency_key, export_schema_version,
+                    export_purpose, checksum_sha256, byte_size, phase, summary_scope,
+                    location_status, data_status, eligible_for_official_reporting,
+                    authorizes_field_work)
+                VALUES (
+                    %s, %s, %s, %s, %s, %s, %s, 'post_service',
+                    'mowing_demo_post_service_only', 'not_collected', 'simulated',
+                    false, false)
+                ON CONFLICT (idempotency_key) DO NOTHING
+                RETURNING id
+                """,
+                (
+                    summary_id,
+                    actor.id,
+                    key_hash,
+                    MOWING_POST_SERVICE_SUMMARY_CSV_VERSION,
+                    request.export_purpose,
+                    checksum,
+                    len(content),
+                ),
+            )
+            if await cursor.fetchone() is None:
+                existing = await self._export_by_key(cursor, key_hash)
+                if existing is None:
+                    raise SummaryExportIdempotencyConflict
+                self._assert_export_replay(
+                    existing, summary_id, actor, request.export_purpose, checksum, len(content)
+                )
+            return MowingPostServiceSummaryExportContent(content=content, checksum_sha256=checksum)
+
+    async def _authorized_export_summary(self, cursor, summary_id, actor):
+        await cursor.execute(
+            """
+            SELECT summary.id, summary.mowing_order_id, policy.version,
+                   summary.generation_rationale, summary.measurement_count,
+                   summary.accepted_photo_review_count, summary.minimum_height_cm,
+                   summary.maximum_height_cm, summary.mean_height_cm,
+                   summary.n1_count, summary.n2_count, summary.n3_count,
+                   summary.generated_at
+            FROM prepared_mowing_post_service_summary summary
+            JOIN prepared_mowing_post_service_summary_policy policy
+              ON policy.id = summary.summary_policy_id
+            JOIN prepared_mowing_order mowing ON mowing.id = summary.mowing_order_id
+            JOIN work_order inspection ON inspection.id = mowing.source_inspection_work_order_id
+            JOIN segment_zone zone ON zone.id = inspection.segment_zone_id
+            JOIN road_segment segment ON segment.id = zone.road_segment_id
+            JOIN road_axis_candidate axis ON axis.id = segment.road_axis_candidate_id
+            WHERE summary.id = %s
+              AND summary.phase = 'post_service'
+              AND summary.summary_scope = 'mowing_demo_post_service_only'
+              AND summary.location_status = 'not_collected'
+              AND summary.data_status = 'simulated'
+              AND NOT summary.eligible_for_official_reporting
+              AND NOT summary.authorizes_field_work
+              AND EXISTS (
+                  SELECT 1 FROM road_user_role assignment
+                  WHERE assignment.user_id = %s
+                    AND assignment.road_id = axis.road_id
+                    AND assignment.role IN ('manager', 'supervisor')
+                    AND assignment.data_status <> 'simulated'
+              )
+            """,
+            (summary_id, actor.id),
+        )
+        row = await cursor.fetchone()
+        return self._row(row) if row is not None else None
+
+    async def _export_by_key(self, cursor, key_hash: str):
+        await cursor.execute(
+            """
+            SELECT summary_id, actor_user_id, export_purpose, checksum_sha256, byte_size
+            FROM prepared_mowing_post_service_summary_export_event
+            WHERE idempotency_key = %s
+            """,
+            (key_hash,),
+        )
+        return await cursor.fetchone()
+
+    @staticmethod
+    def _assert_export_replay(
+        row: tuple,
+        summary_id: UUID,
+        actor: AuthenticatedUser,
+        purpose: str,
+        checksum: str,
+        byte_size: int,
+    ) -> None:
+        if row != (summary_id, actor.id, purpose, checksum, byte_size):
+            raise SummaryExportIdempotencyConflict
+
     async def _by_key(self, cursor, key_hash):
         await cursor.execute(
             "SELECT id, mowing_order_id, generated_by_user_id, generation_rationale FROM prepared_mowing_post_service_summary WHERE idempotency_key=%s",  # noqa: E501
@@ -237,6 +477,13 @@ async def get_mowing_summary_writer():
 
 
 async def get_mowing_summary_reader():
+    settings = get_settings()
+    return PostgresMowingSummaryRepository(
+        settings.database_url, settings.prepared_mowing_post_service_summary_policy_version
+    )
+
+
+async def get_mowing_summary_exporter():
     settings = get_settings()
     return PostgresMowingSummaryRepository(
         settings.database_url, settings.prepared_mowing_post_service_summary_policy_version
@@ -289,3 +536,41 @@ async def list_summaries(
     limit: Annotated[int, Field(ge=1, le=100)] = 50,
 ):
     return await reader.list_for_actor(actor=actor, limit=limit)
+
+
+@summary_router.post("/{summary_id}/exports")
+async def export_summary(
+    summary_id: UUID,
+    request: MowingPostServiceSummaryExportRequest,
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=8, max_length=200)],
+    actor: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    exporter: Annotated[MowingSummaryExporter, Depends(get_mowing_summary_exporter)],
+) -> Response:
+    try:
+        export = await exporter.export_csv(
+            summary_id=summary_id,
+            actor=actor,
+            idempotency_key=idempotency_key,
+            request=request,
+        )
+    except SummaryExportNotFound:
+        raise HTTPException(404, "Simulated mowing post-service summary not found") from None
+    except SummaryExportIdempotencyConflict:
+        raise HTTPException(409, "Idempotency-Key conflict") from None
+    return Response(
+        content=export.content,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="zenit-simulated-mowing-summary-{summary_id}.csv"'
+            ),
+            "Cache-Control": "no-store, private",
+            "X-Content-Type-Options": "nosniff",
+            "X-Zenit-Checksum-SHA256": export.checksum_sha256,
+            "X-Zenit-Export-Schema-Version": export.schema_version,
+            "X-Zenit-Data-Status": "simulated",
+            "X-Zenit-Location-Status": "not_collected",
+            "X-Zenit-Eligible-For-Official-Reporting": "false",
+            "X-Zenit-Authorizes-Field-Work": "false",
+        },
+    )

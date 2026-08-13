@@ -389,6 +389,7 @@ POST /v1/mowing-media/{photo_id}/reviews
 GET  /v1/mowing-photo-review-queue
 POST /v1/prepared-mowing-orders/{mowing_order_id}/post-service-summary
 GET  /v1/prepared-mowing-post-service-summaries
+POST /v1/prepared-mowing-post-service-summaries/{summary_id}/exports
 ```
 
 Recursos são referências candidatas; clima e segurança são declarações manuais
@@ -403,9 +404,9 @@ Na recuperação, a API revalida o papel atual na rodovia, descriptografa a
 versão exata, confere tamanho/SHA-256 e registra o acesso antes da entrega.
 A fila e as decisões humanas permanecem separadas da inspeção; uma aceitação
 confirma apenas qualidade visual e régua visível, sem validar altura ou roçada.
-O dashboard permite solicitar e consultar os resumos pós-serviço simulados; essa
-agregação permanece simulada, idempotente e não atualiza mapa, histórico
-operacional nem relatório oficial.
+O dashboard permite solicitar, consultar e exportar CSV dos resumos pós-serviço
+simulados; essa agregação permanece simulada, idempotente, auditada e não
+atualiza mapa, histórico operacional nem relatório oficial.
 
 ### Prévia NDVI local
 

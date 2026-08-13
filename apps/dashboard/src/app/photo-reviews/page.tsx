@@ -329,6 +329,11 @@ export default async function PhotoReviewsPage({ searchParams }: PageProps) {
                       <div className="summary-classes"><span>N1 · {mowingSummary.n1_count}</span><span>N2 · {mowingSummary.n2_count}</span><span>N3 · {mowingSummary.n3_count}</span></div>
                       <p>{mowingSummary.generation_rationale}</p>
                       <small>Não comprova roçada, eficácia, conclusão, treinamento ou relatório oficial.</small>
+                      <form action={`/api/prepared-mowing-post-service-summaries/${mowingSummary.summary_id}/exports`} className="summary-export-form" method="post">
+                        <input name="csrf_token" type="hidden" value={session.csrfToken} /><input name="idempotency_key" type="hidden" value={randomUUID()} />
+                        <label htmlFor={`mowing-export-purpose-${mowingSummary.summary_id}`}>Propósito da exportação</label><input defaultValue="Compartilhar pós-serviço simulado para revisão" id={`mowing-export-purpose-${mowingSummary.summary_id}`} maxLength={2000} name="export_purpose" required />
+                        <button className="secondary-button" type="submit">Baixar CSV simulado</button><small>CSV auditado, simulado e inelegível para relatório oficial.</small>
+                      </form>
                     </div> : rehearsal.post_service_measurements.length === 3 && rehearsal.post_service_photo_reviews.filter((photo) => photo.latest_decision === "accepted" && photo.latest_quality_status === "accepted" && photo.latest_ruler_status === "visible").length === 3 ? <form action={`/api/prepared-mowing-orders/${proposal.prepared_mowing_order_id}/post-service-summary`} className="prepared-summary-form" method="post">
                       <input name="csrf_token" type="hidden" value={session.csrfToken} /><input name="idempotency_key" type="hidden" value={randomUUID()} />
                       <label htmlFor={`mowing-summary-rationale-${proposal.prepared_mowing_order_id}`}>Justificativa da consolidação pós-serviço</label><textarea defaultValue="Consolidar o pós-serviço simulado após três medições e três revisões visuais aceitas" id={`mowing-summary-rationale-${proposal.prepared_mowing_order_id}`} maxLength={2000} name="generation_rationale" required rows={2} />

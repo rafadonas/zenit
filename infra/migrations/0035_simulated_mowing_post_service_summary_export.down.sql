@@ -1,0 +1,10 @@
+BEGIN;
+
+DROP TRIGGER IF EXISTS prepared_mowing_post_service_summary_export_event_immutable
+    ON prepared_mowing_post_service_summary_export_event;
+DROP TRIGGER IF EXISTS prepared_mowing_post_service_summary_export_event_guard
+    ON prepared_mowing_post_service_summary_export_event;
+DROP FUNCTION IF EXISTS validate_prepared_mowing_post_service_summary_export_event();
+DROP TABLE IF EXISTS prepared_mowing_post_service_summary_export_event;
+
+COMMIT;
