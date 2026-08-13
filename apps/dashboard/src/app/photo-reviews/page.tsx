@@ -10,6 +10,10 @@ import {
   type MowingRehearsalState,
   type PreparedMowingRehearsalCollection,
 } from "../../lib/mowing-rehearsals";
+import {
+  isMowingPostServiceSummaryCollection,
+  type MowingPostServiceSummaryCollection,
+} from "../../lib/mowing-post-service-summaries";
 import { isPhotoReviewQueue, type PhotoReviewQueue } from "../../lib/photo-reviews";
 import {
   isPreparedProposalCollection, type PreparedPostInspectionProposal,
@@ -27,7 +31,7 @@ interface PageProps {
   searchParams: Promise<{
     review?: string; summary?: string; export?: string; proposal?: string;
     proposal_review?: string; mowing_order?: string; resource_plan?: string;
-    readiness?: string; planning_approval?: string;
+    readiness?: string; planning_approval?: string; mowing_summary?: string;
   }>;
 }
 
@@ -93,11 +97,33 @@ async function loadMowingRehearsals(): Promise<PreparedMowingRehearsalCollection
   return payload;
 }
 
+async function loadMowingSummaries(): Promise<MowingPostServiceSummaryCollection | null> {
+  const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
+  if (!token) return null;
+  const baseUrl = process.env.INTERNAL_API_URL ?? "http://localhost:8000";
+  const response = await fetch(`${baseUrl}/v1/prepared-mowing-post-service-summaries?limit=50`, {
+    cache: "no-store", headers: { Authorization: `Bearer ${token}` },
+  });
+  if (response.status === 401) return null;
+  if (!response.ok) throw new Error(`Prepared mowing summary list returned HTTP ${response.status}`);
+  const payload: unknown = await response.json();
+  if (!isMowingPostServiceSummaryCollection(payload)) {
+    throw new Error("Prepared mowing summary safety contract is invalid");
+  }
+  return payload;
+}
+
 function message(
   review?: string, summary?: string, exportStatus?: string, proposal?: string,
   proposalReview?: string, mowingOrder?: string, resourcePlan?: string,
-  readiness?: string, planningApproval?: string,
+  readiness?: string, planningApproval?: string, mowingSummary?: string,
 ): string | null {
+  if (mowingSummary === "generated") return "Resumo pós-serviço simulado gerado; continua sem conclusão operacional.";
+  if (mowingSummary === "forbidden") return "Seu usuário não pode gerar resumo pós-serviço para esta rodovia.";
+  if (mowingSummary === "missing") return "A ordem de roçada preparada não foi encontrada.";
+  if (mowingSummary === "conflict") return "O resumo pós-serviço já existe, a evidência está incompleta ou a chave entrou em conflito.";
+  if (mowingSummary === "invalid") return "A justificativa do resumo pós-serviço é inválida.";
+  if (mowingSummary === "service-unavailable") return "O serviço de resumo pós-serviço não está disponível agora.";
   if (planningApproval === "recorded") return "Decisão sobre o planejamento registrada; aprovação operacional continua não satisfeita.";
   if (planningApproval === "forbidden") return "Seu usuário não pode decidir este planejamento.";
   if (planningApproval === "missing") return "A ordem de roçada preparada não foi encontrada.";
@@ -197,13 +223,14 @@ function formatRecordedSpan(seconds: number | null): string {
 }
 
 export default async function PhotoReviewsPage({ searchParams }: PageProps) {
-  const [session, queue, summaries, proposals, rehearsals, query] = await Promise.all([
+  const [session, queue, summaries, proposals, rehearsals, mowingSummaries, query] = await Promise.all([
     loadDashboardSession(), loadQueue(), loadSummaries(), loadProposals(),
-    loadMowingRehearsals(), searchParams,
+    loadMowingRehearsals(), loadMowingSummaries(), searchParams,
   ]);
   const operationMessage = message(
     query.review, query.summary, query.export, query.proposal, query.proposal_review,
     query.mowing_order, query.resource_plan, query.readiness, query.planning_approval,
+    query.mowing_summary,
   );
   const summaryByOrder = new Map<string, PreparedInspectionSummary>(
     summaries?.items.map((summary) => [summary.work_order_id, summary]) ?? [],
@@ -214,6 +241,9 @@ export default async function PhotoReviewsPage({ searchParams }: PageProps) {
   );
   const rehearsalByMowingOrder = new Map(
     rehearsals?.items.map((rehearsal) => [rehearsal.mowing_order_id, rehearsal]) ?? [],
+  );
+  const mowingSummaryByOrder = new Map(
+    mowingSummaries?.items.map((summary) => [summary.mowing_order_id, summary]) ?? [],
   );
   for (const item of queue?.items ?? []) {
     const group = orderGroups.get(item.work_order_id) ?? [];
@@ -250,6 +280,8 @@ export default async function PhotoReviewsPage({ searchParams }: PageProps) {
             : proposal?.latest_review_decision === "accepted" ? proposal.recommendation : null;
           const rehearsal = proposal?.prepared_mowing_order_id
             ? rehearsalByMowingOrder.get(proposal.prepared_mowing_order_id) : undefined;
+          const mowingSummary = proposal?.prepared_mowing_order_id
+            ? mowingSummaryByOrder.get(proposal.prepared_mowing_order_id) : undefined;
           return <article className="prepared-summary-card" key={workOrderId}>
             <div className="prepared-summary-heading"><div><p className="eyebrow">{first.road_code} · trecho #{first.segment_index} · {first.zone_type}</p><h2>Retorno dos três pontos</h2></div><span className={`status-pill ${summary ? "review" : "prepared"}`}>{summary ? "Resumo gerado" : `${acceptedCount}/3 aceitos`}</span></div>
             {summary ? <>
@@ -291,6 +323,17 @@ export default async function PhotoReviewsPage({ searchParams }: PageProps) {
                       {rehearsal.post_service_photo_reviews.length > 0 ? <ol>{rehearsal.post_service_photo_reviews.map((photo) => <li key={photo.photo_id}><div><strong>Ponto preparado {photo.source_point_sequence}</strong><span>{photo.latest_decision ? `Decisão ${photo.latest_decision}` : "Aguardando revisão"}</span></div><span>{photo.latest_ruler_status === "visible" ? "Régua visível" : photo.latest_ruler_status === null ? "Não revisada" : "Régua não confirmada"}</span></li>)}</ol> : <p>Nenhuma foto pós-serviço enviada.</p>}
                       <small>Entrada simulada e não verificada, sem GPS ou foto. Não é evidência de vegetação, eficácia ou conclusão da roçada.</small>
                     </div>
+                    {mowingSummary ? <div className="mowing-post-service-history">
+                      <div><strong>Resumo pós-serviço simulado</strong><span className="status-pill review">Gerado</span></div>
+                      <div className="summary-metrics"><div><strong>{formatHeight(mowingSummary.minimum_height_cm)} cm</strong><span>Mínima</span></div><div><strong>{formatHeight(mowingSummary.mean_height_cm)} cm</strong><span>Média</span></div><div><strong>{formatHeight(mowingSummary.maximum_height_cm)} cm</strong><span>Máxima</span></div></div>
+                      <div className="summary-classes"><span>N1 · {mowingSummary.n1_count}</span><span>N2 · {mowingSummary.n2_count}</span><span>N3 · {mowingSummary.n3_count}</span></div>
+                      <p>{mowingSummary.generation_rationale}</p>
+                      <small>Não comprova roçada, eficácia, conclusão, treinamento ou relatório oficial.</small>
+                    </div> : rehearsal.post_service_measurements.length === 3 && rehearsal.post_service_photo_reviews.filter((photo) => photo.latest_decision === "accepted" && photo.latest_quality_status === "accepted" && photo.latest_ruler_status === "visible").length === 3 ? <form action={`/api/prepared-mowing-orders/${proposal.prepared_mowing_order_id}/post-service-summary`} className="prepared-summary-form" method="post">
+                      <input name="csrf_token" type="hidden" value={session.csrfToken} /><input name="idempotency_key" type="hidden" value={randomUUID()} />
+                      <label htmlFor={`mowing-summary-rationale-${proposal.prepared_mowing_order_id}`}>Justificativa da consolidação pós-serviço</label><textarea defaultValue="Consolidar o pós-serviço simulado após três medições e três revisões visuais aceitas" id={`mowing-summary-rationale-${proposal.prepared_mowing_order_id}`} maxLength={2000} name="generation_rationale" required rows={2} />
+                      <button className="primary-button" type="submit">Gerar resumo pós-serviço</button><small>Calcula agregados apenas das alturas digitadas; fotos aceitas só fecham a completude visual. Não autoriza campo.</small>
+                    </form> : <div className="summary-pending"><strong>Resumo pós-serviço pendente</strong><span>Exige três alturas digitadas e três fotos aceitas com qualidade aceita e régua visível.</span></div>}
                     <small>Estado simulado e não operacional. “Ensaio finalizado” não comprova execução ou conclusão oficial.</small>
                   </div> : null}
                   <form action={`/api/prepared-mowing-orders/${proposal.prepared_mowing_order_id}/resource-plans`} className="prepared-summary-form" method="post">
