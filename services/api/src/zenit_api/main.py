@@ -16,6 +16,10 @@ from zenit_api.mowing_orders import router as mowing_orders_router
 from zenit_api.mowing_photo_reviews import queue_router as mowing_photo_review_queue_router
 from zenit_api.mowing_photo_reviews import router as mowing_photo_reviews_router
 from zenit_api.mowing_planning_approvals import router as mowing_planning_approvals_router
+from zenit_api.mowing_post_service_exceptions import (
+    collection_router as mowing_exception_collection_router,
+)
+from zenit_api.mowing_post_service_exceptions import router as mowing_exception_router
 from zenit_api.mowing_post_service_summaries import (
     router as mowing_post_service_summary_router,
 )
@@ -68,6 +72,8 @@ app.include_router(mowing_media_router)
 app.include_router(mowing_photo_reviews_router)
 app.include_router(mowing_post_service_summary_router)
 app.include_router(mowing_post_service_summary_list_router)
+app.include_router(mowing_exception_router)
+app.include_router(mowing_exception_collection_router)
 app.include_router(mowing_photo_review_queue_router)
 app.include_router(mowing_orders_router)
 app.include_router(mowing_rehearsals_router)

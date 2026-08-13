@@ -219,7 +219,7 @@ antes de alterar AOI ou período.
 
 ## Banco de dados e migrações
 
-O banco atual exige as migrações `0001` a `0033`, sempre em ordem numérica. Um
+O banco atual exige as migrações `0001` a `0036`, sempre em ordem numérica. Um
 volume novo do Compose executa todas automaticamente por
 `/docker-entrypoint-initdb.d`. Volumes existentes não são atualizados por esse
 mecanismo.
@@ -244,7 +244,8 @@ As migrações preservam uma evolução append-only:
 - `0015`–`0021`: upload/revisão de mídia, resumo preparado e exportação
   auditada;
 - `0022`–`0027`: proposta pós-inspeção, revisão e planejamento de roçada;
-- `0028`–`0033`: ensaio simulado, medições, fotos, acesso e revisão pós-serviço.
+- `0028`–`0036`: ensaio simulado, medições, fotos, acesso, revisão, resumo,
+  exportação e exceção pós-serviço.
 
 Decisões detalhadas e invariantes de cada etapa estão em
 [`docs/decisions`](docs/decisions).
@@ -390,6 +391,8 @@ GET  /v1/mowing-photo-review-queue
 POST /v1/prepared-mowing-orders/{mowing_order_id}/post-service-summary
 GET  /v1/prepared-mowing-post-service-summaries
 POST /v1/prepared-mowing-post-service-summaries/{summary_id}/exports
+POST /v1/prepared-mowing-post-service-summaries/{summary_id}/exceptions
+GET  /v1/prepared-mowing-post-service-exceptions
 ```
 
 Recursos são referências candidatas; clima e segurança são declarações manuais
@@ -407,6 +410,9 @@ confirma apenas qualidade visual e régua visível, sem validar altura ou roçad
 O dashboard permite solicitar, consultar e exportar CSV dos resumos pós-serviço
 simulados; essa agregação permanece simulada, idempotente, auditada e não
 atualiza mapa, histórico operacional nem relatório oficial.
+Uma exceção pós-serviço simulada pode apontar necessidade de inspeção de
+seguimento quando a máxima digitada ainda excede 10 cm em área especial ou
+30 cm nas demais zonas; ela exige revisão humana e não autoriza campo.
 
 ### Prévia NDVI local
 

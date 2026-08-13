@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     prepared_mowing_post_service_summary_policy_version: str = (
         "prepared-mowing-post-service-summary-v1"
     )
+    prepared_mowing_post_service_exception_policy_version: str = (
+        "prepared-mowing-post-service-exception-v1"
+    )
     object_storage_endpoint: str = "http://minio:9000"
     object_storage_access_key: str = "zenit"
     object_storage_secret_key: SecretStr = SecretStr("change_me")
