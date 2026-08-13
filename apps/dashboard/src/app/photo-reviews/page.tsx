@@ -223,7 +223,7 @@ export default async function PhotoReviewsPage({ searchParams }: PageProps) {
   return <main className="recommendations-shell">
     <header className="topbar">
       <div className="brand-block"><span className="brand-mark" aria-hidden="true"><i /></span><div><strong>ZENIT</strong><small>Vegetação rodoviária</small></div></div>
-      <nav className="topnav" aria-label="Navegação principal"><Link href="/">Corredor</Link><Link href="/recommendations">Recomendações</Link><Link aria-current="page" href="/photo-reviews">Fotos</Link></nav>
+      <nav className="topnav" aria-label="Navegação principal"><Link href="/">Corredor</Link><Link href="/recommendations">Recomendações</Link><Link aria-current="page" href="/photo-reviews">Fotos de inspeção</Link><Link href="/mowing-photo-reviews">Fotos pós-serviço</Link><Link href="/mowing-post-service-summaries">Resumos pós-serviço</Link></nav>
       {session ? <div className="session-context"><span>{session.user.display_name}</span><form action="/api/auth/logout" method="post"><input name="csrf_token" type="hidden" value={session.csrfToken} /><button type="submit">Sair</button></form></div> : <div className="update-context"><span>Dados</span><strong>preparados</strong></div>}
     </header>
     <section className="queue-heading">

@@ -48,7 +48,7 @@ button, input, select, textarea { font: inherit; }
 .brand-mark { width: 38px; height: 38px; display: grid; place-items: center; border: 1px solid rgb(255 255 255 / 34%); border-radius: 50% 50% 44% 56%; transform: rotate(-18deg); }
 .brand-mark i { width: 15px; height: 23px; border: 2px solid #d7efc8; border-width: 0 2px 2px 0; border-radius: 0 70% 0 70%; transform: rotate(-25deg); }
 .route-context { font-size: .78rem; letter-spacing: .05em; color: #d2e5dc; }
-.topnav { display: flex; align-items: center; gap: 8px; }
+.topnav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .topnav a { padding: 8px 10px; border-radius: 7px; color: #cfe2d9; font-size: .72rem; text-decoration: none; }
 .topnav a:hover, .topnav a:focus-visible, .topnav a[aria-current="page"] { color: white; background: rgb(255 255 255 / 12%); }
 .live-dot { display: inline-block; width: 7px; height: 7px; margin-right: 8px; border-radius: 50%; background: #a8d786; box-shadow: 0 0 0 4px rgb(168 215 134 / 14%); }

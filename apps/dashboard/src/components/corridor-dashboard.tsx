@@ -279,7 +279,9 @@ export function CorridorDashboard({
         <nav className="topnav" aria-label="Navegação principal">
           <Link aria-current="page" href="/">Corredor</Link>
           <Link href="/recommendations">Recomendações</Link>
-          <Link href="/photo-reviews">Fotos</Link>
+          <Link href="/photo-reviews">Fotos de inspeção</Link>
+          <Link href="/mowing-photo-reviews">Fotos pós-serviço</Link>
+          <Link href="/mowing-post-service-summaries">Resumos pós-serviço</Link>
         </nav>
         <div className="update-context">
           <span>Geometria</span>

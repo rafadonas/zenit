@@ -403,6 +403,9 @@ Na recuperação, a API revalida o papel atual na rodovia, descriptografa a
 versão exata, confere tamanho/SHA-256 e registra o acesso antes da entrega.
 A fila e as decisões humanas permanecem separadas da inspeção; uma aceitação
 confirma apenas qualidade visual e régua visível, sem validar altura ou roçada.
+O dashboard expõe os resumos pós-serviço gerados em tela somente leitura; essa
+agregação permanece simulada e não atualiza mapa, histórico operacional nem
+relatório oficial.
 
 ### Prévia NDVI local
 
