@@ -219,7 +219,7 @@ antes de alterar AOI ou período.
 
 ## Banco de dados e migrações
 
-O banco atual exige as migrações `0001` a `0036`, sempre em ordem numérica. Um
+O banco atual exige as migrações `0001` a `0037`, sempre em ordem numérica. Um
 volume novo do Compose executa todas automaticamente por
 `/docker-entrypoint-initdb.d`. Volumes existentes não são atualizados por esse
 mecanismo.
@@ -244,8 +244,8 @@ As migrações preservam uma evolução append-only:
 - `0015`–`0021`: upload/revisão de mídia, resumo preparado e exportação
   auditada;
 - `0022`–`0027`: proposta pós-inspeção, revisão e planejamento de roçada;
-- `0028`–`0036`: ensaio simulado, medições, fotos, acesso, revisão, resumo,
-  exportação e exceção pós-serviço.
+- `0028`–`0037`: ensaio simulado, medições, fotos, acesso, revisão, resumo,
+  exportação, exceção pós-serviço e decisão humana da exceção.
 
 Decisões detalhadas e invariantes de cada etapa estão em
 [`docs/decisions`](docs/decisions).
@@ -393,6 +393,7 @@ GET  /v1/prepared-mowing-post-service-summaries
 POST /v1/prepared-mowing-post-service-summaries/{summary_id}/exports
 POST /v1/prepared-mowing-post-service-summaries/{summary_id}/exceptions
 GET  /v1/prepared-mowing-post-service-exceptions
+POST /v1/prepared-mowing-post-service-exceptions/{exception_id}/decisions
 ```
 
 Recursos são referências candidatas; clima e segurança são declarações manuais
@@ -412,7 +413,10 @@ simulados; essa agregação permanece simulada, idempotente, auditada e não
 atualiza mapa, histórico operacional nem relatório oficial.
 Uma exceção pós-serviço simulada pode apontar necessidade de inspeção de
 seguimento quando a máxima digitada ainda excede 10 cm em área especial ou
-30 cm nas demais zonas; ela exige revisão humana e não autoriza campo.
+30 cm nas demais zonas; ela exige revisão humana e não autoriza campo. A decisão
+humana da exceção é append-only, pode aceitar, rejeitar ou ajustar apenas para
+`monitor`/`inspect_follow_up`, e continua inelegível para mapa, histórico
+operacional, relatório oficial e treinamento de modelo.
 
 ### Prévia NDVI local
 

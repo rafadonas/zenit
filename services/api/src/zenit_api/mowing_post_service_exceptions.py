@@ -8,7 +8,7 @@ from uuid import UUID
 
 import psycopg
 from fastapi import APIRouter, Depends, Header, HTTPException
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from zenit_api.auth import AuthenticatedUser, get_current_user
 from zenit_api.config import get_settings
@@ -51,6 +51,78 @@ class MowingPostServiceExceptionResponse(BaseModel):
     eligible_for_official_reporting: Literal[False] = False
     authorizes_field_work: Literal[False] = False
     created_at: datetime
+    review_count: int = Field(default=0, ge=0)
+    latest_review_id: UUID | None = None
+    latest_review_decision: Literal["accepted", "rejected", "adjusted"] | None = None
+    latest_adjusted_recommendation: Literal["monitor", "inspect_follow_up"] | None = None
+    latest_review_rationale: str | None = None
+    latest_reviewed_at: datetime | None = None
+    review_state: Literal["awaiting_review", "review_recorded_no_work_authorization"] = (
+        "awaiting_review"
+    )
+
+    @model_validator(mode="after")
+    def validate_review_state(self) -> MowingPostServiceExceptionResponse:
+        if self.review_count == 0:
+            if any(
+                value is not None
+                for value in (
+                    self.latest_review_id,
+                    self.latest_review_decision,
+                    self.latest_adjusted_recommendation,
+                    self.latest_review_rationale,
+                    self.latest_reviewed_at,
+                )
+            ) or self.review_state != "awaiting_review":
+                raise ValueError("unreviewed exception cannot expose review metadata")
+        elif (
+            self.latest_review_id is None
+            or self.latest_review_decision is None
+            or self.latest_reviewed_at is None
+            or self.review_state != "review_recorded_no_work_authorization"
+            or (self.latest_review_decision == "adjusted")
+            != (self.latest_adjusted_recommendation is not None)
+        ):
+            raise ValueError("reviewed exception requires one consistent effective review")
+        return self
+
+
+class MowingPostServiceExceptionReviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    decision: Literal["accepted", "rejected", "adjusted"]
+    adjusted_recommendation: Literal["monitor", "inspect_follow_up"] | None = None
+    rationale: str | None = Field(default=None, max_length=2000)
+    supersedes_review_id: UUID | None = None
+
+    @field_validator("rationale")
+    @classmethod
+    def normalize_rationale(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return value.strip() or None
+
+    @model_validator(mode="after")
+    def validate_review(self) -> MowingPostServiceExceptionReviewRequest:
+        if (self.decision == "adjusted") != (self.adjusted_recommendation is not None):
+            raise ValueError("adjusted decision requires exactly one replacement")
+        if self.decision in {"rejected", "adjusted"} and self.rationale is None:
+            raise ValueError("rejected and adjusted decisions require a rationale")
+        return self
+
+
+class MowingPostServiceExceptionReviewResponse(BaseModel):
+    review_id: UUID
+    exception_id: UUID
+    decision: Literal["accepted", "rejected", "adjusted"]
+    adjusted_recommendation: Literal["monitor", "inspect_follow_up"] | None
+    rationale: str | None
+    supersedes_review_id: UUID | None
+    policy_version: str
+    phase: Literal["post_service"] = "post_service"
+    data_status: Literal["simulated"] = "simulated"
+    eligible_for_official_reporting: Literal[False] = False
+    authorizes_field_work: Literal[False] = False
+    reviewed_at: datetime
 
 
 class MowingPostServiceExceptionCollection(BaseModel):
@@ -84,6 +156,10 @@ class ExceptionIdempotencyConflict(Exception):
     pass
 
 
+class ExceptionReviewSupersession(Exception):
+    pass
+
+
 class MowingPostServiceExceptionRepository(Protocol):
     async def create(
         self,
@@ -97,6 +173,15 @@ class MowingPostServiceExceptionRepository(Protocol):
     async def list_for_actor(
         self, *, actor: AuthenticatedUser, limit: int
     ) -> MowingPostServiceExceptionCollection: ...
+
+    async def record_review(
+        self,
+        *,
+        exception_id: UUID,
+        actor: AuthenticatedUser,
+        idempotency_key: str,
+        request: MowingPostServiceExceptionReviewRequest,
+    ) -> MowingPostServiceExceptionReviewResponse: ...
 
 
 class PostgresMowingPostServiceExceptionRepository:
@@ -211,6 +296,102 @@ class PostgresMowingPostServiceExceptionRepository:
             items=items, result_count=len(items), limit=limit, truncated=len(rows) > limit
         )
 
+    async def record_review(
+        self,
+        *,
+        exception_id: UUID,
+        actor: AuthenticatedUser,
+        idempotency_key: str,
+        request: MowingPostServiceExceptionReviewRequest,
+    ) -> MowingPostServiceExceptionReviewResponse:
+        key_hash = hashlib.sha256(idempotency_key.encode()).hexdigest()
+        connection = await psycopg.AsyncConnection.connect(self._database_url)
+        async with connection, connection.cursor() as cursor:
+            await cursor.execute(
+                """
+                SELECT exception.policy_id, policy.version, axis.road_id, policy.allowed_roles
+                FROM prepared_mowing_post_service_exception exception
+                JOIN prepared_mowing_post_service_exception_policy policy
+                  ON policy.id = exception.policy_id
+                JOIN prepared_mowing_post_service_summary summary
+                  ON summary.id = exception.summary_id
+                JOIN prepared_mowing_order mowing ON mowing.id = summary.mowing_order_id
+                JOIN work_order inspection ON inspection.id = mowing.source_inspection_work_order_id
+                JOIN segment_zone zone ON zone.id = inspection.segment_zone_id
+                JOIN road_segment segment ON segment.id = zone.road_segment_id
+                JOIN road_axis_candidate axis ON axis.id = segment.road_axis_candidate_id
+                WHERE exception.id=%s AND exception.requires_human_review
+                  AND exception.phase='post_service'
+                  AND exception.data_status='simulated'
+                  AND NOT exception.eligible_for_official_reporting
+                  AND NOT exception.authorizes_field_work
+                  AND policy.data_status='prepared'
+                  AND policy.requires_human_review
+                  AND NOT policy.authorizes_field_work
+                """,
+                (exception_id,),
+            )
+            target = await cursor.fetchone()
+            if target is None:
+                raise ExceptionNotFound
+            await cursor.execute(
+                """SELECT 1 FROM road_user_role WHERE user_id=%s AND road_id=%s
+                   AND role=ANY(%s) AND data_status <> 'simulated' LIMIT 1""",
+                (actor.id, target[2], target[3]),
+            )
+            if not await cursor.fetchone():
+                raise ExceptionForbidden
+            existing = await self._review_by_key(cursor, key_hash)
+            if existing is not None:
+                self._assert_review_replay(existing, exception_id, actor, request)
+                return self._review_response(existing)
+            await cursor.execute(
+                "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                (f"mowing-post-service-exception-review:{exception_id}",),
+            )
+            await cursor.execute(
+                """
+                SELECT review.id FROM prepared_mowing_post_service_exception_review review
+                WHERE review.exception_id=%s
+                  AND NOT EXISTS (
+                      SELECT 1 FROM prepared_mowing_post_service_exception_review newer
+                      WHERE newer.supersedes_review_id = review.id)
+                ORDER BY review.reviewed_at DESC LIMIT 1
+                """,
+                (exception_id,),
+            )
+            effective = await cursor.fetchone()
+            if (effective is None and request.supersedes_review_id is not None) or (
+                effective is not None and request.supersedes_review_id != effective[0]
+            ):
+                raise ExceptionReviewSupersession
+            await cursor.execute(
+                """
+                INSERT INTO prepared_mowing_post_service_exception_review (
+                    exception_id, reviewer_user_id, policy_id, supersedes_review_id,
+                    idempotency_key, decision, adjusted_recommendation, rationale,
+                    phase, data_status, eligible_for_official_reporting, authorizes_field_work)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,'post_service','simulated',false,false)
+                ON CONFLICT (idempotency_key) DO NOTHING
+                RETURNING id, exception_id, reviewer_user_id, decision,
+                          adjusted_recommendation, rationale, supersedes_review_id,
+                          reviewed_at
+                """,
+                (
+                    exception_id, actor.id, target[0], request.supersedes_review_id,
+                    key_hash, request.decision, request.adjusted_recommendation,
+                    request.rationale,
+                ),
+            )
+            inserted = await cursor.fetchone()
+            if inserted is None:
+                existing = await self._review_by_key(cursor, key_hash)
+                if existing is None:
+                    raise ExceptionIdempotencyConflict
+                self._assert_review_replay(existing, exception_id, actor, request)
+                return self._review_response(existing)
+            return self._review_response((*inserted, target[1]))
+
     async def _by_key(self, cursor, key_hash):
         await cursor.execute(
             """
@@ -221,6 +402,43 @@ class PostgresMowingPostServiceExceptionRepository:
             (key_hash,),
         )
         return await cursor.fetchone()
+
+    async def _review_by_key(self, cursor, key_hash):
+        await cursor.execute(
+            """
+            SELECT review.id, review.exception_id, review.reviewer_user_id,
+                   review.decision, review.adjusted_recommendation, review.rationale,
+                   review.supersedes_review_id, review.reviewed_at, policy.version
+            FROM prepared_mowing_post_service_exception_review review
+            JOIN prepared_mowing_post_service_exception_policy policy
+              ON policy.id = review.policy_id
+            WHERE review.idempotency_key=%s
+            """,
+            (key_hash,),
+        )
+        return await cursor.fetchone()
+
+    @staticmethod
+    def _assert_review_replay(row, exception_id, actor, request):
+        expected = (
+            exception_id, actor.id, request.decision, request.adjusted_recommendation,
+            request.rationale, request.supersedes_review_id,
+        )
+        if row[1:7] != expected:
+            raise ExceptionIdempotencyConflict
+
+    @staticmethod
+    def _review_response(row) -> MowingPostServiceExceptionReviewResponse:
+        return MowingPostServiceExceptionReviewResponse(
+            review_id=row[0],
+            exception_id=row[1],
+            decision=row[3],
+            adjusted_recommendation=row[4],
+            rationale=row[5],
+            supersedes_review_id=row[6],
+            reviewed_at=row[7],
+            policy_version=row[8],
+        )
 
     async def _response(self, cursor, exception_id):
         await cursor.execute(self._query("exception.id=%s"), (exception_id,))
@@ -233,7 +451,9 @@ class PostgresMowingPostServiceExceptionRepository:
                    road.code, segment.segment_index, zone.zone_type, policy.version,
                    exception.creation_rationale, exception.recommendation,
                    exception.applicable_threshold_cm, exception.maximum_height_cm,
-                   exception.threshold_exceeded, exception.created_at
+                   exception.threshold_exceeded, exception.created_at,
+                   COALESCE(review_total.review_count, 0), latest.id, latest.decision,
+                   latest.adjusted_recommendation, latest.rationale, latest.reviewed_at
             FROM prepared_mowing_post_service_exception exception
             JOIN prepared_mowing_post_service_summary summary ON summary.id = exception.summary_id
             JOIN prepared_mowing_order mowing ON mowing.id = summary.mowing_order_id
@@ -244,6 +464,21 @@ class PostgresMowingPostServiceExceptionRepository:
             JOIN road ON road.id = axis.road_id
             JOIN prepared_mowing_post_service_exception_policy policy
               ON policy.id = exception.policy_id
+            LEFT JOIN LATERAL (
+                SELECT count(*) AS review_count
+                FROM prepared_mowing_post_service_exception_review review
+                WHERE review.exception_id = exception.id
+            ) review_total ON true
+            LEFT JOIN LATERAL (
+                SELECT review.id, review.decision, review.adjusted_recommendation,
+                       review.rationale, review.reviewed_at
+                FROM prepared_mowing_post_service_exception_review review
+                WHERE review.exception_id = exception.id
+                  AND NOT EXISTS (
+                      SELECT 1 FROM prepared_mowing_post_service_exception_review newer
+                      WHERE newer.supersedes_review_id = review.id)
+                ORDER BY review.reviewed_at DESC LIMIT 1
+            ) latest ON true
             WHERE {where_clause}
               AND exception.phase = 'post_service'
               AND exception.data_status = 'simulated'
@@ -268,6 +503,15 @@ class PostgresMowingPostServiceExceptionRepository:
             maximum_height_cm=row[10],
             threshold_exceeded=row[11],
             created_at=row[12],
+            review_count=row[13],
+            latest_review_id=row[14],
+            latest_review_decision=row[15],
+            latest_adjusted_recommendation=row[16],
+            latest_review_rationale=row[17],
+            latest_reviewed_at=row[18],
+            review_state=(
+                "review_recorded_no_work_authorization" if row[14] else "awaiting_review"
+            ),
         )
 
 
@@ -325,3 +569,33 @@ async def list_exceptions(
     limit: Annotated[int, Field(ge=1, le=100)] = 50,
 ):
     return await repository.list_for_actor(actor=actor, limit=limit)
+
+
+@collection_router.post(
+    "/{exception_id}/decisions",
+    response_model=MowingPostServiceExceptionReviewResponse,
+)
+async def review_exception(
+    exception_id: UUID,
+    request: MowingPostServiceExceptionReviewRequest,
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=8, max_length=200)],
+    actor: Annotated[AuthenticatedUser, Depends(get_current_user)],
+    repository: Annotated[
+        MowingPostServiceExceptionRepository, Depends(get_exception_repository)
+    ],
+):
+    try:
+        return await repository.record_review(
+            exception_id=exception_id,
+            actor=actor,
+            idempotency_key=idempotency_key,
+            request=request,
+        )
+    except ExceptionNotFound:
+        raise HTTPException(404, "Simulated mowing post-service exception not found") from None
+    except ExceptionForbidden:
+        raise HTTPException(403, "User cannot review this road") from None
+    except ExceptionIdempotencyConflict:
+        raise HTTPException(409, "Idempotency-Key conflict") from None
+    except ExceptionReviewSupersession:
+        raise HTTPException(409, "Review must supersede the effective exception review") from None
