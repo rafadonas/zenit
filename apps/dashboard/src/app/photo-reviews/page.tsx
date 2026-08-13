@@ -11,6 +11,10 @@ import {
   type PreparedMowingRehearsalCollection,
 } from "../../lib/mowing-rehearsals";
 import {
+  isMowingPostServiceExceptionCollection,
+  type MowingPostServiceExceptionCollection,
+} from "../../lib/mowing-post-service-exceptions";
+import {
   isMowingPostServiceSummaryCollection,
   type MowingPostServiceSummaryCollection,
 } from "../../lib/mowing-post-service-summaries";
@@ -32,6 +36,7 @@ interface PageProps {
     review?: string; summary?: string; export?: string; proposal?: string;
     proposal_review?: string; mowing_order?: string; resource_plan?: string;
     readiness?: string; planning_approval?: string; mowing_summary?: string;
+    mowing_exception?: string;
   }>;
 }
 
@@ -113,11 +118,34 @@ async function loadMowingSummaries(): Promise<MowingPostServiceSummaryCollection
   return payload;
 }
 
+async function loadMowingExceptions(): Promise<MowingPostServiceExceptionCollection | null> {
+  const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
+  if (!token) return null;
+  const baseUrl = process.env.INTERNAL_API_URL ?? "http://localhost:8000";
+  const response = await fetch(`${baseUrl}/v1/prepared-mowing-post-service-exceptions?limit=50`, {
+    cache: "no-store", headers: { Authorization: `Bearer ${token}` },
+  });
+  if (response.status === 401) return null;
+  if (!response.ok) throw new Error(`Prepared mowing exception list returned HTTP ${response.status}`);
+  const payload: unknown = await response.json();
+  if (!isMowingPostServiceExceptionCollection(payload)) {
+    throw new Error("Prepared mowing exception safety contract is invalid");
+  }
+  return payload;
+}
+
 function message(
   review?: string, summary?: string, exportStatus?: string, proposal?: string,
   proposalReview?: string, mowingOrder?: string, resourcePlan?: string,
   readiness?: string, planningApproval?: string, mowingSummary?: string,
+  mowingException?: string,
 ): string | null {
+  if (mowingException === "created") return "Exceção pós-serviço simulada registrada para revisão humana.";
+  if (mowingException === "forbidden") return "Seu usuário não pode avaliar exceção pós-serviço nesta rodovia.";
+  if (mowingException === "missing") return "O resumo pós-serviço simulado não foi encontrado.";
+  if (mowingException === "conflict") return "A exceção já existe ou a chave entrou em conflito.";
+  if (mowingException === "invalid") return "A justificativa da exceção pós-serviço é inválida.";
+  if (mowingException === "service-unavailable") return "O serviço de exceções pós-serviço não está disponível agora.";
   if (mowingSummary === "generated") return "Resumo pós-serviço simulado gerado; continua sem conclusão operacional.";
   if (mowingSummary === "forbidden") return "Seu usuário não pode gerar resumo pós-serviço para esta rodovia.";
   if (mowingSummary === "missing") return "A ordem de roçada preparada não foi encontrada.";
@@ -223,14 +251,16 @@ function formatRecordedSpan(seconds: number | null): string {
 }
 
 export default async function PhotoReviewsPage({ searchParams }: PageProps) {
-  const [session, queue, summaries, proposals, rehearsals, mowingSummaries, query] = await Promise.all([
+  const [
+    session, queue, summaries, proposals, rehearsals, mowingSummaries, mowingExceptions, query,
+  ] = await Promise.all([
     loadDashboardSession(), loadQueue(), loadSummaries(), loadProposals(),
-    loadMowingRehearsals(), loadMowingSummaries(), searchParams,
+    loadMowingRehearsals(), loadMowingSummaries(), loadMowingExceptions(), searchParams,
   ]);
   const operationMessage = message(
     query.review, query.summary, query.export, query.proposal, query.proposal_review,
     query.mowing_order, query.resource_plan, query.readiness, query.planning_approval,
-    query.mowing_summary,
+    query.mowing_summary, query.mowing_exception,
   );
   const summaryByOrder = new Map<string, PreparedInspectionSummary>(
     summaries?.items.map((summary) => [summary.work_order_id, summary]) ?? [],
@@ -244,6 +274,9 @@ export default async function PhotoReviewsPage({ searchParams }: PageProps) {
   );
   const mowingSummaryByOrder = new Map(
     mowingSummaries?.items.map((summary) => [summary.mowing_order_id, summary]) ?? [],
+  );
+  const mowingExceptionBySummary = new Map(
+    mowingExceptions?.items.map((item) => [item.summary_id, item]) ?? [],
   );
   for (const item of queue?.items ?? []) {
     const group = orderGroups.get(item.work_order_id) ?? [];
@@ -282,6 +315,8 @@ export default async function PhotoReviewsPage({ searchParams }: PageProps) {
             ? rehearsalByMowingOrder.get(proposal.prepared_mowing_order_id) : undefined;
           const mowingSummary = proposal?.prepared_mowing_order_id
             ? mowingSummaryByOrder.get(proposal.prepared_mowing_order_id) : undefined;
+          const mowingException = mowingSummary
+            ? mowingExceptionBySummary.get(mowingSummary.summary_id) : undefined;
           return <article className="prepared-summary-card" key={workOrderId}>
             <div className="prepared-summary-heading"><div><p className="eyebrow">{first.road_code} · trecho #{first.segment_index} · {first.zone_type}</p><h2>Retorno dos três pontos</h2></div><span className={`status-pill ${summary ? "review" : "prepared"}`}>{summary ? "Resumo gerado" : `${acceptedCount}/3 aceitos`}</span></div>
             {summary ? <>
@@ -334,6 +369,14 @@ export default async function PhotoReviewsPage({ searchParams }: PageProps) {
                         <label htmlFor={`mowing-export-purpose-${mowingSummary.summary_id}`}>Propósito da exportação</label><input defaultValue="Compartilhar pós-serviço simulado para revisão" id={`mowing-export-purpose-${mowingSummary.summary_id}`} maxLength={2000} name="export_purpose" required />
                         <button className="secondary-button" type="submit">Baixar CSV simulado</button><small>CSV auditado, simulado e inelegível para relatório oficial.</small>
                       </form>
+                      {mowingException ? <div className="post-inspection-proposal">
+                        <div><strong>{mowingException.recommendation === "inspect_follow_up" ? "Inspeção de seguimento indicada" : "Monitoramento indicado"}</strong><span>Máxima {formatHeight(mowingException.maximum_height_cm)} cm · limiar {formatHeight(mowingException.applicable_threshold_cm)} cm</span></div><span className="status-pill review">Revisão humana obrigatória</span>
+                        <small>Regra {mowingException.policy_version}. Exceção simulada: não conclui roçada, não atualiza mapa e não autoriza campo.</small>
+                      </div> : <form action={`/api/prepared-mowing-post-service-summaries/${mowingSummary.summary_id}/exceptions`} className="prepared-summary-form" method="post">
+                        <input name="csrf_token" type="hidden" value={session.csrfToken} /><input name="idempotency_key" type="hidden" value={randomUUID()} />
+                        <label htmlFor={`mowing-exception-rationale-${mowingSummary.summary_id}`}>Justificativa da avaliação de exceção</label><textarea defaultValue="Aplicar limiar preparado ao resumo pós-serviço simulado" id={`mowing-exception-rationale-${mowingSummary.summary_id}`} maxLength={2000} name="creation_rationale" required rows={2} />
+                        <button className="primary-button" type="submit">Avaliar exceção pós-serviço</button><small>Se a máxima exceder o limiar, gera somente indicação de inspeção de seguimento com revisão humana.</small>
+                      </form>}
                     </div> : rehearsal.post_service_measurements.length === 3 && rehearsal.post_service_photo_reviews.filter((photo) => photo.latest_decision === "accepted" && photo.latest_quality_status === "accepted" && photo.latest_ruler_status === "visible").length === 3 ? <form action={`/api/prepared-mowing-orders/${proposal.prepared_mowing_order_id}/post-service-summary`} className="prepared-summary-form" method="post">
                       <input name="csrf_token" type="hidden" value={session.csrfToken} /><input name="idempotency_key" type="hidden" value={randomUUID()} />
                       <label htmlFor={`mowing-summary-rationale-${proposal.prepared_mowing_order_id}`}>Justificativa da consolidação pós-serviço</label><textarea defaultValue="Consolidar o pós-serviço simulado após três medições e três revisões visuais aceitas" id={`mowing-summary-rationale-${proposal.prepared_mowing_order_id}`} maxLength={2000} name="generation_rationale" required rows={2} />
