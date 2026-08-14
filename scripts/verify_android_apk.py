@@ -21,6 +21,7 @@ REQUIRED_ENTRIES = (
     "classes.dex",
     "resources.arsc",
     "assets/flutter_assets/AssetManifest.bin",
+    "assets/flutter_assets/kernel_blob.bin",
 )
 RunCommand = Callable[..., subprocess.CompletedProcess[str]]
 
@@ -39,9 +40,14 @@ class ApkEvidence:
     application_id: str
     version_name: str
     version_code: str
+    min_sdk: str
+    target_sdk: str
+    debuggable: bool
     configured_api_base_url: str
     abis: tuple[str, ...]
     signature_verified: bool
+    signature_scheme_v2_verified: bool
+    signer_certificate_sha256: str
     eligible_for_field_execution: bool
     eligible_for_official_reporting: bool
     eligible_for_model_training: bool
@@ -125,7 +131,7 @@ def _validate_demo_api_base_url(value: str) -> None:
         )
 
 
-def _inspect_archive(apk_path: Path) -> tuple[str, ...]:
+def _inspect_archive(apk_path: Path, configured_api_base_url: str) -> tuple[str, ...]:
     try:
         with zipfile.ZipFile(apk_path) as archive:
             entries = archive.namelist()
@@ -144,6 +150,11 @@ def _inspect_archive(apk_path: Path) -> tuple[str, ...]:
             ]
             if unsafe:
                 raise ApkVerificationError(f"APK contains unsafe entry path: {unsafe[0]}")
+            kernel_blob = archive.read("assets/flutter_assets/kernel_blob.bin")
+            if configured_api_base_url.encode() not in kernel_blob:
+                raise ApkVerificationError(
+                    "APK Flutter kernel does not contain the configured demonstration API URL"
+                )
             abis = sorted(
                 {
                     parts[1]
@@ -160,12 +171,22 @@ def _inspect_archive(apk_path: Path) -> tuple[str, ...]:
     return tuple(abis)
 
 
+def _signature_value(output: str, label: str) -> str:
+    prefix = f"{label}:"
+    for line in output.splitlines():
+        if line.startswith(prefix):
+            return line.removeprefix(prefix).strip()
+    raise ApkVerificationError(f"APK signature output is missing {label!r}")
+
+
 def verify_apk(
     apk_path: Path,
     *,
     expected_application_id: str,
     expected_version_name: str,
     expected_version_code: str,
+    expected_min_sdk: str,
+    expected_target_sdk: str,
     configured_api_base_url: str,
     apkanalyzer_path: Path | None = None,
     apksigner_path: Path | None = None,
@@ -176,7 +197,7 @@ def verify_apk(
     if apk_path.stat().st_size == 0:
         raise ApkVerificationError("APK is empty")
     _validate_demo_api_base_url(configured_api_base_url)
-    abis = _inspect_archive(apk_path)
+    abis = _inspect_archive(apk_path, configured_api_base_url)
 
     apkanalyzer = _find_sdk_tool("apkanalyzer", apkanalyzer_path)
     apksigner = _find_sdk_tool("apksigner", apksigner_path)
@@ -195,10 +216,28 @@ def verify_apk(
         name="APK version-code inspection",
         runner=runner,
     )
+    min_sdk = _run_tool(
+        (apkanalyzer, "manifest", "min-sdk", apk_path),
+        name="APK min-sdk inspection",
+        runner=runner,
+    )
+    target_sdk = _run_tool(
+        (apkanalyzer, "manifest", "target-sdk", apk_path),
+        name="APK target-sdk inspection",
+        runner=runner,
+    )
+    debuggable = _run_tool(
+        (apkanalyzer, "manifest", "debuggable", apk_path),
+        name="APK debuggable inspection",
+        runner=runner,
+    )
     expected = {
         "application id": (application_id, expected_application_id),
         "version name": (version_name, expected_version_name),
         "version code": (version_code, expected_version_code),
+        "minimum SDK": (min_sdk, expected_min_sdk),
+        "target SDK": (target_sdk, expected_target_sdk),
+        "debuggable flag": (debuggable, "true"),
     }
     for label, (actual, expected_value) in expected.items():
         if actual != expected_value:
@@ -206,11 +245,29 @@ def verify_apk(
                 f"APK {label} is {actual!r}; expected {expected_value!r}"
             )
 
-    _run_tool(
+    signature_output = _run_tool(
         (apksigner, "verify", "--verbose", "--print-certs", apk_path),
         name="APK signature verification",
         runner=runner,
     )
+    if _signature_value(signature_output, "Verified using v2 scheme (APK Signature Scheme v2)") != (
+        "true"
+    ):
+        raise ApkVerificationError("APK signature does not use the required v2 scheme")
+    if _signature_value(signature_output, "Number of signers") != "1":
+        raise ApkVerificationError("APK must have exactly one debug signer")
+    signer_dn = _signature_value(signature_output, "Signer #1 certificate DN")
+    if signer_dn != "C=US, O=Android, CN=Android Debug":
+        raise ApkVerificationError(
+            f"APK signer is not the expected Android debug signer: {signer_dn}"
+        )
+    signer_certificate_sha256 = _signature_value(
+        signature_output, "Signer #1 certificate SHA-256 digest"
+    )
+    if len(signer_certificate_sha256) != 64 or any(
+        character not in "0123456789abcdef" for character in signer_certificate_sha256
+    ):
+        raise ApkVerificationError("APK signer certificate SHA-256 digest is invalid")
     return ApkEvidence(
         artifact_role="zenit_mvp_demonstration_android_debug_apk",
         artifact_status="demonstration_build",
@@ -220,9 +277,14 @@ def verify_apk(
         application_id=application_id,
         version_name=version_name,
         version_code=version_code,
+        min_sdk=min_sdk,
+        target_sdk=target_sdk,
+        debuggable=True,
         configured_api_base_url=configured_api_base_url,
         abis=abis,
         signature_verified=True,
+        signature_scheme_v2_verified=True,
+        signer_certificate_sha256=signer_certificate_sha256,
         eligible_for_field_execution=False,
         eligible_for_official_reporting=False,
         eligible_for_model_training=False,
@@ -235,6 +297,8 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--expected-application-id", required=True)
     parser.add_argument("--expected-version-name", required=True)
     parser.add_argument("--expected-version-code", required=True)
+    parser.add_argument("--expected-min-sdk", required=True)
+    parser.add_argument("--expected-target-sdk", required=True)
     parser.add_argument("--configured-api-base-url", required=True)
     parser.add_argument("--apkanalyzer", type=Path)
     parser.add_argument("--apksigner", type=Path)
@@ -250,6 +314,8 @@ def main(argv: list[str] | None = None) -> int:
             expected_application_id=args.expected_application_id,
             expected_version_name=args.expected_version_name,
             expected_version_code=args.expected_version_code,
+            expected_min_sdk=args.expected_min_sdk,
+            expected_target_sdk=args.expected_target_sdk,
             configured_api_base_url=args.configured_api_base_url,
             apkanalyzer_path=args.apkanalyzer,
             apksigner_path=args.apksigner,

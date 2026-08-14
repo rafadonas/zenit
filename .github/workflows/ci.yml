@@ -71,6 +71,8 @@ jobs:
             --expected-application-id br.com.zenit.zenit_mobile \
             --expected-version-name 1.0.0 \
             --expected-version-code 1 \
+            --expected-min-sdk 24 \
+            --expected-target-sdk 36 \
             --configured-api-base-url https://api.example.invalid \
             --evidence-out build/app/outputs/flutter-apk/app-debug.evidence.json
 

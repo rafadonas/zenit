@@ -101,6 +101,8 @@ python ../../scripts/verify_android_apk.py \
   --expected-application-id br.com.zenit.zenit_mobile \
   --expected-version-name 1.0.0 \
   --expected-version-code 1 \
+  --expected-min-sdk 24 \
+  --expected-target-sdk 36 \
   --configured-api-base-url https://api.example.invalid \
   --evidence-out build/app/outputs/flutter-apk/app-debug.evidence.json
 ```
@@ -108,3 +110,5 @@ python ../../scripts/verify_android_apk.py \
 The verifier checks archive structure, Flutter native ABIs, package/version,
 Android signature, and SHA-256. Its evidence explicitly marks the debug build
 as ineligible for field execution, official reporting, and model training.
+The current Flutter/plugins baseline requires Android API 24 or newer and
+targets API 36.

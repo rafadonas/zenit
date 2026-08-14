@@ -491,7 +491,9 @@ Tráfego HTTP sem TLS só é permitido pelo manifesto Android de depuração.
 
 ### Integração contínua
 
-A CI valida Python, dashboard, Flutter e um ambiente Compose novo. O smoke test
+A CI valida Python, dashboard, Flutter, o APK demonstrativo e um ambiente
+Compose novo. O APK deve conter a URL reservada, package/version e SDKs
+esperados, três ABIs Flutter e uma assinatura debug v2 válida. O smoke test
 confere schema PostGIS, healthcheck, resposta satelital vazia com proveniência,
 proteção das rotas de escrita e disponibilidade do dashboard/login sem exigir
 arquivos brutos ou credenciais de provedores.

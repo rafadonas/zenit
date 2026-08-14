@@ -46,6 +46,13 @@ npm run dashboard:test
 npm run dashboard:build
 flutter analyze
 flutter test
+flutter build apk --debug --dart-define=ZENIT_API_BASE_URL=https://api.example.invalid
+python scripts/verify_android_apk.py \
+  apps/mobile/build/app/outputs/flutter-apk/app-debug.apk \
+  --expected-application-id br.com.zenit.zenit_mobile \
+  --expected-version-name 1.0.0 --expected-version-code 1 \
+  --expected-min-sdk 24 --expected-target-sdk 36 \
+  --configured-api-base-url https://api.example.invalid
 docker compose config --quiet
 fresh PostgreSQL initialization with migrations 0001-0037
 python scripts/verify_mvp_stack.py
@@ -58,11 +65,14 @@ not modified. The tracked smoke verifier is shared with CI and covers 25 HTTP
 contracts from public health and collection responses through the final
 post-service exception review authentication boundary.
 
-The local workstation has Flutter 3.44.9 but no Android SDK, so the debug APK
-was not built during this audit. Mobile formatting, static analysis, and all 58
-Flutter tests passed. The tracked CI job includes the debug APK build and must
-pass, or the same build must run on a workstation with the Android SDK, before
-an installable artifact is treated as validated.
+The local workstation built and validated the demonstrative Android debug APK
+with Flutter 3.44.9, Android API 36, Build Tools 36.0.0, NDK 28.2, and Temurin
+JDK 17. The artifact uses the reserved `https://api.example.invalid` endpoint,
+requires API 24, targets API 36, and is signed by one Android debug signer with
+APK Signature Scheme v2. Its validation evidence records SHA-256
+`acbd95ec24fa399bb742287f2044148e64286451dbee252cd396e21f7f82f2c1`
+and size 155,508,813 bytes. The APK remains a demonstrative build and is
+ineligible for field execution, official reporting, and model training.
 
 ## External blockers for an operational pilot
 
