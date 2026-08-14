@@ -295,6 +295,24 @@ def _verify_collection(body: bytes, name: str, *, expect_empty: bool) -> None:
         raise SmokeCheckError(f"{name} was expected to be empty in a fresh stack")
 
 
+def _verify_health(body: bytes) -> None:
+    payload = _decode_object(body, "API health")
+    if payload.get("status") != "ok":
+        raise SmokeCheckError("API health JSON status is not 'ok'")
+    checks = payload.get("checks")
+    if not isinstance(checks, dict):
+        raise SmokeCheckError("API health is missing dependency checks")
+
+    expected = {
+        "database": {"status": "ok", "required": True},
+        "object_storage": {"status": "ok", "required": True},
+        "queue": {"status": "not_configured", "required": False},
+    }
+    for dependency, expected_status in expected.items():
+        if checks.get(dependency) != expected_status:
+            raise SmokeCheckError(f"API health has invalid {dependency} readiness")
+
+
 def run_checks(
     *,
     api_base: str,
@@ -307,8 +325,7 @@ def run_checks(
 
     health = StatusCheck("API health", api_base, "/health", 200)
     health_body = _expect_status(health, timeout=timeout, opener=opener)
-    if _decode_object(health_body, health.name).get("status") != "ok":
-        raise SmokeCheckError("API health JSON status is not 'ok'")
+    _verify_health(health_body)
     check_count += 1
 
     collections = (

@@ -28,7 +28,7 @@ def _request(
 
 
 def test_success_response_includes_a_generated_correlation_id() -> None:
-    response = _request("/health")
+    response = _request("/openapi.json")
 
     assert response.status_code == 200
     assert UUID(response.headers[CORRELATION_ID_HEADER])
@@ -37,14 +37,14 @@ def test_success_response_includes_a_generated_correlation_id() -> None:
 def test_valid_incoming_correlation_id_is_preserved() -> None:
     correlation_id = "20000000-0000-4000-8000-000000000001"
 
-    response = _request("/health", headers={CORRELATION_ID_HEADER: correlation_id})
+    response = _request("/openapi.json", headers={CORRELATION_ID_HEADER: correlation_id})
 
     assert response.status_code == 200
     assert response.headers[CORRELATION_ID_HEADER] == correlation_id
 
 
 def test_invalid_incoming_correlation_id_is_replaced() -> None:
-    response = _request("/health", headers={CORRELATION_ID_HEADER: "not-a-uuid"})
+    response = _request("/openapi.json", headers={CORRELATION_ID_HEADER: "not-a-uuid"})
 
     assert response.status_code == 200
     generated = response.headers[CORRELATION_ID_HEADER]

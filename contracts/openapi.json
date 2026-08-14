@@ -416,8 +416,53 @@
         "title": "ConflictingSyncEventResponse",
         "type": "object"
       },
+      "HealthChecksResponse": {
+        "properties": {
+          "database": {
+            "$ref": "#/components/schemas/HealthDependencyResponse"
+          },
+          "object_storage": {
+            "$ref": "#/components/schemas/HealthDependencyResponse"
+          },
+          "queue": {
+            "$ref": "#/components/schemas/HealthDependencyResponse"
+          }
+        },
+        "required": [
+          "database",
+          "object_storage",
+          "queue"
+        ],
+        "title": "HealthChecksResponse",
+        "type": "object"
+      },
+      "HealthDependencyResponse": {
+        "properties": {
+          "required": {
+            "title": "Required",
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "not_configured"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "required"
+        ],
+        "title": "HealthDependencyResponse",
+        "type": "object"
+      },
       "HealthResponse": {
         "properties": {
+          "checks": {
+            "$ref": "#/components/schemas/HealthChecksResponse"
+          },
           "environment": {
             "title": "Environment",
             "type": "string"
@@ -427,6 +472,8 @@
             "type": "string"
           },
           "status": {
+            "const": "ok",
+            "default": "ok",
             "title": "Status",
             "type": "string"
           },
@@ -436,10 +483,10 @@
           }
         },
         "required": [
-          "status",
           "service",
           "version",
-          "environment"
+          "environment",
+          "checks"
         ],
         "title": "HealthResponse",
         "type": "object"
@@ -5981,7 +6028,6 @@
   "paths": {
     "/health": {
       "get": {
-        "description": "Report process health without exposing secrets or dependency details.",
         "operationId": "health_health_get",
         "responses": {
           "200": {

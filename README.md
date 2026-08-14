@@ -182,6 +182,11 @@ Serviços locais:
 | PostgreSQL/PostGIS | `localhost:5432` |
 | MinIO Console | `http://localhost:9001` |
 
+O healthcheck retorna sucesso somente quando PostgreSQL e MinIO respondem. A
+fila é declarada como `not_configured` porque não há broker no MVP. O timeout de
+cada probe é configurado por `HEALTH_PROBE_TIMEOUT_SECONDS`, com padrão local de
+um segundo.
+
 Nesta estação, o Docker roda em modo rootless. Em um novo shell, os binários
 locais podem ser selecionados assim:
 
@@ -260,7 +265,7 @@ rotas abaixo usam o prefixo versionado `/v1`.
 
 | Método e rota | Finalidade |
 | --- | --- |
-| `GET /health` | Saúde da API |
+| `GET /health` | Prontidão da API, PostgreSQL e MinIO; fila explicitamente ausente |
 | `GET /v1/roads/SP021/segments?...` | Segmentos GeoJSON por `bbox` |
 | `GET /v1/segments/{id}/satellite-observations` | Evidências persistidas do segmento |
 | `POST /v1/analysis/preview` | Prévia não persistente do baseline |

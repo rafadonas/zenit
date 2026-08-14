@@ -35,6 +35,7 @@ field authorization.
 | Dashboard accessibility | Ready as automated baseline | All current main shells expose a skip target; keyboard focus, reduced motion, JSX semantics, and primary muted-text contrast are gated. Manual browser and assistive-technology audits remain required before operational use. |
 | Dashboard HTTP security | Ready as local baseline | Every route receives anti-clickjacking, MIME sniffing, referrer, opener, browser-permission, base URI, and form-action controls. A nonce-based script policy, TLS termination, and HSTS remain deployment work. |
 | API error observability | Ready as local baseline | Success and error responses carry a UUID correlation header; HTTP, validation, and unexpected failures use one versioned envelope. Production log aggregation and distributed tracing remain deployment work. |
+| API dependency readiness | Ready | `GET /health` fails closed unless PostgreSQL and MinIO respond to bounded probes. The absent queue is explicitly `not_configured`; introducing a broker remains outside the current architecture. |
 | Automated quality gates | Ready | Python, dashboard, Flutter, production dashboard build, versioned OpenAPI contract, migration contract, and fresh-database smoke checks pass locally and are represented in CI. |
 
 ## Validation record
@@ -69,8 +70,10 @@ The fresh-database check verified the final summary export, exception, exception
 review tables, and the versioned exception policy. Its isolated container,
 network, and volume were removed after validation; the development stack was
 not modified. The tracked smoke verifier is shared with CI and covers 25 HTTP
-contracts from public health and collection responses through the final
-post-service exception review authentication boundary.
+contracts from dependency-aware public health and collection responses through
+the final post-service exception review authentication boundary. Health success
+requires PostgreSQL and MinIO readiness while reporting the absent queue as
+non-required.
 
 The FastAPI OpenAPI document is tracked at `contracts/openapi.json` and checked
 byte for byte in CI. Its repository validator currently covers 34 paths,

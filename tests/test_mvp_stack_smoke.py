@@ -27,7 +27,19 @@ def _success_opener(request: object, *, timeout: float) -> FakeResponse:
     del timeout
     url = request.full_url  # type: ignore[attr-defined]
     if url.endswith("/health"):
-        return FakeResponse(200, b'{"status":"ok"}')
+        return FakeResponse(
+            200,
+            json.dumps(
+                {
+                    "status": "ok",
+                    "checks": {
+                        "database": {"status": "ok", "required": True},
+                        "object_storage": {"status": "ok", "required": True},
+                        "queue": {"status": "not_configured", "required": False},
+                    },
+                }
+            ).encode(),
+        )
     if url.endswith("/satellite-observations") or url.endswith("/v1/recommendations"):
         return FakeResponse(200, b'{"items":[],"metadata":{"result_count":0}}')
     if url.startswith("http://dashboard.test"):
@@ -67,6 +79,32 @@ def test_run_checks_rejects_invalid_health_payload() -> None:
         return _success_opener(request, timeout=timeout)
 
     with pytest.raises(SmokeCheckError, match="health JSON status is not 'ok'"):
+        run_checks(
+            api_base="http://api.test",
+            dashboard_base="http://dashboard.test",
+            opener=opener,
+        )
+
+
+def test_run_checks_rejects_unverified_health_dependency() -> None:
+    def opener(request: object, *, timeout: float) -> FakeResponse:
+        if request.full_url.endswith("/health"):  # type: ignore[attr-defined]
+            return FakeResponse(
+                200,
+                json.dumps(
+                    {
+                        "status": "ok",
+                        "checks": {
+                            "database": {"status": "ok", "required": True},
+                            "object_storage": {"status": "unknown", "required": True},
+                            "queue": {"status": "not_configured", "required": False},
+                        },
+                    }
+                ).encode(),
+            )
+        return _success_opener(request, timeout=timeout)
+
+    with pytest.raises(SmokeCheckError, match="invalid object_storage readiness"):
         run_checks(
             api_base="http://api.test",
             dashboard_base="http://dashboard.test",

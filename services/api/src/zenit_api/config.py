@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     app_env: Literal["development", "test", "demo", "staging", "production"] = "development"
     app_name: str = "zenit"
     app_version: str = "0.1.0"
+    health_probe_timeout_seconds: float = Field(default=1.0, ge=0.1, le=10.0)
     database_url: str = "postgresql://zenit:change_me@postgres:5432/zenit"
     auth_secret_key: SecretStr = SecretStr(
         "development-only-change-this-authentication-secret"

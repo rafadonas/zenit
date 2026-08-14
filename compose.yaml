@@ -81,6 +81,7 @@ services:
       APP_ENV: ${APP_ENV:-development}
       APP_NAME: ${APP_NAME:-zenit}
       APP_VERSION: ${APP_VERSION:-0.1.0}
+      HEALTH_PROBE_TIMEOUT_SECONDS: ${HEALTH_PROBE_TIMEOUT_SECONDS:-1.0}
       DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://zenit:change_me@postgres:5432/zenit}
       AUTH_SECRET_KEY: ${AUTH_SECRET_KEY:-development-only-change-this-authentication-secret}
       AUTH_ACCESS_TOKEN_MINUTES: ${AUTH_ACCESS_TOKEN_MINUTES:-30}
