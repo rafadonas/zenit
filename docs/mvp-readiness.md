@@ -22,7 +22,7 @@ field authorization.
 
 | Capability | Demonstration status | Evidence and boundary |
 | --- | --- | --- |
-| Reproducible foundation | Ready | Compose defines healthy PostgreSQL/PostGIS, MinIO, API, and dashboard services. A fresh database applies migrations `0001`-`0037`. |
+| Reproducible foundation | Ready | Compose defines healthy PostgreSQL/PostGIS, MinIO, API, and dashboard services. Dashboard readiness fails closed when its server-side API dependency is unavailable. A fresh database applies migrations `0001`-`0037`. |
 | Source audit and ingestion | Ready | Immutable source catalog, checksums, lineage, idempotent imports, and deterministic parser fixtures are covered by tests and data-quality reports. |
 | Segments, zones, and map | Ready with estimated data | The dashboard exposes 100 m segments and separate zones. The candidate axis remains `estimated`, `needs_validation`, and non-operational. |
 | Satellite baseline | Ready with partial cache | Discovery, quality gates, explainable rules, provenance, and a checksum-bound NDVI preview exist. No complete source scene is approved for operations. |
@@ -75,6 +75,8 @@ the final post-service exception review authentication boundary. Health success
 requires PostgreSQL and MinIO readiness while reporting the absent queue as
 non-required. Dashboard checks additionally require the expected server-rendered
 page markers, so a generic framework error document cannot satisfy the gate.
+The Compose dashboard probe separately validates its bounded server-side path to
+the dependency-aware API health endpoint without loading the segment collection.
 
 The FastAPI OpenAPI document is tracked at `contracts/openapi.json` and checked
 byte for byte in CI. Its repository validator currently covers 34 paths,

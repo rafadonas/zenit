@@ -185,7 +185,8 @@ Serviços locais:
 O healthcheck retorna sucesso somente quando PostgreSQL e MinIO respondem. A
 fila é declarada como `not_configured` porque não há broker no MVP. O timeout de
 cada probe é configurado por `HEALTH_PROBE_TIMEOUT_SECONDS`, com padrão local de
-um segundo.
+um segundo. O dashboard expõe `http://localhost:3000/api/health` e só fica
+saudável no Compose quando consegue validar esse contrato pela rede interna.
 
 Nesta estação, o Docker roda em modo rootless. Em um novo shell, os binários
 locais podem ser selecionados assim:

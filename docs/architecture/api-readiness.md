@@ -36,9 +36,14 @@ The response and sanitized warning log share the request correlation ID.
 `HEALTH_PROBE_TIMEOUT_SECONDS` bounds each required check from 0.1 through 10
 seconds and defaults to one second. PostgreSQL and MinIO are checked in
 parallel. Compose starts the API only after its dependency containers are
-healthy and starts the dashboard only after the API first becomes healthy. A
-later dependency failure marks the API unhealthy but does not automatically
-stop an already running dashboard.
+healthy and starts the dashboard only after the API first becomes healthy.
+
+The dashboard relays this dependency boundary through its own public,
+read-only `GET /api/health` route. The relay uses a two-second timeout, validates
+the API readiness fields, and returns sanitized HTTP 503 JSON when the API is
+unreachable or degraded. Compose probes this route, so a later API dependency
+failure also marks the dashboard unhealthy. Compose health status does not by
+itself stop or restart an already running dependent service.
 
 ## Safety boundary
 
