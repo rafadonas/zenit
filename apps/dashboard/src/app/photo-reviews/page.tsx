@@ -20,6 +20,10 @@ import {
   mowingPostServiceExceptionReviewStatus,
 } from "../../lib/mowing-post-service-exception-presenter";
 import {
+  mowingPostServiceExceptionMessage,
+  mowingPostServiceExceptionReviewMessage,
+} from "../../lib/mowing-post-service-operation-message";
+import {
   isMowingPostServiceSummaryCollection,
   type MowingPostServiceSummaryCollection,
 } from "../../lib/mowing-post-service-summaries";
@@ -145,18 +149,10 @@ function message(
   readiness?: string, planningApproval?: string, mowingSummary?: string,
   mowingException?: string, exceptionReview?: string,
 ): string | null {
-  if (mowingException === "created") return "Exceção pós-serviço simulada registrada para revisão humana.";
-  if (mowingException === "forbidden") return "Seu usuário não pode avaliar exceção pós-serviço nesta rodovia.";
-  if (mowingException === "missing") return "O resumo pós-serviço simulado não foi encontrado.";
-  if (mowingException === "conflict") return "A exceção já existe ou a chave entrou em conflito.";
-  if (mowingException === "invalid") return "A justificativa da exceção pós-serviço é inválida.";
-  if (mowingException === "service-unavailable") return "O serviço de exceções pós-serviço não está disponível agora.";
-  if (exceptionReview === "recorded") return "Revisão humana da exceção pós-serviço registrada na trilha append-only.";
-  if (exceptionReview === "forbidden") return "Seu usuário não pode revisar esta exceção pós-serviço nesta rodovia.";
-  if (exceptionReview === "missing") return "A exceção pós-serviço simulada não foi encontrada.";
-  if (exceptionReview === "conflict") return "A chave de repetição ou a revisão efetiva da exceção entrou em conflito.";
-  if (exceptionReview === "invalid") return "A decisão da exceção pós-serviço está incompleta ou inconsistente.";
-  if (exceptionReview === "service-unavailable") return "O serviço de revisão da exceção pós-serviço não está disponível agora.";
+  const mowingPostServiceMessage =
+    mowingPostServiceExceptionMessage(mowingException) ??
+    mowingPostServiceExceptionReviewMessage(exceptionReview);
+  if (mowingPostServiceMessage) return mowingPostServiceMessage;
   if (mowingSummary === "generated") return "Resumo pós-serviço simulado gerado; continua sem conclusão operacional.";
   if (mowingSummary === "forbidden") return "Seu usuário não pode gerar resumo pós-serviço para esta rodovia.";
   if (mowingSummary === "missing") return "A ordem de roçada preparada não foi encontrada.";

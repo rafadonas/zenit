@@ -14,6 +14,11 @@ import {
   mowingPostServiceExceptionReviewStatus,
 } from "../../lib/mowing-post-service-exception-presenter";
 import {
+  mowingPostServiceExceptionMessage,
+  mowingPostServiceExceptionReviewMessage,
+  mowingPostServiceSummaryExportMessage,
+} from "../../lib/mowing-post-service-operation-message";
+import {
   isMowingPostServiceSummaryCollection,
   type MowingPostServiceSummaryCollection,
 } from "../../lib/mowing-post-service-summaries";
@@ -77,59 +82,6 @@ function cm(value: string | number): string {
   return `${Number(value).toFixed(2)} cm`;
 }
 
-function exportMessage(status?: string): string | null {
-  if (status === "missing") {
-    return "O resumo pós-serviço simulado não foi encontrado ou não está acessível.";
-  }
-  if (status === "conflict") {
-    return "A chave da exportação entrou em conflito com outra solicitação.";
-  }
-  if (status === "invalid") return "Informe um propósito válido para exportar o resumo.";
-  if (status === "unsafe-response") {
-    return "A exportação foi bloqueada porque o CSV não confirmou os rótulos simulados.";
-  }
-  if (status === "service-unavailable") {
-    return "O serviço de exportação não está disponível agora.";
-  }
-  return null;
-}
-
-function exceptionReviewMessage(status?: string): string | null {
-  if (status === "recorded") {
-    return "Revisão humana da exceção registrada na trilha append-only.";
-  }
-  if (status === "forbidden") {
-    return "Seu usuário não pode revisar esta exceção nesta rodovia.";
-  }
-  if (status === "missing") return "A exceção pós-serviço simulada não foi encontrada.";
-  if (status === "conflict") {
-    return "A chave de repetição ou a revisão efetiva entrou em conflito.";
-  }
-  if (status === "invalid") {
-    return "A decisão da exceção está incompleta ou inconsistente.";
-  }
-  if (status === "service-unavailable") {
-    return "O serviço de revisão da exceção não está disponível agora.";
-  }
-  return null;
-}
-
-function mowingExceptionMessage(status?: string): string | null {
-  if (status === "created") {
-    return "Exceção pós-serviço simulada registrada para revisão humana.";
-  }
-  if (status === "forbidden") {
-    return "Seu usuário não pode avaliar exceção pós-serviço nesta rodovia.";
-  }
-  if (status === "missing") return "O resumo pós-serviço simulado não foi encontrado.";
-  if (status === "conflict") return "A exceção já existe ou a chave entrou em conflito.";
-  if (status === "invalid") return "A justificativa da exceção pós-serviço é inválida.";
-  if (status === "service-unavailable") {
-    return "O serviço de exceções pós-serviço não está disponível agora.";
-  }
-  return null;
-}
-
 export default async function MowingPostServiceSummariesPage({ searchParams }: PageProps) {
   const [session, summaries, exceptions, query] = await Promise.all([
     loadDashboardSession(),
@@ -138,9 +90,9 @@ export default async function MowingPostServiceSummariesPage({ searchParams }: P
     searchParams,
   ]);
   const operationMessage =
-    mowingExceptionMessage(query.mowing_exception) ??
-    exceptionReviewMessage(query.exception_review) ??
-    exportMessage(query.export);
+    mowingPostServiceExceptionMessage(query.mowing_exception) ??
+    mowingPostServiceExceptionReviewMessage(query.exception_review) ??
+    mowingPostServiceSummaryExportMessage(query.export);
   const exceptionBySummary = new Map(
     exceptions?.items.map((item) => [item.summary_id, item]) ?? [],
   );
