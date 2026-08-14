@@ -22,7 +22,11 @@ import { SESSION_COOKIE_NAME } from "../../lib/session-security";
 export const dynamic = "force-dynamic";
 
 interface PageProps {
-  searchParams: Promise<{ export?: string; exception_review?: string }>;
+  searchParams: Promise<{
+    export?: string;
+    mowing_exception?: string;
+    exception_review?: string;
+  }>;
 }
 
 async function loadSummaries(): Promise<MowingPostServiceSummaryCollection | null> {
@@ -110,6 +114,22 @@ function exceptionReviewMessage(status?: string): string | null {
   return null;
 }
 
+function mowingExceptionMessage(status?: string): string | null {
+  if (status === "created") {
+    return "Exceção pós-serviço simulada registrada para revisão humana.";
+  }
+  if (status === "forbidden") {
+    return "Seu usuário não pode avaliar exceção pós-serviço nesta rodovia.";
+  }
+  if (status === "missing") return "O resumo pós-serviço simulado não foi encontrado.";
+  if (status === "conflict") return "A exceção já existe ou a chave entrou em conflito.";
+  if (status === "invalid") return "A justificativa da exceção pós-serviço é inválida.";
+  if (status === "service-unavailable") {
+    return "O serviço de exceções pós-serviço não está disponível agora.";
+  }
+  return null;
+}
+
 export default async function MowingPostServiceSummariesPage({ searchParams }: PageProps) {
   const [session, summaries, exceptions, query] = await Promise.all([
     loadDashboardSession(),
@@ -118,7 +138,9 @@ export default async function MowingPostServiceSummariesPage({ searchParams }: P
     searchParams,
   ]);
   const operationMessage =
-    exceptionReviewMessage(query.exception_review) ?? exportMessage(query.export);
+    mowingExceptionMessage(query.mowing_exception) ??
+    exceptionReviewMessage(query.exception_review) ??
+    exportMessage(query.export);
   const exceptionBySummary = new Map(
     exceptions?.items.map((item) => [item.summary_id, item]) ?? [],
   );
@@ -352,7 +374,34 @@ export default async function MowingPostServiceSummariesPage({ searchParams }: P
                         </small>
                       </form>
                     </>
-                  ) : null}
+                  ) : (
+                    <form
+                      action={`/api/prepared-mowing-post-service-summaries/${item.summary_id}/exceptions`}
+                      className="prepared-summary-form"
+                      method="post"
+                    >
+                      <input name="csrf_token" type="hidden" value={session.csrfToken} />
+                      <input name="idempotency_key" type="hidden" value={randomUUID()} />
+                      <label htmlFor={`mowing-exception-rationale-${item.summary_id}`}>
+                        Justificativa da avaliação de exceção
+                      </label>
+                      <textarea
+                        defaultValue="Aplicar limiar preparado ao resumo pós-serviço simulado"
+                        id={`mowing-exception-rationale-${item.summary_id}`}
+                        maxLength={2000}
+                        name="creation_rationale"
+                        required
+                        rows={3}
+                      />
+                      <button className="primary-button" type="submit">
+                        Avaliar exceção pós-serviço
+                      </button>
+                      <small>
+                        Se a máxima exceder o limiar, gera somente indicação de inspeção de
+                        seguimento com revisão humana.
+                      </small>
+                    </form>
+                  )}
 
                   <form
                     action={`/api/prepared-mowing-post-service-summaries/${item.summary_id}/exports`}
