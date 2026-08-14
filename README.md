@@ -453,6 +453,12 @@ execute `python scripts/export_openapi.py`, revise o diff e mantenha o gate
 `--check` aprovado. O exportador recusa rotas de aplicação fora de `/v1`,
 identificadores de operação duplicados e valores sensíveis conhecidos.
 
+Todas as respostas da API incluem `X-Correlation-ID`. Erros HTTP, de validação
+e internos seguem o envelope estável `code`, `message`, `details` e
+`correlation_id`; falhas inesperadas não retornam detalhes internos. O contrato
+e seus limites estão em
+[API error and correlation contract](docs/architecture/api-error-contract.md).
+
 ### Dashboard Next.js
 
 Inicie a API e execute:

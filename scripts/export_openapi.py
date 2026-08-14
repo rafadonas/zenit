@@ -20,6 +20,8 @@ SENSITIVE_MARKERS = {
     "postgresql+psycopg://zenit:",
     "ZGV2ZWxvcG1lbnQtb25seS0zMi1ieXRlLWtleSEhISE=",
 }
+ERROR_RESPONSE_REF = "#/components/schemas/ApiErrorResponse"
+CORRELATION_ID_HEADER = "X-Correlation-ID"
 
 
 class OpenApiContractError(RuntimeError):
@@ -38,6 +40,24 @@ def validate_openapi_contract(schema: Mapping[str, Any]) -> None:
     info = _object(schema.get("info"), "info")
     if info.get("title") != "ZENIT API" or info.get("version") != "0.1.0":
         raise OpenApiContractError("API title and version must match the MVP contract")
+
+    components = _object(schema.get("components"), "components")
+    schemas = _object(components.get("schemas"), "components.schemas")
+    error_schema = _object(schemas.get("ApiErrorResponse"), "ApiErrorResponse")
+    error_properties = _object(error_schema.get("properties"), "ApiErrorResponse.properties")
+    required_error_fields = {"code", "message", "details", "correlation_id"}
+    declared_error_fields = set(error_schema.get("required", []))
+    if declared_error_fields != required_error_fields or not required_error_fields <= set(
+        error_properties
+    ):
+        raise OpenApiContractError("ApiErrorResponse must require the stable error fields")
+
+    correlation_property = _object(
+        error_properties.get("correlation_id"),
+        "ApiErrorResponse.correlation_id",
+    )
+    if correlation_property.get("type") != "string" or correlation_property.get("format") != "uuid":
+        raise OpenApiContractError("ApiErrorResponse correlation_id must be a UUID string")
 
     paths = _object(schema.get("paths"), "paths")
     if "/health" not in paths:
@@ -68,6 +88,29 @@ def validate_openapi_contract(schema: Mapping[str, Any]) -> None:
             responses = operation.get("responses")
             if not isinstance(responses, Mapping) or not responses:
                 raise OpenApiContractError(f"{method.upper()} {path} has no responses")
+            for status_code in ("422", "default"):
+                error_response = _object(
+                    responses.get(status_code),
+                    f"paths.{path}.{method}.responses.{status_code}",
+                )
+                headers = _object(error_response.get("headers"), "error response headers")
+                correlation_header = _object(
+                    headers.get(CORRELATION_ID_HEADER),
+                    f"error response {CORRELATION_ID_HEADER}",
+                )
+                header_schema = _object(
+                    correlation_header.get("schema"),
+                    f"error response {CORRELATION_ID_HEADER} schema",
+                )
+                if header_schema.get("type") != "string" or header_schema.get("format") != "uuid":
+                    raise OpenApiContractError("error correlation header must be a UUID string")
+                content = _object(error_response.get("content"), "error response content")
+                json_content = _object(content.get("application/json"), "error JSON content")
+                response_schema = _object(json_content.get("schema"), "error JSON schema")
+                if response_schema.get("$ref") != ERROR_RESPONSE_REF:
+                    raise OpenApiContractError(
+                        f"{method.upper()} {path} has no stable {status_code} error response"
+                    )
             operation_count += 1
     if operation_count == 0:
         raise OpenApiContractError("OpenAPI contract contains no operations")

@@ -49,6 +49,36 @@ void main() {
     },
   );
 
+  test('login surfaces the stable API error message', () async {
+    final gateway = HttpZenitGateway(
+      baseUrl: 'https://api.example.test',
+      client: MockClient((request) async {
+        return http.Response(
+          jsonEncode({
+            'code': 'authentication_required',
+            'message': 'Incorrect email or password',
+            'details': null,
+            'correlation_id': '20000000-0000-4000-8000-000000000001',
+          }),
+          401,
+        );
+      }),
+    );
+
+    await expectLater(
+      gateway.login('field@example.test', 'wrong-password'),
+      throwsA(
+        isA<ZenitApiException>()
+            .having((error) => error.statusCode, 'statusCode', 401)
+            .having(
+              (error) => error.message,
+              'message',
+              'Incorrect email or password',
+            ),
+      ),
+    );
+  });
+
   test('downloads prepared orders with bearer authentication', () async {
     final gateway = HttpZenitGateway(
       baseUrl: 'https://api.example.test',

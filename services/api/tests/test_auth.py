@@ -92,7 +92,11 @@ def test_login_uses_the_same_generic_failure_for_invalid_credentials() -> None:
     response = asyncio.run(request())
 
     assert response.status_code == 401
-    assert response.json() == {"detail": "Incorrect email or password"}
+    payload = response.json()
+    assert payload["code"] == "authentication_required"
+    assert payload["message"] == "Incorrect email or password"
+    assert payload["details"] is None
+    assert payload["correlation_id"] == response.headers["x-correlation-id"]
     assert response.headers["www-authenticate"] == "Bearer"
 
 

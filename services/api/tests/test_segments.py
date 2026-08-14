@@ -78,4 +78,7 @@ def test_segments_rejects_inverted_bbox_before_repository_call() -> None:
         app.dependency_overrides.clear()
 
     assert response.status_code == 422
-    assert response.json()["detail"] == "Bounding box minimums must be below maximums"
+    payload = response.json()
+    assert payload["code"] == "unprocessable_content"
+    assert payload["message"] == "Bounding box minimums must be below maximums"
+    assert payload["correlation_id"] == response.headers["x-correlation-id"]

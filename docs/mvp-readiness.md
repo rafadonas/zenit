@@ -34,6 +34,7 @@ field authorization.
 | History and reporting | Ready only in demonstration scope | Read-only rehearsal history and simulated CSV artifacts are available. Operational map/history updates and official reports are intentionally blocked. |
 | Dashboard accessibility | Ready as automated baseline | All current main shells expose a skip target; keyboard focus, reduced motion, JSX semantics, and primary muted-text contrast are gated. Manual browser and assistive-technology audits remain required before operational use. |
 | Dashboard HTTP security | Ready as local baseline | Every route receives anti-clickjacking, MIME sniffing, referrer, opener, browser-permission, base URI, and form-action controls. A nonce-based script policy, TLS termination, and HSTS remain deployment work. |
+| API error observability | Ready as local baseline | Success and error responses carry a UUID correlation header; HTTP, validation, and unexpected failures use one versioned envelope. Production log aggregation and distributed tracing remain deployment work. |
 | Automated quality gates | Ready | Python, dashboard, Flutter, production dashboard build, versioned OpenAPI contract, migration contract, and fresh-database smoke checks pass locally and are represented in CI. |
 
 ## Validation record
@@ -74,7 +75,10 @@ post-service exception review authentication boundary.
 The FastAPI OpenAPI document is tracked at `contracts/openapi.json` and checked
 byte for byte in CI. Its repository validator currently covers 34 paths,
 requires versioned application routes, unique operation identifiers, tags and
-responses, and rejects known development credentials.
+responses, the stable API error envelope with UUID correlation headers, and
+rejects known development credentials. Runtime tests cover generated,
+caller-supplied, and malformed correlation identifiers; sanitized validation
+details; preserved authentication challenges; and generic internal failures.
 
 The dashboard accessibility baseline covers all eight current main shells,
 global visible focus, reduced-motion behavior, Next.js JSX accessibility lint,

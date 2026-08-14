@@ -126,7 +126,10 @@ def test_role_denial_is_enforced_by_the_server() -> None:
     )
 
     assert response.status_code == 403
-    assert response.json()["detail"] == "Reviewer lacks the required role for this road"
+    payload = response.json()
+    assert payload["code"] == "forbidden"
+    assert payload["message"] == "Reviewer lacks the required role for this road"
+    assert payload["correlation_id"] == response.headers["x-correlation-id"]
 
 
 @pytest.mark.parametrize(

@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from zenit_api.analysis import router as analysis_router
 from zenit_api.auth import router as auth_router
 from zenit_api.config import get_settings
+from zenit_api.error_contract import API_ERROR_RESPONSES, install_error_contract
 from zenit_api.inspection_summaries import collection_router as inspection_summary_collection_router
 from zenit_api.inspection_summaries import router as inspection_summaries_router
 from zenit_api.media import router as media_router
@@ -58,7 +59,9 @@ app = FastAPI(
     title="ZENIT API",
     version=settings.app_version,
     lifespan=lifespan,
+    responses=API_ERROR_RESPONSES,
 )
+install_error_contract(app)
 app.include_router(analysis_router)
 app.include_router(auth_router)
 app.include_router(segments_router)

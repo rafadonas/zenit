@@ -72,7 +72,7 @@ class HttpZenitGateway implements ZenitGateway {
     final payload = _decodeObject(response);
     if (response.statusCode != 200) {
       throw ZenitApiException(
-        _detail(payload, 'Falha na autenticação.'),
+        _errorMessage(payload, 'Falha na autenticação.'),
         statusCode: response.statusCode,
       );
     }
@@ -100,7 +100,7 @@ class HttpZenitGateway implements ZenitGateway {
     final payload = _decodeObject(response);
     if (response.statusCode != 200) {
       throw ZenitApiException(
-        _detail(payload, 'Não foi possível baixar as ordens preparadas.'),
+        _errorMessage(payload, 'Não foi possível baixar as ordens preparadas.'),
         statusCode: response.statusCode,
       );
     }
@@ -128,7 +128,7 @@ class HttpZenitGateway implements ZenitGateway {
     final payload = _decodeObject(response);
     if (response.statusCode != 200) {
       throw ZenitApiException(
-        _detail(
+        _errorMessage(
           payload,
           'Não foi possível baixar os planejamentos preparados de roçada.',
         ),
@@ -171,7 +171,7 @@ class HttpZenitGateway implements ZenitGateway {
     final payload = _decodeObject(response);
     if (response.statusCode != 200) {
       throw ZenitApiException(
-        _detail(payload, 'Não foi possível registrar o dispositivo.'),
+        _errorMessage(payload, 'Não foi possível registrar o dispositivo.'),
         statusCode: response.statusCode,
       );
     }
@@ -199,7 +199,10 @@ class HttpZenitGateway implements ZenitGateway {
     final payload = _decodeObject(response);
     if (response.statusCode != 200) {
       throw ZenitApiException(
-        _detail(payload, 'Não foi possível sincronizar o lote preparado.'),
+        _errorMessage(
+          payload,
+          'Não foi possível sincronizar o lote preparado.',
+        ),
         statusCode: response.statusCode,
       );
     }
@@ -242,7 +245,7 @@ class HttpZenitGateway implements ZenitGateway {
     final payload = _decodeObject(response);
     if (response.statusCode != 200) {
       throw ZenitApiException(
-        _detail(payload, 'Não foi possível enviar a foto preparada.'),
+        _errorMessage(payload, 'Não foi possível enviar a foto preparada.'),
         statusCode: response.statusCode,
       );
     }
@@ -293,7 +296,7 @@ class HttpZenitGateway implements ZenitGateway {
     final payload = _decodeObject(response);
     if (response.statusCode != 200) {
       throw ZenitApiException(
-        _detail(
+        _errorMessage(
           payload,
           'Não foi possível enviar a foto pós-serviço simulada.',
         ),
@@ -340,7 +343,11 @@ class HttpZenitGateway implements ZenitGateway {
     }
   }
 
-  static String _detail(Map<String, Object?> payload, String fallback) {
+  static String _errorMessage(Map<String, Object?> payload, String fallback) {
+    final message = payload['message'];
+    if (message is String && message.isNotEmpty) {
+      return message;
+    }
     final detail = payload['detail'];
     return detail is String && detail.isNotEmpty ? detail : fallback;
   }

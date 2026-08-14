@@ -55,6 +55,14 @@ def test_openapi_rejects_development_credentials() -> None:
         validate_openapi_contract(schema)
 
 
+def test_openapi_requires_the_stable_error_response_on_every_operation() -> None:
+    schema = _mutable_schema()
+    del schema["paths"]["/health"]["get"]["responses"]["default"]
+
+    with pytest.raises(OpenApiContractError, match=r"responses\.default must be an object"):
+        validate_openapi_contract(schema)
+
+
 def test_openapi_check_reports_a_stale_artifact(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
