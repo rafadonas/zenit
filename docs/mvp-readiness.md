@@ -1,0 +1,80 @@
+# ZENIT MVP readiness
+
+- Assessment date: 2026-08-14
+- Target: P0 evaluation demonstration
+- Demonstration decision: GO
+- Operational or field-pilot decision: NO-GO
+
+## Scope boundary
+
+The repository is ready to demonstrate the complete prepared flow from source
+catalog and segment analysis through human decisions, offline mobile capture,
+simulated mowing rehearsal, post-service review, summary, exception assessment,
+and audited export.
+
+This decision does not certify field execution or production readiness. The
+available road axis is estimated, the cached satellite artifact is partial, and
+all inspection and mowing returns are prepared or simulated. They remain
+ineligible for model training, official reporting, map/history promotion, and
+field authorization.
+
+## P0 acceptance matrix
+
+| Capability | Demonstration status | Evidence and boundary |
+| --- | --- | --- |
+| Reproducible foundation | Ready | Compose defines healthy PostgreSQL/PostGIS, MinIO, API, and dashboard services. A fresh database applies migrations `0001`-`0037`. |
+| Source audit and ingestion | Ready | Immutable source catalog, checksums, lineage, idempotent imports, and deterministic parser fixtures are covered by tests and data-quality reports. |
+| Segments, zones, and map | Ready with estimated data | The dashboard exposes 100 m segments and separate zones. The candidate axis remains `estimated`, `needs_validation`, and non-operational. |
+| Satellite baseline | Ready with partial cache | Discovery, quality gates, explainable rules, provenance, and a checksum-bound NDVI preview exist. No complete source scene is approved for operations. |
+| Human decision and inspection order | Ready | Recommendation review is append-only and every prepared order remains linked to its analysis, policy, actor, and effective human decision. |
+| Offline inspection demonstration | Ready | Flutter stores encrypted drafts, three measurements, photos, lifecycle events, and idempotent retries while visibly preserving simulated location. |
+| Prepared inspection return | Ready | Human photo review gates immutable summaries and audited CSV exports without treating pixels as height. |
+| Mowing planning and rehearsal | Ready for demonstration | Proposal, human review, non-executable order, candidate resources, manual readiness, planning-only approval, and offline rehearsal are separated and audited. |
+| Post-service feedback | Ready for demonstration | Three separate simulated heights and photos gate a summary, audited export, threshold exception, and append-only human exception review. |
+| History and reporting | Ready only in demonstration scope | Read-only rehearsal history and simulated CSV artifacts are available. Operational map/history updates and official reports are intentionally blocked. |
+| Automated quality gates | Ready | Python, dashboard, Flutter, production dashboard build, migration contract, and fresh-database smoke checks pass locally and are represented in CI. |
+
+## Validation record
+
+The local release audit ran these tracked checks successfully:
+
+```text
+.venv/bin/ruff check .
+.venv/bin/pytest
+npm run dashboard:lint
+npm run dashboard:test
+npm run dashboard:build
+flutter analyze
+flutter test
+docker compose config --quiet
+fresh PostgreSQL initialization with migrations 0001-0037
+```
+
+The fresh-database check verified the final summary export, exception, exception
+review tables, and the versioned exception policy. Its isolated container,
+network, and volume were removed after validation; the development stack was
+not modified.
+
+The local workstation has Flutter 3.44.9 but no Android SDK, so the debug APK
+was not built during this audit. Mobile formatting, static analysis, and all 58
+Flutter tests passed. The tracked CI job includes the debug APK build and must
+pass, or the same build must run on a workstation with the Android SDK, before
+an installable artifact is treated as validated.
+
+## External blockers for an operational pilot
+
+- Replace the estimated road axis with an approved official axis and validate
+  segment and zone geometry.
+- Approve and retain a complete satellite source scene instead of relying on a
+  partial development cache.
+- Define operational identity, dispatch, GPS, geofence, team/equipment,
+  weather, safety, and approval policies.
+- Validate field measurements and photo/privacy controls, including retention,
+  legal hold, EXIF handling, decoder checks, and malware scanning.
+- Define key custody, rotation, backup, restore, and disaster-recovery
+  procedures for encrypted media.
+- Approve operational map/history promotion and an official report template.
+
+Until those inputs and policies exist, `OFFICIAL_REPORTS_ENABLED` and
+`TRAINING_DATA_ENABLED` must remain false and no prepared or simulated artifact
+may be promoted to operational history.

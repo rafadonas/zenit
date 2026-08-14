@@ -122,8 +122,9 @@ campo e inelegível para relatório oficial.
   revisões visuais aceitas, sem transformar foto em altura ou conclusão.
 - Histórico gerencial somente leitura do ensaio e das alturas brutas.
 
-Ainda não existem conclusão de roçada validada, atualização do mapa/histórico
-ou resumo pós-serviço.
+Ainda não existem conclusão de roçada validada nem atualização operacional do
+mapa/histórico. Os resumos pós-serviço atuais são exclusivamente simulados e
+não comprovam execução ou eficácia.
 
 ## Arquitetura do repositório
 
@@ -517,6 +518,7 @@ arquivos brutos ou credenciais de provedores.
 ## Documentação
 
 - [Manual mestre do projeto](ZENIT_Manual_Mestre_para_Codex.pdf)
+- [Prontidão do MVP demonstrativo](docs/mvp-readiness.md)
 - [Decisões arquiteturais](docs/decisions)
 - [Relatórios de qualidade dos dados](docs/data-quality)
 - [Arquitetura](docs/architecture)
