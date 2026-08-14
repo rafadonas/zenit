@@ -8,8 +8,12 @@ import {
 
 interface RouteContext { params: Promise<{ summaryId: string }>; }
 
-function redirect(origin: string, status: string): NextResponse {
-  const destination = new URL("/photo-reviews", origin);
+function resolveReturnPath(value: FormDataEntryValue | null): string {
+  return value === "/photo-reviews" ? "/photo-reviews" : "/mowing-post-service-summaries";
+}
+
+function redirect(origin: string, path: string, status: string): NextResponse {
+  const destination = new URL(path, origin);
   destination.searchParams.set("mowing_exception", status);
   return NextResponse.redirect(destination, 303);
 }
@@ -23,9 +27,16 @@ export async function POST(request: NextRequest, context: RouteContext): Promise
     );
   }
   const { summaryId } = await context.params;
-  if (!isUuid(summaryId)) return redirect(config.publicOrigin, "invalid");
+  if (!isUuid(summaryId)) {
+    return redirect(config.publicOrigin, "/mowing-post-service-summaries", "invalid");
+  }
   let form: FormData;
-  try { form = await request.formData(); } catch { return redirect(config.publicOrigin, "invalid"); }
+  try {
+    form = await request.formData();
+  } catch {
+    return redirect(config.publicOrigin, "/mowing-post-service-summaries", "invalid");
+  }
+  const returnPath = resolveReturnPath(form.get("return_path"));
   const submission = parsePreparedProposalSubmission(form);
   if (!submission || !csrfTokensMatch(
     submission.csrfToken, request.cookies.get(CSRF_COOKIE_NAME)?.value,
@@ -45,8 +56,8 @@ export async function POST(request: NextRequest, context: RouteContext): Promise
         "Idempotency-Key": submission.idempotencyKey,
       },
     });
-  } catch { return redirect(config.publicOrigin, "service-unavailable"); }
-  if (upstream.ok) return redirect(config.publicOrigin, "created");
+  } catch { return redirect(config.publicOrigin, returnPath, "service-unavailable"); }
+  if (upstream.ok) return redirect(config.publicOrigin, returnPath, "created");
   if (upstream.status === 401) {
     const response = NextResponse.redirect(new URL("/login?error=session", config.publicOrigin), 303);
     clearDashboardSessionCookies(response, config);
@@ -55,5 +66,9 @@ export async function POST(request: NextRequest, context: RouteContext): Promise
   const statuses: Record<number, string> = {
     403: "forbidden", 404: "missing", 409: "conflict", 422: "invalid", 503: "service-unavailable",
   };
-  return redirect(config.publicOrigin, statuses[upstream.status] ?? "service-unavailable");
+  return redirect(
+    config.publicOrigin,
+    returnPath,
+    statuses[upstream.status] ?? "service-unavailable",
+  );
 }

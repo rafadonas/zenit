@@ -30,6 +30,7 @@ describe("mowing post-service exception dashboard proxy", () => {
       csrf_token: csrfToken,
       idempotency_key: "10000000-0000-4000-8000-000000000001",
       creation_rationale: "Avaliar limiar pós-serviço simulado",
+      return_path: "/photo-reviews",
       authorizes_field_work: "true",
     });
     const request = new NextRequest(
@@ -47,6 +48,9 @@ describe("mowing post-service exception dashboard proxy", () => {
     const response = await POST(request, context);
 
     expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe(
+      "http://localhost:3000/photo-reviews?mowing_exception=created",
+    );
     const [url, options] = apiFetch.mock.calls[0] as [string, RequestInit];
     expect(url).toContain(`/v1/prepared-mowing-post-service-summaries/${summaryId}/exceptions`);
     expect(JSON.parse(String(options.body))).toEqual({
@@ -56,5 +60,34 @@ describe("mowing post-service exception dashboard proxy", () => {
       Authorization: "Bearer signed-api-token",
       "Idempotency-Key": "10000000-0000-4000-8000-000000000001",
     });
+  });
+
+  it("falls back to the summary page for a non-allowlisted return path", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 409 })));
+    const body = new URLSearchParams({
+      csrf_token: csrfToken,
+      idempotency_key: "10000000-0000-4000-8000-000000000001",
+      creation_rationale: "Avaliar limiar pós-serviço simulado",
+      return_path: "/internal-only",
+    });
+    const request = new NextRequest(
+      `http://localhost:3000/api/prepared-mowing-post-service-summaries/${summaryId}/exceptions`,
+      {
+        method: "POST",
+        body,
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+          Cookie: `${CSRF_COOKIE_NAME}=${csrfToken}; ${SESSION_COOKIE_NAME}=signed-api-token`,
+          Origin: "http://localhost:3000",
+        },
+      },
+    );
+
+    const response = await POST(request, context);
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe(
+      "http://localhost:3000/mowing-post-service-summaries?mowing_exception=conflict",
+    );
   });
 });
