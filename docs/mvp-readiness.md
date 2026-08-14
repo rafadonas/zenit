@@ -72,7 +72,9 @@ requires API 24, targets API 36, and is signed by one Android debug signer with
 APK Signature Scheme v2. Its validation evidence records SHA-256
 `acbd95ec24fa399bb742287f2044148e64286451dbee252cd396e21f7f82f2c1`
 and size 155,508,813 bytes. The APK remains a demonstrative build and is
-ineligible for field execution, official reporting, and model training.
+ineligible for field execution, official reporting, and model training. The
+[tracked artifact evidence](release-evidence/android-mvp-debug-apk-2026-08-14.json)
+links the generated, ignored binary to source revision `8381f68`.
 
 ## External blockers for an operational pilot
 

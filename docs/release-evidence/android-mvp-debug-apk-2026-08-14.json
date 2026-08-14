@@ -1,0 +1,47 @@
+{
+  "assessment_date": "2026-08-14",
+  "artifact": {
+    "abis": [
+      "arm64-v8a",
+      "armeabi-v7a",
+      "x86_64"
+    ],
+    "application_id": "br.com.zenit.zenit_mobile",
+    "artifact_role": "zenit_mvp_demonstration_android_debug_apk",
+    "artifact_status": "demonstration_build",
+    "committed": false,
+    "debuggable": true,
+    "generated_path": "apps/mobile/build/app/outputs/flutter-apk/app-debug.apk",
+    "min_sdk": 24,
+    "sha256": "acbd95ec24fa399bb742287f2044148e64286451dbee252cd396e21f7f82f2c1",
+    "signature_scheme_v2_verified": true,
+    "signature_verified": true,
+    "signer_certificate_sha256": "88128e1f7c14367364d52d4b87564599933922f7c83efef9570379cf0ac48599",
+    "size_bytes": 155508813,
+    "target_sdk": 36,
+    "version_code": 1,
+    "version_name": "1.0.0"
+  },
+  "build": {
+    "android_build_tools": "36.0.0",
+    "android_ndk": "28.2.13676358",
+    "android_platform": 36,
+    "configured_api_base_url": "https://api.example.invalid",
+    "flutter": "3.44.9",
+    "jdk": "Eclipse Temurin 17.0.20+8",
+    "source_revision": "8381f68",
+    "source_worktree_clean": true
+  },
+  "scope": {
+    "eligible_for_field_execution": false,
+    "eligible_for_model_training": false,
+    "eligible_for_official_reporting": false,
+    "operational_release": false
+  },
+  "verification": {
+    "configured_url_found_in_flutter_kernel": true,
+    "passed": true,
+    "verifier": "scripts/verify_android_apk.py",
+    "verifier_revision": "8381f68"
+  }
+}
