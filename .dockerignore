@@ -5,6 +5,7 @@
 !package.json
 !package-lock.json
 !apps/
+apps/*
 !apps/dashboard/
 !apps/dashboard/**
 apps/dashboard/.next/
