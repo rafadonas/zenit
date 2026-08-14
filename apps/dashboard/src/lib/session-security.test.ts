@@ -4,6 +4,7 @@ import {
   csrfTokensMatch,
   getDashboardSecurityConfig,
   parseDecisionSubmission,
+  parseMowingPostServiceExceptionReviewSubmission,
   parsePreparedInspectionOrderSubmission,
   parsePreparedMowingOrderSubmission,
   parsePreparedMowingResourcePlanSubmission,
@@ -178,6 +179,42 @@ describe("dashboard session security", () => {
     });
     form.delete("rationale");
     expect(parsePreparedProposalReviewSubmission(form)).toBeNull();
+  });
+
+  it("allowlists only valid simulated mowing exception review decisions", () => {
+    const form = new FormData();
+    form.set("csrf_token", csrfToken);
+    form.set("idempotency_key", "10000000-0000-4000-8000-000000000001");
+    form.set("decision", "adjusted");
+    form.set("adjusted_recommendation", "inspect_follow_up");
+    form.set("rationale", "Registrar inspeção de seguimento no fluxo simulado");
+    form.set("supersedes_review_id", "20000000-0000-4000-8000-000000000001");
+    form.set("authorizes_field_work", "true");
+
+    expect(parseMowingPostServiceExceptionReviewSubmission(form)).toEqual({
+      csrfToken,
+      idempotencyKey: "10000000-0000-4000-8000-000000000001",
+      decision: "adjusted",
+      adjustedRecommendation: "inspect_follow_up",
+      rationale: "Registrar inspeção de seguimento no fluxo simulado",
+      supersedesReviewId: "20000000-0000-4000-8000-000000000001",
+    });
+
+    form.set("decision", "accepted");
+    expect(parseMowingPostServiceExceptionReviewSubmission(form)).toBeNull();
+
+    form.set("decision", "rejected");
+    form.delete("adjusted_recommendation");
+    expect(parseMowingPostServiceExceptionReviewSubmission(form)).toEqual({
+      csrfToken,
+      idempotencyKey: "10000000-0000-4000-8000-000000000001",
+      decision: "rejected",
+      rationale: "Registrar inspeção de seguimento no fluxo simulado",
+      supersedesReviewId: "20000000-0000-4000-8000-000000000001",
+    });
+
+    form.delete("rationale");
+    expect(parseMowingPostServiceExceptionReviewSubmission(form)).toBeNull();
   });
 
   it("allowlists a prepared mowing-order request without execution fields", () => {
