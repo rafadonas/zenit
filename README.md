@@ -522,8 +522,8 @@ A CI valida Python, dashboard, Flutter, o APK demonstrativo e um ambiente
 Compose novo. O APK deve conter a URL reservada, package/version e SDKs
 esperados, três ABIs Flutter e uma assinatura debug v2 válida. O smoke test
 confere schema PostGIS, healthcheck, resposta satelital vazia com proveniência,
-proteção das rotas de escrita e disponibilidade do dashboard/login sem exigir
-arquivos brutos ou credenciais de provedores.
+proteção das rotas de escrita e a renderização identificável do dashboard/login
+sem exigir arquivos brutos ou credenciais de provedores.
 
 O manifesto versionado do APK também possui um gate independente para schema,
 proveniência, hashes e bloqueios de uso operacional:

@@ -270,7 +270,11 @@ export function CorridorDashboard({
   }
 
   return (
-    <main className="dashboard-shell" id="main-content">
+    <main
+      className="dashboard-shell"
+      data-zenit-smoke-page="corridor"
+      id="main-content"
+    >
       <header className="topbar">
         <div className="brand-block">
           <span className="brand-mark" aria-hidden="true"><i /></span>

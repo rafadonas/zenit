@@ -313,6 +313,17 @@ def _verify_health(body: bytes) -> None:
             raise SmokeCheckError(f"API health has invalid {dependency} readiness")
 
 
+def _verify_dashboard_page(body: bytes, name: str, marker: str) -> None:
+    try:
+        document = body.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise SmokeCheckError(f"{name} did not return UTF-8 HTML") from exc
+    if "<html" not in document.lower():
+        raise SmokeCheckError(f"{name} did not return an HTML document")
+    if marker not in document:
+        raise SmokeCheckError(f"{name} is missing its rendered page marker")
+
+
 def run_checks(
     *,
     api_base: str,
@@ -346,11 +357,18 @@ def run_checks(
         _expect_status(check, timeout=timeout, opener=opener)
         check_count += 1
 
-    for check in (
-        StatusCheck("dashboard", dashboard_base, "/", 200),
-        StatusCheck("dashboard login", dashboard_base, "/login", 200),
+    for check, marker in (
+        (
+            StatusCheck("dashboard", dashboard_base, "/", 200),
+            'data-zenit-smoke-page="corridor"',
+        ),
+        (
+            StatusCheck("dashboard login", dashboard_base, "/login", 200),
+            'data-zenit-smoke-page="login"',
+        ),
     ):
-        _expect_status(check, timeout=timeout, opener=opener)
+        body = _expect_status(check, timeout=timeout, opener=opener)
+        _verify_dashboard_page(body, check.name, marker)
         check_count += 1
 
     return check_count

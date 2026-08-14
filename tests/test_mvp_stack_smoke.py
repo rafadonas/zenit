@@ -42,8 +42,16 @@ def _success_opener(request: object, *, timeout: float) -> FakeResponse:
         )
     if url.endswith("/satellite-observations") or url.endswith("/v1/recommendations"):
         return FakeResponse(200, b'{"items":[],"metadata":{"result_count":0}}')
-    if url.startswith("http://dashboard.test"):
-        return FakeResponse(200, b"<html></html>")
+    if url == "http://dashboard.test/":
+        return FakeResponse(
+            200,
+            b'<html><main data-zenit-smoke-page="corridor"></main></html>',
+        )
+    if url == "http://dashboard.test/login":
+        return FakeResponse(
+            200,
+            b'<html><main data-zenit-smoke-page="login"></main></html>',
+        )
     raise HTTPError(url, 401, "Unauthorized", {}, io.BytesIO(b'{"detail":"unauthorized"}'))
 
 
@@ -105,6 +113,20 @@ def test_run_checks_rejects_unverified_health_dependency() -> None:
         return _success_opener(request, timeout=timeout)
 
     with pytest.raises(SmokeCheckError, match="invalid object_storage readiness"):
+        run_checks(
+            api_base="http://api.test",
+            dashboard_base="http://dashboard.test",
+            opener=opener,
+        )
+
+
+def test_run_checks_rejects_dashboard_error_page_with_http_200() -> None:
+    def opener(request: object, *, timeout: float) -> FakeResponse:
+        if request.full_url == "http://dashboard.test/":  # type: ignore[attr-defined]
+            return FakeResponse(200, b"<html><h1>Internal Server Error</h1></html>")
+        return _success_opener(request, timeout=timeout)
+
+    with pytest.raises(SmokeCheckError, match="dashboard is missing its rendered page marker"):
         run_checks(
             api_base="http://api.test",
             dashboard_base="http://dashboard.test",
