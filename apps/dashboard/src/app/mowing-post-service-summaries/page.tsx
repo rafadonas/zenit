@@ -6,9 +6,13 @@ import Link from "next/link";
 import { loadDashboardSession } from "../../lib/dashboard-session";
 import {
   isMowingPostServiceExceptionCollection,
-  type MowingPostServiceException,
   type MowingPostServiceExceptionCollection,
 } from "../../lib/mowing-post-service-exceptions";
+import {
+  mowingPostServiceExceptionEffectiveDecision,
+  mowingPostServiceExceptionHeadline,
+  mowingPostServiceExceptionReviewStatus,
+} from "../../lib/mowing-post-service-exception-presenter";
 import {
   isMowingPostServiceSummaryCollection,
   type MowingPostServiceSummaryCollection,
@@ -104,26 +108,6 @@ function exceptionReviewMessage(status?: string): string | null {
     return "O serviço de revisão da exceção não está disponível agora.";
   }
   return null;
-}
-
-function exceptionHeadline(exception: MowingPostServiceException): string {
-  if (exception.latest_review_decision === "adjusted") {
-    return exception.latest_adjusted_recommendation === "inspect_follow_up"
-      ? "Ajustada para inspeção de seguimento"
-      : "Ajustada para monitoramento";
-  }
-  return exception.recommendation === "inspect_follow_up"
-    ? "Inspeção de seguimento indicada"
-    : "Monitoramento indicado";
-}
-
-function effectiveDecision(exception: MowingPostServiceException): string | null {
-  if (!exception.latest_review_decision) return null;
-  if (exception.latest_review_decision === "accepted") return "aceita";
-  if (exception.latest_review_decision === "rejected") return "rejeitada";
-  return exception.latest_adjusted_recommendation === "inspect_follow_up"
-    ? "ajustada para inspeção de seguimento"
-    : "ajustada para monitoramento";
 }
 
 export default async function MowingPostServiceSummariesPage({ searchParams }: PageProps) {
@@ -276,24 +260,22 @@ export default async function MowingPostServiceSummariesPage({ searchParams }: P
                     <>
                       <div className="post-inspection-proposal">
                         <div>
-                          <strong>{exceptionHeadline(exception)}</strong>
+                          <strong>{mowingPostServiceExceptionHeadline(exception)}</strong>
                           <span>
                             Máxima {cm(exception.maximum_height_cm)} · limiar{" "}
                             {cm(exception.applicable_threshold_cm)}
                           </span>
                         </div>
                         <span className="status-pill review">
-                          {exception.review_state === "awaiting_review"
-                            ? "Revisão humana obrigatória"
-                            : "Revisão registrada"}
+                          {mowingPostServiceExceptionReviewStatus(exception)}
                         </span>
                         <small>
                           Exceção simulada; não conclui roçada, não atualiza mapa e não autoriza
                           campo.
                         </small>
-                        {effectiveDecision(exception) ? (
+                        {mowingPostServiceExceptionEffectiveDecision(exception) ? (
                           <small>
-                            Decisão efetiva: {effectiveDecision(exception)} ·{" "}
+                            Decisão efetiva: {mowingPostServiceExceptionEffectiveDecision(exception)} ·{" "}
                             {formatDate(exception.latest_reviewed_at ?? exception.created_at)}
                           </small>
                         ) : null}

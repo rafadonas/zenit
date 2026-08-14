@@ -15,6 +15,11 @@ import {
   type MowingPostServiceExceptionCollection,
 } from "../../lib/mowing-post-service-exceptions";
 import {
+  mowingPostServiceExceptionEffectiveDecision,
+  mowingPostServiceExceptionHeadline,
+  mowingPostServiceExceptionReviewStatus,
+} from "../../lib/mowing-post-service-exception-presenter";
+import {
   isMowingPostServiceSummaryCollection,
   type MowingPostServiceSummaryCollection,
 } from "../../lib/mowing-post-service-summaries";
@@ -370,8 +375,10 @@ export default async function PhotoReviewsPage({ searchParams }: PageProps) {
                         <button className="secondary-button" type="submit">Baixar CSV simulado</button><small>CSV auditado, simulado e inelegível para relatório oficial.</small>
                       </form>
                       {mowingException ? <div className="post-inspection-proposal">
-                        <div><strong>{mowingException.recommendation === "inspect_follow_up" ? "Inspeção de seguimento indicada" : "Monitoramento indicado"}</strong><span>Máxima {formatHeight(mowingException.maximum_height_cm)} cm · limiar {formatHeight(mowingException.applicable_threshold_cm)} cm</span></div><span className="status-pill review">Revisão humana obrigatória</span>
+                        <div><strong>{mowingPostServiceExceptionHeadline(mowingException)}</strong><span>Máxima {formatHeight(mowingException.maximum_height_cm)} cm · limiar {formatHeight(mowingException.applicable_threshold_cm)} cm</span>{mowingPostServiceExceptionEffectiveDecision(mowingException) ? <span>Decisão efetiva: {mowingPostServiceExceptionEffectiveDecision(mowingException)}</span> : null}</div><span className="status-pill review">{mowingPostServiceExceptionReviewStatus(mowingException)}</span>
                         <small>Regra {mowingException.policy_version}. Exceção simulada: não conclui roçada, não atualiza mapa e não autoriza campo.</small>
+                        {mowingException.latest_review_rationale ? <p>{mowingException.latest_review_rationale}</p> : null}
+                        <small>Revise ou corrija a decisão humana em <Link href="/mowing-post-service-summaries">Resumos pós-serviço</Link>.</small>
                       </div> : <form action={`/api/prepared-mowing-post-service-summaries/${mowingSummary.summary_id}/exceptions`} className="prepared-summary-form" method="post">
                         <input name="csrf_token" type="hidden" value={session.csrfToken} /><input name="idempotency_key" type="hidden" value={randomUUID()} />
                         <label htmlFor={`mowing-exception-rationale-${mowingSummary.summary_id}`}>Justificativa da avaliação de exceção</label><textarea defaultValue="Aplicar limiar preparado ao resumo pós-serviço simulado" id={`mowing-exception-rationale-${mowingSummary.summary_id}`} maxLength={2000} name="creation_rationale" required rows={2} />
