@@ -2,7 +2,7 @@
 
 export default function ErrorPage({ reset }: { reset: () => void }) {
   return (
-    <main className="shell">
+    <main className="shell" id="main-content">
       <section className="state-card" role="alert">
         <p className="eyebrow">Falha de comunicação</p>
         <h1>Não foi possível carregar o corredor.</h1>

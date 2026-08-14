@@ -25,7 +25,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const message = loginMessage(query.error, query.status);
 
   return (
-    <main className="login-shell">
+    <main className="login-shell" id="main-content">
       <section className="login-card" aria-labelledby="login-title">
         <div className="login-brand">
           <span className="brand-mark" aria-hidden="true"><i /></span>

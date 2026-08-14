@@ -64,7 +64,7 @@ export default async function RecommendationsPage({ searchParams }: Recommendati
   ]);
   const message = operationMessage(query.auth, query.decision, query.order);
   return (
-    <main className="recommendations-shell">
+    <main className="recommendations-shell" id="main-content">
       <header className="topbar">
         <div className="brand-block">
           <span className="brand-mark" aria-hidden="true"><i /></span>

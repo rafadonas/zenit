@@ -32,6 +32,7 @@ field authorization.
 | Mowing planning and rehearsal | Ready for demonstration | Proposal, human review, non-executable order, candidate resources, manual readiness, planning-only approval, and offline rehearsal are separated and audited. |
 | Post-service feedback | Ready for demonstration | Three separate simulated heights and photos gate a summary, audited export, threshold exception, and append-only human exception review. |
 | History and reporting | Ready only in demonstration scope | Read-only rehearsal history and simulated CSV artifacts are available. Operational map/history updates and official reports are intentionally blocked. |
+| Dashboard accessibility | Ready as automated baseline | All current main shells expose a skip target; keyboard focus, reduced motion, JSX semantics, and primary muted-text contrast are gated. Manual browser and assistive-technology audits remain required before operational use. |
 | Automated quality gates | Ready | Python, dashboard, Flutter, production dashboard build, versioned OpenAPI contract, migration contract, and fresh-database smoke checks pass locally and are represented in CI. |
 
 ## Validation record
@@ -73,6 +74,12 @@ The FastAPI OpenAPI document is tracked at `contracts/openapi.json` and checked
 byte for byte in CI. Its repository validator currently covers 34 paths,
 requires versioned application routes, unique operation identifiers, tags and
 responses, and rejects known development credentials.
+
+The dashboard accessibility baseline covers all eight current main shells,
+global visible focus, reduced-motion behavior, Next.js JSX accessibility lint,
+and at least 4.5:1 contrast for normal muted text on the primary page and card
+surfaces. It is not a claim of complete WCAG conformance and does not replace
+manual keyboard, zoom, screen-reader, or browser contrast testing.
 
 The local workstation built and validated the demonstrative Android debug APK
 with Flutter 3.44.9, Android API 36, Build Tools 36.0.0, NDK 28.2, and Temurin

@@ -270,7 +270,7 @@ export function CorridorDashboard({
   }
 
   return (
-    <main className="dashboard-shell">
+    <main className="dashboard-shell" id="main-content">
       <header className="topbar">
         <div className="brand-block">
           <span className="brand-mark" aria-hidden="true"><i /></span>

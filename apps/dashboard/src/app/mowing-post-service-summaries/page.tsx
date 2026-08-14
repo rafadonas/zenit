@@ -98,7 +98,7 @@ export default async function MowingPostServiceSummariesPage({ searchParams }: P
   );
 
   return (
-    <main className="recommendations-shell">
+    <main className="recommendations-shell" id="main-content">
       <header className="topbar">
         <div className="brand-block">
           <span aria-hidden="true" className="brand-mark"><i /></span>

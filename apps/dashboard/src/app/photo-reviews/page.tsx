@@ -290,7 +290,7 @@ export default async function PhotoReviewsPage({ searchParams }: PageProps) {
     group.push(item);
     orderGroups.set(item.work_order_id, group);
   }
-  return <main className="recommendations-shell">
+  return <main className="recommendations-shell" id="main-content">
     <header className="topbar">
       <div className="brand-block"><span className="brand-mark" aria-hidden="true"><i /></span><div><strong>ZENIT</strong><small>Vegetação rodoviária</small></div></div>
       <nav className="topnav" aria-label="Navegação principal"><Link href="/">Corredor</Link><Link href="/recommendations">Recomendações</Link><Link aria-current="page" href="/photo-reviews">Fotos de inspeção</Link><Link href="/mowing-photo-reviews">Fotos pós-serviço</Link><Link href="/mowing-post-service-summaries">Resumos pós-serviço</Link></nav>

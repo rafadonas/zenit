@@ -470,6 +470,11 @@ npm run dashboard:test
 npm run dashboard:build
 ```
 
+O lint inclui as regras de acessibilidade JSX do Next.js. A suíte também mantém
+um [baseline de acessibilidade](docs/accessibility/dashboard-baseline.md) para
+skip link, alvo principal único, foco de teclado, movimento reduzido e contraste
+do texto secundário nas superfícies principais.
+
 O servidor do dashboard usa `INTERNAL_API_URL`, cujo padrão é
 `http://localhost:8000`. O token bearer fica em cookie `HttpOnly` no servidor;
 mutações exigem token CSRF, `Origin` exata e cookie `SameSite=Strict`.
@@ -552,6 +557,7 @@ Use `--expect-empty` apenas em um banco recém-inicializado, como o da CI.
 - [Manual mestre do projeto](ZENIT_Manual_Mestre_para_Codex.pdf)
 - [Prontidão do MVP demonstrativo](docs/mvp-readiness.md)
 - [Contrato OpenAPI](contracts/openapi.json)
+- [Baseline de acessibilidade](docs/accessibility/dashboard-baseline.md)
 - [Decisões arquiteturais](docs/decisions)
 - [Relatórios de qualidade dos dados](docs/data-quality)
 - [Arquitetura](docs/architecture)
