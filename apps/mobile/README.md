@@ -105,11 +105,17 @@ python ../../scripts/verify_android_apk.py \
   --expected-target-sdk 36 \
   --configured-api-base-url https://api.example.invalid \
   --evidence-out build/app/outputs/flutter-apk/app-debug.evidence.json
+python ../../scripts/verify_release_evidence.py \
+  ../../docs/release-evidence/android-mvp-debug-apk-2026-08-14.json \
+  --artifact build/app/outputs/flutter-apk/app-debug.apk
 ```
 
 The verifier checks archive structure, Flutter native ABIs, package/version,
 Android signature, and SHA-256. Its evidence explicitly marks the debug build
 as ineligible for field execution, official reporting, and model training.
+The tracked-manifest verifier separately rejects schema drift, malformed
+digests, provenance mismatches, or any operational eligibility flag, then
+matches the ignored APK by byte size and SHA-256 when `--artifact` is supplied.
 The current Flutter/plugins baseline requires Android API 24 or newer and
 targets API 36.
 

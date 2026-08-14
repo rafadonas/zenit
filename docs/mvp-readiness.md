@@ -53,6 +53,9 @@ python scripts/verify_android_apk.py \
   --expected-version-name 1.0.0 --expected-version-code 1 \
   --expected-min-sdk 24 --expected-target-sdk 36 \
   --configured-api-base-url https://api.example.invalid
+python scripts/verify_release_evidence.py \
+  docs/release-evidence/android-mvp-debug-apk-2026-08-14.json \
+  --artifact apps/mobile/build/app/outputs/flutter-apk/app-debug.apk
 docker compose config --quiet
 fresh PostgreSQL initialization with migrations 0001-0037
 python scripts/verify_mvp_stack.py
@@ -74,7 +77,9 @@ APK Signature Scheme v2. Its validation evidence records SHA-256
 and size 155,508,813 bytes. The APK remains a demonstrative build and is
 ineligible for field execution, official reporting, and model training. The
 [tracked artifact evidence](release-evidence/android-mvp-debug-apk-2026-08-14.json)
-links the generated, ignored binary to source revision `8381f68`.
+links the generated, ignored binary to source revision `8381f68`. Its versioned
+schema and non-operational safety flags are checked in CI; a local release audit
+additionally matches the available binary by byte size and SHA-256.
 
 ## External blockers for an operational pilot
 

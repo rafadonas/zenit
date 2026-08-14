@@ -18,6 +18,8 @@ jobs:
           cache: pip
       - name: Install API and development tools
         run: python -m pip install -e '.[dev]'
+      - name: Verify tracked release evidence
+        run: python scripts/verify_release_evidence.py docs/release-evidence/android-mvp-debug-apk-2026-08-14.json
       - name: Lint
         run: ruff check .
       - name: Test

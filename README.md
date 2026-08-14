@@ -498,6 +498,18 @@ confere schema PostGIS, healthcheck, resposta satelital vazia com proveniência,
 proteção das rotas de escrita e disponibilidade do dashboard/login sem exigir
 arquivos brutos ou credenciais de provedores.
 
+O manifesto versionado do APK também possui um gate independente para schema,
+proveniência, hashes e bloqueios de uso operacional:
+
+```bash
+python scripts/verify_release_evidence.py \
+  docs/release-evidence/android-mvp-debug-apk-2026-08-14.json
+```
+
+Quando o APK ignorado estiver disponível, acrescente
+`--artifact apps/mobile/build/app/outputs/flutter-apk/app-debug.apk` para
+conferir o tamanho e o SHA-256 do binário contra o manifesto.
+
 Com o stack ativo, os mesmos contratos HTTP da CI podem ser verificados
 localmente sem credenciais:
 
