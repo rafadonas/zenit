@@ -112,3 +112,8 @@ Android signature, and SHA-256. Its evidence explicitly marks the debug build
 as ineligible for field execution, official reporting, and model training.
 The current Flutter/plugins baseline requires Android API 24 or newer and
 targets API 36.
+
+No release signing configuration is tracked. The Android Gradle Plugin leaves
+the `release` variant unsigned instead of reusing the debug key. Production
+signing, key custody, and distribution require a separate approved operational
+release process.

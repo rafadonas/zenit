@@ -524,6 +524,8 @@ Use `--expect-empty` apenas em um banco recém-inicializado, como o da CI.
 - O mapa e o histórico ainda não são atualizados com um resultado pós-roçada.
 - Não existe relatório operacional oficial; os resumos atuais são preparados e
   simulados.
+- A variante Android `release` não possui assinatura configurada; somente o APK
+  debug demonstrativo passa pelo gate atual de entrega.
 - A cena satelital completa e o eixo rodoviário oficial continuam pendentes.
 
 ## Documentação
