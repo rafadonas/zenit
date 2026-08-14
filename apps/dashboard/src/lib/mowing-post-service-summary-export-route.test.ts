@@ -15,6 +15,7 @@ function request(): NextRequest {
     csrf_token: csrfToken,
     idempotency_key: "10000000-0000-4000-8000-000000000001",
     export_purpose: "Compartilhar pós-serviço simulado",
+    return_path: "/photo-reviews",
     eligible_for_official_reporting: "true",
   });
   return new NextRequest(
@@ -78,6 +79,17 @@ describe("simulated mowing post-service CSV dashboard proxy", () => {
       Authorization: "Bearer signed-api-token",
       "Idempotency-Key": "10000000-0000-4000-8000-000000000001",
     });
+  });
+
+  it("redirects export failures back to the allowlisted source page", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 409 })));
+
+    const response = await POST(request(), context);
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe(
+      "http://localhost:3000/photo-reviews?export=conflict",
+    );
   });
 
   it("fails closed when upstream omits safety headers or has a bad checksum", async () => {

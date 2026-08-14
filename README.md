@@ -409,7 +409,8 @@ versão exata, confere tamanho/SHA-256 e registra o acesso antes da entrega.
 A fila e as decisões humanas permanecem separadas da inspeção; uma aceitação
 confirma apenas qualidade visual e régua visível, sem validar altura ou roçada.
 O dashboard permite solicitar, consultar, revisar exceções humanas e exportar
-CSV dos resumos pós-serviço simulados; essa agregação permanece simulada,
+CSV dos resumos pós-serviço simulados tanto em `/mowing-post-service-summaries`
+quanto no contexto de `/photo-reviews`; essa agregação permanece simulada,
 idempotente, auditada e não atualiza mapa, histórico operacional nem relatório
 oficial.
 Uma exceção pós-serviço simulada pode apontar necessidade de inspeção de

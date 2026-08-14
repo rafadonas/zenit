@@ -376,7 +376,7 @@ export default async function PhotoReviewsPage({ searchParams }: PageProps) {
                       <p>{mowingSummary.generation_rationale}</p>
                       <small>Não comprova roçada, eficácia, conclusão, treinamento ou relatório oficial.</small>
                       <form action={`/api/prepared-mowing-post-service-summaries/${mowingSummary.summary_id}/exports`} className="summary-export-form" method="post">
-                        <input name="csrf_token" type="hidden" value={session.csrfToken} /><input name="idempotency_key" type="hidden" value={randomUUID()} />
+                        <input name="csrf_token" type="hidden" value={session.csrfToken} /><input name="idempotency_key" type="hidden" value={randomUUID()} /><input name="return_path" type="hidden" value="/photo-reviews" />
                         <label htmlFor={`mowing-export-purpose-${mowingSummary.summary_id}`}>Propósito da exportação</label><input defaultValue="Compartilhar pós-serviço simulado para revisão" id={`mowing-export-purpose-${mowingSummary.summary_id}`} maxLength={2000} name="export_purpose" required />
                         <button className="secondary-button" type="submit">Baixar CSV simulado</button><small>CSV auditado, simulado e inelegível para relatório oficial.</small>
                       </form>

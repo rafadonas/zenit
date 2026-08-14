@@ -13,8 +13,12 @@ const EXPORT_SCHEMA_VERSION = "simulated-mowing-post-service-summary-csv-v1";
 
 interface RouteContext { params: Promise<{ summaryId: string }>; }
 
-function redirect(origin: string, status: string): NextResponse {
-  const destination = new URL("/mowing-post-service-summaries", origin);
+function resolveReturnPath(value: FormDataEntryValue | null): string {
+  return value === "/photo-reviews" ? "/photo-reviews" : "/mowing-post-service-summaries";
+}
+
+function redirect(origin: string, path: string, status: string): NextResponse {
+  const destination = new URL(path, origin);
   destination.searchParams.set("export", status);
   return NextResponse.redirect(destination, 303);
 }
@@ -34,9 +38,14 @@ export async function POST(request: NextRequest, context: RouteContext): Promise
     return NextResponse.json({ detail: "Cross-origin mowing export rejected" }, { status: 403 });
   }
   const { summaryId } = await context.params;
-  if (!isUuid(summaryId)) return redirect(config.publicOrigin, "invalid");
+  if (!isUuid(summaryId)) return redirect(config.publicOrigin, "/mowing-post-service-summaries", "invalid");
   let form: FormData;
-  try { form = await request.formData(); } catch { return redirect(config.publicOrigin, "invalid"); }
+  try {
+    form = await request.formData();
+  } catch {
+    return redirect(config.publicOrigin, "/mowing-post-service-summaries", "invalid");
+  }
+  const returnPath = resolveReturnPath(form.get("return_path"));
   const submission = parsePreparedSummaryExportSubmission(form);
   if (!submission || !csrfTokensMatch(
     submission.csrfToken, request.cookies.get(CSRF_COOKIE_NAME)?.value,
@@ -56,7 +65,9 @@ export async function POST(request: NextRequest, context: RouteContext): Promise
         "Idempotency-Key": submission.idempotencyKey,
       },
     });
-  } catch { return redirect(config.publicOrigin, "service-unavailable"); }
+  } catch {
+    return redirect(config.publicOrigin, returnPath, "service-unavailable");
+  }
   if (upstream.status === 401) {
     const response = NextResponse.redirect(new URL("/login?error=session", config.publicOrigin), 303);
     clearDashboardSessionCookies(response, config);
@@ -66,16 +77,24 @@ export async function POST(request: NextRequest, context: RouteContext): Promise
     const statuses: Record<number, string> = {
       404: "missing", 409: "conflict", 422: "invalid", 503: "service-unavailable",
     };
-    return redirect(config.publicOrigin, statuses[upstream.status] ?? "service-unavailable");
+    return redirect(
+      config.publicOrigin,
+      returnPath,
+      statuses[upstream.status] ?? "service-unavailable",
+    );
   }
-  if (!hasSafeExportHeaders(upstream)) return redirect(config.publicOrigin, "unsafe-response");
+  if (!hasSafeExportHeaders(upstream)) {
+    return redirect(config.publicOrigin, returnPath, "unsafe-response");
+  }
   const content = new Uint8Array(await upstream.arrayBuffer());
   if (content.byteLength === 0 || content.byteLength > MAX_EXPORT_BYTES) {
-    return redirect(config.publicOrigin, "unsafe-response");
+    return redirect(config.publicOrigin, returnPath, "unsafe-response");
   }
   const checksum = upstream.headers.get("x-zenit-checksum-sha256");
   const calculated = createHash("sha256").update(content).digest("hex");
-  if (checksum !== calculated) return redirect(config.publicOrigin, "unsafe-response");
+  if (checksum !== calculated) {
+    return redirect(config.publicOrigin, returnPath, "unsafe-response");
+  }
   return new NextResponse(content, {
     status: 200,
     headers: {
