@@ -478,6 +478,10 @@ do texto secundário nas superfícies principais.
 O servidor do dashboard usa `INTERNAL_API_URL`, cujo padrão é
 `http://localhost:8000`. O token bearer fica em cookie `HttpOnly` no servidor;
 mutações exigem token CSRF, `Origin` exata e cookie `SameSite=Strict`.
+Todas as rotas recebem o
+[baseline de headers HTTP](docs/security/dashboard-http-headers.md), incluindo
+anti-clickjacking, `nosniff`, referrer restrito, isolamento de opener e bloqueio
+de câmera, geolocalização e microfone.
 
 ### Aplicativo Flutter
 
@@ -543,6 +547,8 @@ Use `--expect-empty` apenas em um banco recém-inicializado, como o da CI.
   definidos antes de um piloto.
 - Ainda faltam política de retenção/legal hold, tratamento de EXIF, verificação
   por decoder/malware e controles completos de privacidade.
+- A CSP atual protege `base-uri`, `form-action` e `frame-ancestors`, mas ainda
+  não define `script-src` com nonce. HSTS depende do proxy TLS de produção.
 - Não há GPS real, despacho, rastreamento, execução de roçada ou aprovação
   operacional.
 - O mapa e o histórico ainda não são atualizados com um resultado pós-roçada.
@@ -558,6 +564,7 @@ Use `--expect-empty` apenas em um banco recém-inicializado, como o da CI.
 - [Prontidão do MVP demonstrativo](docs/mvp-readiness.md)
 - [Contrato OpenAPI](contracts/openapi.json)
 - [Baseline de acessibilidade](docs/accessibility/dashboard-baseline.md)
+- [Baseline de headers HTTP](docs/security/dashboard-http-headers.md)
 - [Decisões arquiteturais](docs/decisions)
 - [Relatórios de qualidade dos dados](docs/data-quality)
 - [Arquitetura](docs/architecture)

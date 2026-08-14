@@ -33,6 +33,7 @@ field authorization.
 | Post-service feedback | Ready for demonstration | Three separate simulated heights and photos gate a summary, audited export, threshold exception, and append-only human exception review. |
 | History and reporting | Ready only in demonstration scope | Read-only rehearsal history and simulated CSV artifacts are available. Operational map/history updates and official reports are intentionally blocked. |
 | Dashboard accessibility | Ready as automated baseline | All current main shells expose a skip target; keyboard focus, reduced motion, JSX semantics, and primary muted-text contrast are gated. Manual browser and assistive-technology audits remain required before operational use. |
+| Dashboard HTTP security | Ready as local baseline | Every route receives anti-clickjacking, MIME sniffing, referrer, opener, browser-permission, base URI, and form-action controls. A nonce-based script policy, TLS termination, and HSTS remain deployment work. |
 | Automated quality gates | Ready | Python, dashboard, Flutter, production dashboard build, versioned OpenAPI contract, migration contract, and fresh-database smoke checks pass locally and are represented in CI. |
 
 ## Validation record
@@ -80,6 +81,12 @@ global visible focus, reduced-motion behavior, Next.js JSX accessibility lint,
 and at least 4.5:1 contrast for normal muted text on the primary page and card
 surfaces. It is not a claim of complete WCAG conformance and does not replace
 manual keyboard, zoom, screen-reader, or browser contrast testing.
+
+The dashboard HTTP baseline applies seven headers to every route. Runtime
+validation on the local Next.js server confirmed the partial CSP,
+`Cross-Origin-Opener-Policy`, `Permissions-Policy`, `Referrer-Policy`,
+`X-Content-Type-Options`, `X-DNS-Prefetch-Control`, and `X-Frame-Options`.
+Nonce-based script restrictions and HSTS remain outside this local baseline.
 
 The local workstation built and validated the demonstrative Android debug APK
 with Flutter 3.44.9, Android API 36, Build Tools 36.0.0, NDK 28.2, and Temurin
