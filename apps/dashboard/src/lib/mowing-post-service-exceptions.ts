@@ -20,6 +20,13 @@ export interface MowingPostServiceException {
   eligible_for_official_reporting: false;
   authorizes_field_work: false;
   created_at: string;
+  review_count: number;
+  latest_review_id: string | null;
+  latest_review_decision: "accepted" | "rejected" | "adjusted" | null;
+  latest_adjusted_recommendation: "monitor" | "inspect_follow_up" | null;
+  latest_review_rationale: string | null;
+  latest_reviewed_at: string | null;
+  review_state: "awaiting_review" | "review_recorded_no_work_authorization";
 }
 
 export interface MowingPostServiceExceptionCollection {
@@ -45,6 +52,13 @@ function isException(value: unknown): value is MowingPostServiceException {
   const threshold = Number(value.applicable_threshold_cm);
   const maximum = Number(value.maximum_height_cm);
   const exceeded = maximum > threshold;
+  const reviewCount = value.review_count;
+  const latestReviewId = value.latest_review_id;
+  const latestDecision = value.latest_review_decision;
+  const latestAdjustedRecommendation = value.latest_adjusted_recommendation;
+  const latestReviewRationale = value.latest_review_rationale;
+  const latestReviewedAt = value.latest_reviewed_at;
+  const reviewState = value.review_state;
   return [10, 30].includes(threshold) &&
     value.threshold_exceeded === exceeded &&
     value.recommendation === (exceeded ? "inspect_follow_up" : "monitor") &&
@@ -65,7 +79,35 @@ function isException(value: unknown): value is MowingPostServiceException {
     value.eligible_for_official_reporting === false &&
     value.authorizes_field_work === false &&
     typeof value.created_at === "string" &&
-    Number.isFinite(Date.parse(value.created_at));
+    Number.isFinite(Date.parse(value.created_at)) &&
+    typeof reviewCount === "number" &&
+    Number.isInteger(reviewCount) &&
+    reviewCount >= 0 &&
+    (latestReviewId === null || typeof latestReviewId === "string") &&
+    (latestDecision === null ||
+      ["accepted", "rejected", "adjusted"].includes(String(latestDecision))) &&
+    (latestAdjustedRecommendation === null ||
+      ["monitor", "inspect_follow_up"].includes(String(latestAdjustedRecommendation))) &&
+    (latestReviewRationale === null || typeof latestReviewRationale === "string") &&
+    (latestReviewedAt === null ||
+      (typeof latestReviewedAt === "string" &&
+        Number.isFinite(Date.parse(latestReviewedAt)))) &&
+    ["awaiting_review", "review_recorded_no_work_authorization"].includes(
+      String(reviewState),
+    ) &&
+    ((reviewCount === 0 &&
+      latestReviewId === null &&
+      latestDecision === null &&
+      latestAdjustedRecommendation === null &&
+      latestReviewRationale === null &&
+      latestReviewedAt === null &&
+      reviewState === "awaiting_review") ||
+      (reviewCount > 0 &&
+        latestReviewId !== null &&
+        latestDecision !== null &&
+        latestReviewedAt !== null &&
+        reviewState === "review_recorded_no_work_authorization" &&
+        ((latestDecision === "adjusted") === (latestAdjustedRecommendation !== null))));
 }
 
 export function isMowingPostServiceExceptionCollection(

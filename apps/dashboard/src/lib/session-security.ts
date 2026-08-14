@@ -62,6 +62,15 @@ export interface PreparedProposalReviewSubmission {
   supersedesReviewId?: string;
 }
 
+export interface MowingPostServiceExceptionReviewSubmission {
+  csrfToken: string;
+  idempotencyKey: string;
+  decision: "accepted" | "rejected" | "adjusted";
+  adjustedRecommendation?: "monitor" | "inspect_follow_up";
+  rationale?: string;
+  supersedesReviewId?: string;
+}
+
 export interface PreparedMowingOrderSubmission {
   csrfToken: string;
   idempotencyKey: string;
@@ -330,6 +339,38 @@ export function parsePreparedProposalReviewSubmission(
     decision: decision as PreparedProposalReviewSubmission["decision"],
     ...(adjustedRecommendation ? {
       adjustedRecommendation: adjustedRecommendation as "monitor" | "mowing_review",
+    } : {}),
+    ...(rationale ? { rationale } : {}),
+    ...(supersedesReviewId ? { supersedesReviewId } : {}),
+  };
+}
+
+export function parseMowingPostServiceExceptionReviewSubmission(
+  form: FormData,
+): MowingPostServiceExceptionReviewSubmission | null {
+  const csrfToken = formString(form, "csrf_token");
+  const idempotencyKey = formString(form, "idempotency_key");
+  const decision = formString(form, "decision");
+  const adjustedRecommendation = formString(form, "adjusted_recommendation");
+  const rationale = formString(form, "rationale");
+  const supersedesReviewId = formString(form, "supersedes_review_id");
+  if (
+    csrfToken === null || !CSRF_PATTERN.test(csrfToken) ||
+    idempotencyKey === null || !UUID_PATTERN.test(idempotencyKey) ||
+    !["accepted", "rejected", "adjusted"].includes(decision ?? "") ||
+    (supersedesReviewId !== null && supersedesReviewId !== "" &&
+      !UUID_PATTERN.test(supersedesReviewId)) || (rationale !== null && rationale.length > 2000)
+  ) return null;
+  const isAdjusted = decision === "adjusted";
+  if (isAdjusted !== ["monitor", "inspect_follow_up"].includes(adjustedRecommendation ?? "")) {
+    return null;
+  }
+  if ((decision === "rejected" || isAdjusted) && !rationale) return null;
+  return {
+    csrfToken, idempotencyKey,
+    decision: decision as MowingPostServiceExceptionReviewSubmission["decision"],
+    ...(adjustedRecommendation ? {
+      adjustedRecommendation: adjustedRecommendation as "monitor" | "inspect_follow_up",
     } : {}),
     ...(rationale ? { rationale } : {}),
     ...(supersedesReviewId ? { supersedesReviewId } : {}),

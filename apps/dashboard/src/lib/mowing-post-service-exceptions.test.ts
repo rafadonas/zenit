@@ -23,6 +23,13 @@ const item = {
   eligible_for_official_reporting: false,
   authorizes_field_work: false,
   created_at: "2026-08-13T12:00:00Z",
+  review_count: 0,
+  latest_review_id: null,
+  latest_review_decision: null,
+  latest_adjusted_recommendation: null,
+  latest_review_rationale: null,
+  latest_reviewed_at: null,
+  review_state: "awaiting_review",
 };
 
 describe("mowing post-service exception contract", () => {
@@ -46,6 +53,41 @@ describe("mowing post-service exception contract", () => {
     })).toBe(false);
     expect(isMowingPostServiceExceptionCollection({
       items: [{ ...item, recommendation: "monitor" }],
+      result_count: 1,
+      limit: 50,
+      truncated: false,
+      warning: "Simulated post-service exceptions only request human follow-up review.",
+    })).toBe(false);
+  });
+
+  it("accepts reviewed exceptions only with coherent effective review metadata", () => {
+    expect(isMowingPostServiceExceptionCollection({
+      items: [{
+        ...item,
+        review_count: 1,
+        latest_review_id: "99000000-0000-4000-8000-000000000099",
+        latest_review_decision: "adjusted",
+        latest_adjusted_recommendation: "monitor",
+        latest_review_rationale: "Registrar monitoramento após nova leitura humana.",
+        latest_reviewed_at: "2026-08-13T12:30:00Z",
+        review_state: "review_recorded_no_work_authorization",
+      }],
+      result_count: 1,
+      limit: 50,
+      truncated: false,
+      warning: "Simulated post-service exceptions only request human follow-up review.",
+    })).toBe(true);
+    expect(isMowingPostServiceExceptionCollection({
+      items: [{
+        ...item,
+        review_count: 1,
+        latest_review_id: "99000000-0000-4000-8000-000000000099",
+        latest_review_decision: "accepted",
+        latest_adjusted_recommendation: "monitor",
+        latest_review_rationale: null,
+        latest_reviewed_at: "2026-08-13T12:30:00Z",
+        review_state: "review_recorded_no_work_authorization",
+      }],
       result_count: 1,
       limit: 50,
       truncated: false,
