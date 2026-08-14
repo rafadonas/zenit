@@ -17,9 +17,11 @@ from zenit_api.auth import (
     decode_access_token,
     get_current_user,
     get_identity_reader,
+    get_login_throttle,
     get_road_role_reader,
 )
 from zenit_api.config import Settings
+from zenit_api.login_throttle import LoginThrottlePolicy, digest_login_identifier
 from zenit_api.main import app
 
 USER_ID = UUID("10000000-0000-4000-8000-000000000001")
@@ -27,6 +29,7 @@ USER_ID = UUID("10000000-0000-4000-8000-000000000001")
 
 class FakeIdentityReader:
     def __init__(self, *, password: str = "correct-horse-battery", status: str = "active") -> None:
+        self.by_email_calls = 0
         self.identity = UserIdentity(
             id=USER_ID,
             email="manager@example.test",
@@ -36,20 +39,75 @@ class FakeIdentityReader:
         )
 
     async def by_email(self, email: str) -> UserIdentity | None:
+        self.by_email_calls += 1
         return self.identity if email.lower() == self.identity.email else None
 
     async def by_id(self, user_id: UUID) -> UserIdentity | None:
         return self.identity if user_id == self.identity.id else None
 
 
+class FakeLoginThrottle:
+    def __init__(
+        self,
+        *,
+        retry_after: int | None = None,
+        failure_retry_after: int | None = None,
+    ) -> None:
+        self.retry_after_seconds = retry_after
+        self.failure_retry_after_seconds = failure_retry_after
+        self.checked_digests: list[str] = []
+        self.failed_digests: list[str] = []
+        self.succeeded_digests: list[str] = []
+
+    async def retry_after(
+        self,
+        identifier_digest: str,
+        *,
+        policy: LoginThrottlePolicy,
+        correlation_id: UUID,
+        now: datetime,
+    ) -> int | None:
+        del policy, correlation_id, now
+        self.checked_digests.append(identifier_digest)
+        return self.retry_after_seconds
+
+    async def record_failure(
+        self,
+        identifier_digest: str,
+        *,
+        policy: LoginThrottlePolicy,
+        correlation_id: UUID,
+        now: datetime,
+    ) -> int | None:
+        del policy, correlation_id, now
+        self.failed_digests.append(identifier_digest)
+        return self.failure_retry_after_seconds
+
+    async def record_success(
+        self,
+        identifier_digest: str,
+        *,
+        policy: LoginThrottlePolicy,
+        correlation_id: UUID,
+        now: datetime,
+    ) -> None:
+        del policy, correlation_id, now
+        self.succeeded_digests.append(identifier_digest)
+
+
 def test_login_returns_a_scoped_expiring_token_without_password_data() -> None:
     reader = FakeIdentityReader()
+    throttle = FakeLoginThrottle()
 
     async def fake_reader() -> FakeIdentityReader:
         return reader
 
+    async def fake_throttle() -> FakeLoginThrottle:
+        return throttle
+
     async def request():
         app.dependency_overrides[get_identity_reader] = fake_reader
+        app.dependency_overrides[get_login_throttle] = fake_throttle
         try:
             transport = ASGITransport(app=app)
             async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -69,16 +127,23 @@ def test_login_returns_a_scoped_expiring_token_without_password_data() -> None:
     assert payload["user"]["id"] == str(USER_ID)
     assert "password" not in response.text
     assert decode_access_token(payload["access_token"], Settings()) == USER_ID
+    assert throttle.checked_digests == throttle.succeeded_digests
+    assert throttle.failed_digests == []
 
 
 def test_login_uses_the_same_generic_failure_for_invalid_credentials() -> None:
     reader = FakeIdentityReader()
+    throttle = FakeLoginThrottle()
 
     async def fake_reader() -> FakeIdentityReader:
         return reader
 
+    async def fake_throttle() -> FakeLoginThrottle:
+        return throttle
+
     async def request():
         app.dependency_overrides[get_identity_reader] = fake_reader
+        app.dependency_overrides[get_login_throttle] = fake_throttle
         try:
             transport = ASGITransport(app=app)
             async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -98,6 +163,78 @@ def test_login_uses_the_same_generic_failure_for_invalid_credentials() -> None:
     assert payload["details"] is None
     assert payload["correlation_id"] == response.headers["x-correlation-id"]
     assert response.headers["www-authenticate"] == "Bearer"
+    assert throttle.checked_digests == throttle.failed_digests
+    assert throttle.succeeded_digests == []
+
+
+def test_login_throttle_rejects_before_identity_or_password_lookup() -> None:
+    reader = FakeIdentityReader()
+    throttle = FakeLoginThrottle(retry_after=37)
+
+    async def fake_reader() -> FakeIdentityReader:
+        return reader
+
+    async def fake_throttle() -> FakeLoginThrottle:
+        return throttle
+
+    async def request():
+        app.dependency_overrides[get_identity_reader] = fake_reader
+        app.dependency_overrides[get_login_throttle] = fake_throttle
+        try:
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                return await client.post(
+                    "/v1/auth/token",
+                    data={"username": "manager@example.test", "password": "wrong-password"},
+                )
+        finally:
+            app.dependency_overrides.clear()
+
+    response = asyncio.run(request())
+
+    assert response.status_code == 429
+    assert response.headers["retry-after"] == "37"
+    assert response.json()["code"] == "rate_limit_exceeded"
+    assert reader.by_email_calls == 0
+    assert throttle.failed_digests == []
+
+
+def test_login_failure_that_reaches_limit_returns_retry_after() -> None:
+    reader = FakeIdentityReader()
+    throttle = FakeLoginThrottle(failure_retry_after=900)
+
+    async def fake_reader() -> FakeIdentityReader:
+        return reader
+
+    async def fake_throttle() -> FakeLoginThrottle:
+        return throttle
+
+    async def request():
+        app.dependency_overrides[get_identity_reader] = fake_reader
+        app.dependency_overrides[get_login_throttle] = fake_throttle
+        try:
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                return await client.post(
+                    "/v1/auth/token",
+                    data={"username": "manager@example.test", "password": "wrong-password"},
+                )
+        finally:
+            app.dependency_overrides.clear()
+
+    response = asyncio.run(request())
+
+    assert response.status_code == 429
+    assert response.headers["retry-after"] == "900"
+    assert throttle.checked_digests == throttle.failed_digests
+
+
+def test_login_identifier_digest_is_normalized_and_does_not_expose_email() -> None:
+    digest = digest_login_identifier(" Manager@Example.Test ", "test-secret")
+
+    assert digest == digest_login_identifier("manager@example.test", "test-secret")
+    assert len(digest) == 64
+    assert "manager" not in digest
 
 
 def test_access_token_rejects_an_unexpected_audience() -> None:
@@ -132,6 +269,11 @@ def test_access_token_rejects_an_unexpected_audience() -> None:
 def test_staging_rejects_the_development_signing_secret() -> None:
     with pytest.raises(ValidationError, match="AUTH_SECRET_KEY"):
         Settings(app_env="staging")
+
+
+def test_login_throttle_policy_version_rejects_untracked_free_text() -> None:
+    with pytest.raises(ValidationError, match="auth_login_throttle_policy_version"):
+        Settings(auth_login_throttle_policy_version=" untracked policy ")
 
 
 def test_media_encryption_key_requires_exactly_32_base64_encoded_bytes() -> None:

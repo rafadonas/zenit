@@ -59,4 +59,22 @@ describe("dashboard login route", () => {
     expect(cookies).toContain("HttpOnly");
     expect(cookies).toContain("SameSite=strict");
   });
+
+  it("preserves the API login-throttle outcome without exposing its body", async () => {
+    const apiFetch = vi.fn().mockResolvedValue(
+      new Response("private throttle detail", {
+        headers: { "Retry-After": "900" },
+        status: 429,
+      }),
+    );
+    vi.stubGlobal("fetch", apiFetch);
+
+    const response = await POST(loginRequest());
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe(
+      "http://localhost:3000/login?error=rate-limited",
+    );
+    expect(await response.text()).not.toContain("private throttle detail");
+  });
 });

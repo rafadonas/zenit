@@ -12,6 +12,7 @@ interface LoginPageProps {
 function loginMessage(error: string | undefined, status: string | undefined): string | null {
   if (status === "signed-out") return "Sessão encerrada com segurança.";
   if (error === "credentials") return "E-mail ou senha inválidos.";
+  if (error === "rate-limited") return "Muitas tentativas. Aguarde antes de tentar novamente.";
   if (error === "session") return "Sua sessão expirou. Entre novamente.";
   if (error === "service-unavailable") return "Autenticação indisponível no momento.";
   if (error === "invalid-request") return "Revise os campos e tente novamente.";

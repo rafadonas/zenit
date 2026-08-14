@@ -27,6 +27,15 @@ class Settings(BaseSettings):
     auth_access_token_minutes: int = Field(default=30, ge=5, le=1440)
     auth_token_issuer: str = "zenit"
     auth_token_audience: str = "zenit-api"
+    auth_login_attempt_limit: int = Field(default=5, ge=2, le=20)
+    auth_login_window_seconds: int = Field(default=900, ge=60, le=86400)
+    auth_login_block_seconds: int = Field(default=900, ge=60, le=86400)
+    auth_login_throttle_policy_version: str = Field(
+        default="local-login-throttle-v1",
+        min_length=1,
+        max_length=100,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$",
+    )
     recommendation_review_policy_version: str = "recommendation-review-mvp-v1"
     inspection_order_policy_version: str = "prepared-inspection-order-v1"
     prepared_photo_review_policy_version: str = "prepared-photo-review-v1"

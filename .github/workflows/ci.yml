@@ -124,7 +124,9 @@ jobs:
                 AND to_regclass('public.prepared_mowing_post_service_summary') IS NOT NULL
                 AND to_regclass('public.prepared_mowing_post_service_summary_export_event') IS NOT NULL
                 AND to_regclass('public.prepared_mowing_post_service_exception') IS NOT NULL
-                AND to_regclass('public.prepared_mowing_post_service_exception_review') IS NOT NULL;" \
+                AND to_regclass('public.prepared_mowing_post_service_exception_review') IS NOT NULL
+                AND to_regclass('public.authentication_login_throttle') IS NOT NULL
+                AND to_regclass('public.authentication_login_attempt') IS NOT NULL;" \
             | grep -qx t
           docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit -Atc \
             "SELECT postgis_typmod_type(a.atttypmod)

@@ -56,9 +56,15 @@ export async function POST(request: Request): Promise<NextResponse> {
     return redirectToLogin(config.publicOrigin, "service-unavailable");
   }
   if (!apiResponse.ok) {
+    const error =
+      apiResponse.status === 401
+        ? "credentials"
+        : apiResponse.status === 429
+          ? "rate-limited"
+          : "service-unavailable";
     return redirectToLogin(
       config.publicOrigin,
-      apiResponse.status === 401 ? "credentials" : "service-unavailable",
+      error,
     );
   }
 

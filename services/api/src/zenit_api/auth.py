@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 
 import jwt
 import psycopg
-from fastapi import APIRouter, Depends, Form, HTTPException, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
 from jwt.exceptions import InvalidTokenError
 from pwdlib import PasswordHash
@@ -15,6 +15,13 @@ from pwdlib.exceptions import UnknownHashError
 from pydantic import BaseModel
 
 from zenit_api.config import Settings, get_settings
+from zenit_api.error_contract import ApiErrorResponse
+from zenit_api.login_throttle import (
+    LoginThrottle,
+    LoginThrottlePolicy,
+    PostgresLoginThrottleRepository,
+    digest_login_identifier,
+)
 
 TOKEN_ALGORITHM = "HS256"
 PASSWORD_HASH = PasswordHash.recommended()
@@ -142,6 +149,10 @@ async def get_auth_settings() -> Settings:
     return get_settings()
 
 
+async def get_login_throttle() -> LoginThrottle:
+    return PostgresLoginThrottleRepository(get_settings().database_url)
+
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/v1/auth/token")
 
 
@@ -189,6 +200,23 @@ def _credentials_error() -> HTTPException:
     )
 
 
+def _login_throttle_policy(settings: Settings) -> LoginThrottlePolicy:
+    return LoginThrottlePolicy(
+        version=settings.auth_login_throttle_policy_version,
+        attempt_limit=settings.auth_login_attempt_limit,
+        window=timedelta(seconds=settings.auth_login_window_seconds),
+        block_duration=timedelta(seconds=settings.auth_login_block_seconds),
+    )
+
+
+def _login_rate_limit_error(retry_after: int) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        detail="Too many login attempts; retry later",
+        headers={"Retry-After": str(retry_after)},
+    )
+
+
 async def get_current_user(
     token: Annotated[str, Depends(oauth2_scheme)],
     reader: Annotated[IdentityReader, Depends(get_identity_reader)],
@@ -212,14 +240,55 @@ async def get_current_user(
 router = APIRouter(prefix="/v1/auth", tags=["auth"])
 
 
-@router.post("/token", response_model=AccessTokenResponse)
+@router.post(
+    "/token",
+    response_model=AccessTokenResponse,
+    responses={
+        429: {
+            "description": "The normalized login identifier is temporarily throttled.",
+            "headers": {
+                "Retry-After": {
+                    "description": "Seconds until another login attempt is allowed.",
+                    "schema": {"type": "integer", "minimum": 1},
+                },
+                "X-Correlation-ID": {
+                    "description": "Request correlation identifier.",
+                    "schema": {"type": "string", "format": "uuid"},
+                },
+            },
+            "model": ApiErrorResponse,
+        }
+    },
+)
 async def login_for_access_token(
+    request: Request,
     username: Annotated[str, Form(min_length=3, max_length=320)],
     password: Annotated[str, Form(min_length=1, max_length=1024)],
     reader: Annotated[IdentityReader, Depends(get_identity_reader)],
+    throttle: Annotated[LoginThrottle, Depends(get_login_throttle)],
     settings: Annotated[Settings, Depends(get_auth_settings)],
 ) -> AccessTokenResponse:
-    identity = await reader.by_email(username.strip())
+    normalized_username = username.strip().lower()
+    identifier_digest = digest_login_identifier(
+        normalized_username,
+        settings.auth_secret_key.get_secret_value(),
+    )
+    policy = _login_throttle_policy(settings)
+    now = datetime.now(UTC)
+    request_correlation_id = getattr(request.state, "correlation_id", None)
+    correlation_id = (
+        request_correlation_id if isinstance(request_correlation_id, UUID) else uuid4()
+    )
+    retry_after = await throttle.retry_after(
+        identifier_digest,
+        policy=policy,
+        correlation_id=correlation_id,
+        now=now,
+    )
+    if retry_after is not None:
+        raise _login_rate_limit_error(retry_after)
+
+    identity = await reader.by_email(normalized_username)
     password_hash = identity.password_hash if identity is not None else _DUMMY_PASSWORD_HASH
     try:
         password_matches = PASSWORD_HASH.verify(password, password_hash)
@@ -227,12 +296,26 @@ async def login_for_access_token(
         password_matches = False
 
     if identity is None or identity.status != "active" or not password_matches:
+        retry_after = await throttle.record_failure(
+            identifier_digest,
+            policy=policy,
+            correlation_id=correlation_id,
+            now=now,
+        )
+        if retry_after is not None:
+            raise _login_rate_limit_error(retry_after)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    await throttle.record_success(
+        identifier_digest,
+        policy=policy,
+        correlation_id=correlation_id,
+        now=now,
+    )
     token, expires_in = create_access_token(identity.id, settings)
     return AccessTokenResponse(
         access_token=token,

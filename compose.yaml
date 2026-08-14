@@ -48,6 +48,7 @@ services:
       - ./infra/migrations/0035_simulated_mowing_post_service_summary_export.sql:/docker-entrypoint-initdb.d/0035.sql:ro
       - ./infra/migrations/0036_simulated_mowing_post_service_exception.sql:/docker-entrypoint-initdb.d/0036.sql:ro
       - ./infra/migrations/0037_simulated_mowing_post_service_exception_review.sql:/docker-entrypoint-initdb.d/0037.sql:ro
+      - ./infra/migrations/0038_persistent_login_throttle.sql:/docker-entrypoint-initdb.d/0038.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -87,6 +88,10 @@ services:
       AUTH_ACCESS_TOKEN_MINUTES: ${AUTH_ACCESS_TOKEN_MINUTES:-30}
       AUTH_TOKEN_ISSUER: ${AUTH_TOKEN_ISSUER:-zenit}
       AUTH_TOKEN_AUDIENCE: ${AUTH_TOKEN_AUDIENCE:-zenit-api}
+      AUTH_LOGIN_ATTEMPT_LIMIT: ${AUTH_LOGIN_ATTEMPT_LIMIT:-5}
+      AUTH_LOGIN_WINDOW_SECONDS: ${AUTH_LOGIN_WINDOW_SECONDS:-900}
+      AUTH_LOGIN_BLOCK_SECONDS: ${AUTH_LOGIN_BLOCK_SECONDS:-900}
+      AUTH_LOGIN_THROTTLE_POLICY_VERSION: ${AUTH_LOGIN_THROTTLE_POLICY_VERSION:-local-login-throttle-v1}
       RECOMMENDATION_REVIEW_POLICY_VERSION: ${RECOMMENDATION_REVIEW_POLICY_VERSION:-recommendation-review-mvp-v1}
       INSPECTION_ORDER_POLICY_VERSION: ${INSPECTION_ORDER_POLICY_VERSION:-prepared-inspection-order-v1}
       PREPARED_PHOTO_REVIEW_POLICY_VERSION: ${PREPARED_PHOTO_REVIEW_POLICY_VERSION:-prepared-photo-review-v1}

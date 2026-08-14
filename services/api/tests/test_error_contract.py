@@ -131,6 +131,13 @@ def test_openapi_documents_the_error_envelope_and_correlation_header() -> None:
     assert responses["default"]["content"]["application/json"]["schema"] == {
         "$ref": "#/components/schemas/ApiErrorResponse"
     }
+    assert responses["429"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/ApiErrorResponse"
+    }
+    assert responses["429"]["headers"]["Retry-After"]["schema"] == {
+        "type": "integer",
+        "minimum": 1,
+    }
     assert responses["422"]["headers"][CORRELATION_ID_HEADER]["schema"] == {
         "type": "string",
         "format": "uuid",

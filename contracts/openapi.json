@@ -6262,6 +6262,32 @@
               }
             }
           },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "The normalized login identifier is temporarily throttled.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until another login attempt is allowed.",
+                "schema": {
+                  "minimum": 1.0,
+                  "type": "integer"
+                }
+              },
+              "X-Correlation-ID": {
+                "description": "Request correlation identifier.",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
           "default": {
             "content": {
               "application/json": {

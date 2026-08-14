@@ -22,7 +22,7 @@ field authorization.
 
 | Capability | Demonstration status | Evidence and boundary |
 | --- | --- | --- |
-| Reproducible foundation | Ready | Compose defines healthy PostgreSQL/PostGIS, MinIO, API, and dashboard services. Dashboard readiness fails closed when its server-side API dependency is unavailable. A fresh database applies migrations `0001`-`0037`. |
+| Reproducible foundation | Ready | Compose defines healthy PostgreSQL/PostGIS, MinIO, API, and dashboard services. Dashboard readiness fails closed when its server-side API dependency is unavailable. A fresh database applies migrations `0001`-`0038`. |
 | Source audit and ingestion | Ready | Immutable source catalog, checksums, lineage, idempotent imports, and deterministic parser fixtures are covered by tests and data-quality reports. |
 | Segments, zones, and map | Ready with estimated data | The dashboard exposes 100 m segments and separate zones. The candidate axis remains `estimated`, `needs_validation`, and non-operational. |
 | Satellite baseline | Ready with partial cache | Discovery, quality gates, explainable rules, provenance, and a checksum-bound NDVI preview exist. No complete source scene is approved for operations. |
@@ -36,6 +36,7 @@ field authorization.
 | Dashboard HTTP security | Ready as local baseline | Every route receives anti-clickjacking, MIME sniffing, referrer, opener, browser-permission, base URI, and form-action controls. A nonce-based script policy, TLS termination, and HSTS remain deployment work. |
 | API error observability | Ready as local baseline | Success and error responses carry a UUID correlation header; HTTP, validation, and unexpected failures use one versioned envelope. Production log aggregation and distributed tracing remain deployment work. |
 | API dependency readiness | Ready | `GET /health` fails closed unless PostgreSQL and MinIO respond to bounded probes. The absent queue is explicitly `not_configured`; introducing a broker remains outside the current architecture. |
+| Local login abuse control | Ready as local baseline | Failed password attempts use a persistent versioned throttle keyed by HMAC digest. Append-only outcomes retain correlation IDs without storing submitted identifiers. Corporate identity and centralized monitoring remain pilot blockers. |
 | Automated quality gates | Ready | Python, dashboard, Flutter, production dashboard build, versioned OpenAPI contract, migration contract, and fresh-database smoke checks pass locally and are represented in CI. The stack smoke requires rendered corridor and login page markers instead of accepting any HTTP 200 HTML. |
 
 ## Validation record
@@ -62,7 +63,7 @@ python scripts/verify_release_evidence.py \
   docs/release-evidence/android-mvp-debug-apk-2026-08-14.json \
   --artifact apps/mobile/build/app/outputs/flutter-apk/app-debug.apk
 docker compose config --quiet
-fresh PostgreSQL initialization with migrations 0001-0037
+fresh PostgreSQL initialization with migrations 0001-0038
 python scripts/verify_mvp_stack.py
 ```
 

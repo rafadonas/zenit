@@ -226,7 +226,7 @@ antes de alterar AOI ou período.
 
 ## Banco de dados e migrações
 
-O banco atual exige as migrações `0001` a `0037`, sempre em ordem numérica. Um
+O banco atual exige as migrações `0001` a `0038`, sempre em ordem numérica. Um
 volume novo do Compose executa todas automaticamente por
 `/docker-entrypoint-initdb.d`. Volumes existentes não são atualizados por esse
 mecanismo.
@@ -253,6 +253,7 @@ As migrações preservam uma evolução append-only:
 - `0022`–`0027`: proposta pós-inspeção, revisão e planejamento de roçada;
 - `0028`–`0037`: ensaio simulado, medições, fotos, acesso, revisão, resumo,
   exportação, exceção pós-serviço e decisão humana da exceção.
+- `0038`: limitação persistente e auditada de tentativas de login local.
 
 Decisões detalhadas e invariantes de cada etapa estão em
 [`docs/decisions`](docs/decisions).
@@ -308,6 +309,11 @@ Content-Type: application/x-www-form-urlencoded
 
 username=manager%40example.test&password=<senha-local>
 ```
+
+Por padrão, cinco falhas em 15 minutos bloqueiam temporariamente o identificador
+por 15 minutos. O banco armazena somente um digest HMAC e eventos append-only;
+os limites são configuráveis pelas variáveis `AUTH_LOGIN_*` documentadas em
+[`docs/security/local-login-throttle.md`](docs/security/local-login-throttle.md).
 
 Rotas centrais do fluxo gerencial:
 
@@ -549,9 +555,10 @@ Use `--expect-empty` apenas em um banco recém-inicializado, como o da CI.
 
 ## Segurança e limitações conhecidas
 
-- A autenticação local do MVP não possui identidade corporativa, refresh token,
-  recuperação de senha ou limitação de tentativas. Não deve ser exposta
-  diretamente à internet.
+- A autenticação local do MVP possui limitação persistente de tentativas, mas
+  ainda não oferece identidade corporativa, refresh token, recuperação de senha,
+  revogação de sessão ou controles adaptativos. Não deve ser exposta diretamente
+  à internet.
 - Staging e produção devem usar HTTPS, `DASHBOARD_COOKIE_SECURE=true` e
   `DASHBOARD_PUBLIC_ORIGIN` com a origem pública exata.
 - A chave AES-256-GCM fica fora do object storage. Perder essa chave torna as
@@ -577,6 +584,7 @@ Use `--expect-empty` apenas em um banco recém-inicializado, como o da CI.
 - [Contrato OpenAPI](contracts/openapi.json)
 - [Baseline de acessibilidade](docs/accessibility/dashboard-baseline.md)
 - [Baseline de headers HTTP](docs/security/dashboard-http-headers.md)
+- [Baseline de limitação do login local](docs/security/local-login-throttle.md)
 - [Decisões arquiteturais](docs/decisions)
 - [Relatórios de qualidade dos dados](docs/data-quality)
 - [Arquitetura](docs/architecture)

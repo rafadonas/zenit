@@ -80,6 +80,9 @@ PREPARED_MOWING_POST_SERVICE_EXCEPTION_MIGRATION = Path(
 PREPARED_MOWING_POST_SERVICE_EXCEPTION_REVIEW_MIGRATION = Path(
     "infra/migrations/0037_simulated_mowing_post_service_exception_review.sql"
 )
+LOGIN_THROTTLE_MIGRATION = Path(
+    "infra/migrations/0038_persistent_login_throttle.sql"
+)
 
 
 class MigrationContractTests(unittest.TestCase):
@@ -182,7 +185,7 @@ class MigrationContractTests(unittest.TestCase):
         mounts = [
             line.strip() for line in compose.splitlines() if "/docker-entrypoint-initdb.d/" in line
         ]
-        self.assertEqual(len(mounts), 37)
+        self.assertEqual(len(mounts), 38)
         for version, mount in enumerate(mounts, start=1):
             prefix = f"{version:04d}"
             self.assertIn(f"infra/migrations/{prefix}_", mount)
@@ -366,6 +369,18 @@ class MigrationContractTests(unittest.TestCase):
         self.assertIn(
             "prepared_mowing_post_service_exception_review_immutable", sql
         )
+
+    def test_login_throttle_is_persistent_private_and_audited(self) -> None:
+        sql = LOGIN_THROTTLE_MIGRATION.read_text(encoding="utf-8")
+
+        self.assertIn("CREATE TABLE authentication_login_throttle", sql)
+        self.assertIn("CREATE TABLE authentication_login_attempt", sql)
+        self.assertIn("identifier_digest char(64)", sql)
+        self.assertNotIn("email", sql)
+        self.assertIn("outcome IN ('succeeded', 'failed', 'blocked')", sql)
+        self.assertIn("correlation_id uuid NOT NULL", sql)
+        self.assertIn("authentication_login_attempt_immutable", sql)
+        self.assertIn("append-only", sql)
 
     def test_recommendation_reviews_are_audited_and_append_only(self) -> None:
         sql = RECOMMENDATION_REVIEW_MIGRATION.read_text(encoding="utf-8")
