@@ -53,6 +53,12 @@ export interface PreparedProposalSubmission {
   creationRationale: string;
 }
 
+export interface MowingPostServiceExceptionSubmission {
+  csrfToken: string;
+  idempotencyKey: string;
+  creationRationale: string;
+}
+
 export interface PreparedProposalReviewSubmission {
   csrfToken: string;
   idempotencyKey: string;
@@ -302,6 +308,20 @@ export function parsePreparedSummaryExportSubmission(
 }
 
 export function parsePreparedProposalSubmission(form: FormData): PreparedProposalSubmission | null {
+  return parseCreationRationaleSubmission(form);
+}
+
+export function parseMowingPostServiceExceptionSubmission(
+  form: FormData,
+): MowingPostServiceExceptionSubmission | null {
+  return parseCreationRationaleSubmission(form);
+}
+
+function parseCreationRationaleSubmission(form: FormData): {
+  csrfToken: string;
+  idempotencyKey: string;
+  creationRationale: string;
+} | null {
   const csrfToken = formString(form, "csrf_token");
   const idempotencyKey = formString(form, "idempotency_key");
   const creationRationale = formString(form, "creation_rationale");

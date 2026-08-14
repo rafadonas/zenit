@@ -3,7 +3,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { clearDashboardSessionCookies } from "../../../../../lib/dashboard-cookies";
 import {
   CSRF_COOKIE_NAME, csrfTokensMatch, getDashboardSecurityConfig, isUuid,
-  parsePreparedProposalSubmission, requestOriginMatches, SESSION_COOKIE_NAME,
+  parseMowingPostServiceExceptionSubmission, requestOriginMatches, SESSION_COOKIE_NAME,
 } from "../../../../../lib/session-security";
 
 interface RouteContext { params: Promise<{ summaryId: string }>; }
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest, context: RouteContext): Promise
     return redirect(config.publicOrigin, "/mowing-post-service-summaries", "invalid");
   }
   const returnPath = resolveReturnPath(form.get("return_path"));
-  const submission = parsePreparedProposalSubmission(form);
+  const submission = parseMowingPostServiceExceptionSubmission(form);
   if (!submission || !csrfTokensMatch(
     submission.csrfToken, request.cookies.get(CSRF_COOKIE_NAME)?.value,
   )) {

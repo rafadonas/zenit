@@ -10,6 +10,7 @@ import {
   parsePreparedMowingResourcePlanSubmission,
   parsePreparedMowingReadinessSubmission,
   parsePreparedMowingPlanningApprovalSubmission,
+  parseMowingPostServiceExceptionSubmission,
   parsePhotoReviewSubmission,
   parsePreparedProposalSubmission,
   parsePreparedProposalReviewSubmission,
@@ -162,6 +163,23 @@ describe("dashboard session security", () => {
       idempotencyKey: "10000000-0000-4000-8000-000000000001",
       creationRationale: "Aplicar regra preparada ao retorno revisado",
     });
+  });
+
+  it("allowlists a simulated mowing post-service exception rationale", () => {
+    const form = new FormData();
+    form.set("csrf_token", csrfToken);
+    form.set("idempotency_key", "10000000-0000-4000-8000-000000000001");
+    form.set("creation_rationale", "Avaliar o limiar pós-serviço simulado");
+    form.set("authorizes_field_work", "true");
+
+    expect(parseMowingPostServiceExceptionSubmission(form)).toEqual({
+      csrfToken,
+      idempotencyKey: "10000000-0000-4000-8000-000000000001",
+      creationRationale: "Avaliar o limiar pós-serviço simulado",
+    });
+
+    form.set("creation_rationale", "");
+    expect(parseMowingPostServiceExceptionSubmission(form)).toBeNull();
   });
 
   it("requires consistent human decisions for prepared proposals", () => {
