@@ -71,6 +71,15 @@ PREPARED_MOWING_POST_SERVICE_PHOTO_REVIEW_MIGRATION = Path(
 PREPARED_MOWING_POST_SERVICE_SUMMARY_MIGRATION = Path(
     "infra/migrations/0034_prepared_mowing_post_service_summary.sql"
 )
+PREPARED_MOWING_POST_SERVICE_SUMMARY_EXPORT_MIGRATION = Path(
+    "infra/migrations/0035_simulated_mowing_post_service_summary_export.sql"
+)
+PREPARED_MOWING_POST_SERVICE_EXCEPTION_MIGRATION = Path(
+    "infra/migrations/0036_simulated_mowing_post_service_exception.sql"
+)
+PREPARED_MOWING_POST_SERVICE_EXCEPTION_REVIEW_MIGRATION = Path(
+    "infra/migrations/0037_simulated_mowing_post_service_exception_review.sql"
+)
 
 
 class MigrationContractTests(unittest.TestCase):
@@ -173,7 +182,7 @@ class MigrationContractTests(unittest.TestCase):
         mounts = [
             line.strip() for line in compose.splitlines() if "/docker-entrypoint-initdb.d/" in line
         ]
-        self.assertEqual(len(mounts), 34)
+        self.assertEqual(len(mounts), 37)
         for version, mount in enumerate(mounts, start=1):
             prefix = f"{version:04d}"
             self.assertIn(f"infra/migrations/{prefix}_", mount)
@@ -308,6 +317,55 @@ class MigrationContractTests(unittest.TestCase):
         self.assertIn("data_status = 'simulated'", sql)
         self.assertIn("simulated_reviewed_non_operational", sql)
         self.assertIn("prepared_mowing_post_service_summary_immutable", sql)
+
+    def test_mowing_post_service_summary_export_is_audited_and_non_official(self) -> None:
+        sql = PREPARED_MOWING_POST_SERVICE_SUMMARY_EXPORT_MIGRATION.read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            "CREATE TABLE prepared_mowing_post_service_summary_export_event", sql
+        )
+        self.assertIn("simulated-mowing-post-service-summary-csv-v1", sql)
+        self.assertIn("data_status = 'simulated'", sql)
+        self.assertIn("CHECK (NOT eligible_for_official_reporting)", sql)
+        self.assertIn("CHECK (NOT authorizes_field_work)", sql)
+        self.assertIn(
+            "prepared_mowing_post_service_summary_export_event_immutable", sql
+        )
+
+    def test_mowing_post_service_exception_preserves_thresholds_and_human_gate(self) -> None:
+        sql = PREPARED_MOWING_POST_SERVICE_EXCEPTION_MIGRATION.read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            "CREATE TABLE prepared_mowing_post_service_exception_policy", sql
+        )
+        self.assertIn("CREATE TABLE prepared_mowing_post_service_exception", sql)
+        self.assertIn("general_threshold_cm = 30", sql)
+        self.assertIn("special_threshold_cm = 10", sql)
+        self.assertIn("recommendation IN ('monitor', 'inspect_follow_up')", sql)
+        self.assertIn("CHECK (requires_human_review)", sql)
+        self.assertIn("CHECK (NOT eligible_for_model_training)", sql)
+        self.assertIn("prepared_mowing_post_service_exception_immutable", sql)
+
+    def test_mowing_post_service_exception_review_is_linear_and_non_authorizing(self) -> None:
+        sql = PREPARED_MOWING_POST_SERVICE_EXCEPTION_REVIEW_MIGRATION.read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(
+            "CREATE TABLE prepared_mowing_post_service_exception_review", sql
+        )
+        self.assertIn("decision IN ('accepted', 'rejected', 'adjusted')", sql)
+        self.assertIn(
+            "adjusted_recommendation IN ('monitor', 'inspect_follow_up')", sql
+        )
+        self.assertIn("pg_advisory_xact_lock", sql)
+        self.assertIn("can only supersede effective review", sql)
+        self.assertIn("CHECK (NOT eligible_for_official_reporting)", sql)
+        self.assertIn("CHECK (NOT authorizes_field_work)", sql)
+        self.assertIn(
+            "prepared_mowing_post_service_exception_review_immutable", sql
+        )
 
     def test_recommendation_reviews_are_audited_and_append_only(self) -> None:
         sql = RECOMMENDATION_REVIEW_MIGRATION.read_text(encoding="utf-8")

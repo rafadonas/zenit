@@ -101,7 +101,15 @@ jobs:
                 AND to_regclass('public.prepared_mowing_readiness_assessment') IS NOT NULL
                 AND to_regclass('public.prepared_mowing_planning_approval') IS NOT NULL
                 AND to_regclass('public.prepared_mowing_demo_event') IS NOT NULL
-                AND to_regclass('public.prepared_mowing_post_service_measurement') IS NOT NULL;" \
+                AND to_regclass('public.prepared_mowing_post_service_measurement') IS NOT NULL
+                AND to_regclass('public.prepared_mowing_post_service_photo_manifest') IS NOT NULL
+                AND to_regclass('public.prepared_mowing_post_service_photo_upload_receipt') IS NOT NULL
+                AND to_regclass('public.prepared_mowing_post_service_photo_access_event') IS NOT NULL
+                AND to_regclass('public.prepared_mowing_post_service_photo_human_review') IS NOT NULL
+                AND to_regclass('public.prepared_mowing_post_service_summary') IS NOT NULL
+                AND to_regclass('public.prepared_mowing_post_service_summary_export_event') IS NOT NULL
+                AND to_regclass('public.prepared_mowing_post_service_exception') IS NOT NULL
+                AND to_regclass('public.prepared_mowing_post_service_exception_review') IS NOT NULL;" \
             | grep -qx t
           docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit -Atc \
             "SELECT postgis_typmod_type(a.atttypmod)
@@ -166,6 +174,26 @@ jobs:
             -X POST -H 'Content-Type: application/json' -H 'Idempotency-Key: ci-planning-approval-check' \
             -d '{"readiness_assessment_id":"00000000-0000-4000-8000-000000000001","decision":"rejected","decision_rationale":"CI authentication boundary"}' \
             http://localhost:8000/v1/prepared-mowing-orders/00000000-0000-4000-8000-000000000001/planning-approvals)" = 401
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            -X POST -H 'Content-Type: application/json' -H 'Idempotency-Key: ci-mowing-summary-check' \
+            -d '{"generation_rationale":"CI authentication boundary"}' \
+            http://localhost:8000/v1/prepared-mowing-orders/00000000-0000-4000-8000-000000000001/post-service-summary)" = 401
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            http://localhost:8000/v1/prepared-mowing-post-service-summaries)" = 401
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            -X POST -H 'Content-Type: application/json' -H 'Idempotency-Key: ci-mowing-summary-export-check' \
+            -d '{"export_purpose":"CI authentication boundary"}' \
+            http://localhost:8000/v1/prepared-mowing-post-service-summaries/00000000-0000-4000-8000-000000000001/exports)" = 401
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            -X POST -H 'Content-Type: application/json' -H 'Idempotency-Key: ci-mowing-exception-check' \
+            -d '{"creation_rationale":"CI authentication boundary"}' \
+            http://localhost:8000/v1/prepared-mowing-post-service-summaries/00000000-0000-4000-8000-000000000001/exceptions)" = 401
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            http://localhost:8000/v1/prepared-mowing-post-service-exceptions)" = 401
+          test "$(curl --silent --output /dev/null --write-out '%{http_code}' \
+            -X POST -H 'Content-Type: application/json' -H 'Idempotency-Key: ci-mowing-exception-review-check' \
+            -d '{"decision":"accepted"}' \
+            http://localhost:8000/v1/prepared-mowing-post-service-exceptions/00000000-0000-4000-8000-000000000001/decisions)" = 401
           curl --fail --silent --show-error --output /dev/null http://localhost:3000
           curl --fail --silent --show-error --output /dev/null http://localhost:3000/login
       - name: Show service logs on failure
