@@ -13,8 +13,12 @@ import {
 
 interface RouteContext { params: Promise<{ exceptionId: string }>; }
 
-function redirect(origin: string, status: string): NextResponse {
-  const destination = new URL("/mowing-post-service-summaries", origin);
+function resolveReturnPath(value: FormDataEntryValue | null): string {
+  return value === "/photo-reviews" ? "/photo-reviews" : "/mowing-post-service-summaries";
+}
+
+function redirect(origin: string, path: string, status: string): NextResponse {
+  const destination = new URL(path, origin);
   destination.searchParams.set("exception_review", status);
   return NextResponse.redirect(destination, 303);
 }
@@ -28,13 +32,16 @@ export async function POST(request: NextRequest, context: RouteContext): Promise
     );
   }
   const { exceptionId } = await context.params;
-  if (!isUuid(exceptionId)) return redirect(config.publicOrigin, "invalid");
+  if (!isUuid(exceptionId)) {
+    return redirect(config.publicOrigin, "/mowing-post-service-summaries", "invalid");
+  }
   let form: FormData;
   try {
     form = await request.formData();
   } catch {
-    return redirect(config.publicOrigin, "invalid");
+    return redirect(config.publicOrigin, "/mowing-post-service-summaries", "invalid");
   }
+  const returnPath = resolveReturnPath(form.get("return_path"));
   const submission = parseMowingPostServiceExceptionReviewSubmission(form);
   if (!submission || !csrfTokensMatch(
     submission.csrfToken,
@@ -70,9 +77,9 @@ export async function POST(request: NextRequest, context: RouteContext): Promise
       },
     });
   } catch {
-    return redirect(config.publicOrigin, "service-unavailable");
+    return redirect(config.publicOrigin, returnPath, "service-unavailable");
   }
-  if (upstream.ok) return redirect(config.publicOrigin, "recorded");
+  if (upstream.ok) return redirect(config.publicOrigin, returnPath, "recorded");
   if (upstream.status === 401) {
     const response = NextResponse.redirect(
       new URL("/login?error=session", config.publicOrigin),
@@ -88,5 +95,9 @@ export async function POST(request: NextRequest, context: RouteContext): Promise
     422: "invalid",
     503: "service-unavailable",
   };
-  return redirect(config.publicOrigin, statuses[upstream.status] ?? "service-unavailable");
+  return redirect(
+    config.publicOrigin,
+    returnPath,
+    statuses[upstream.status] ?? "service-unavailable",
+  );
 }

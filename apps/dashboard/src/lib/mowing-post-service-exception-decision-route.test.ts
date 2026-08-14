@@ -33,6 +33,7 @@ describe("mowing post-service exception review dashboard proxy", () => {
       adjusted_recommendation: "inspect_follow_up",
       rationale: "Registrar inspeção de seguimento após revisão humana.",
       supersedes_review_id: "99000000-0000-4000-8000-000000000099",
+      return_path: "/photo-reviews",
       eligible_for_official_reporting: "true",
     });
     const request = new NextRequest(
@@ -51,6 +52,9 @@ describe("mowing post-service exception review dashboard proxy", () => {
     const response = await POST(request, context);
 
     expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe(
+      "http://localhost:3000/photo-reviews?exception_review=recorded",
+    );
     const [url, options] = apiFetch.mock.calls[0] as [string, RequestInit];
     expect(url).toContain(`/v1/prepared-mowing-post-service-exceptions/${exceptionId}/decisions`);
     expect(JSON.parse(String(options.body))).toEqual({

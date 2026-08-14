@@ -41,7 +41,7 @@ interface PageProps {
     review?: string; summary?: string; export?: string; proposal?: string;
     proposal_review?: string; mowing_order?: string; resource_plan?: string;
     readiness?: string; planning_approval?: string; mowing_summary?: string;
-    mowing_exception?: string;
+    mowing_exception?: string; exception_review?: string;
   }>;
 }
 
@@ -143,7 +143,7 @@ function message(
   review?: string, summary?: string, exportStatus?: string, proposal?: string,
   proposalReview?: string, mowingOrder?: string, resourcePlan?: string,
   readiness?: string, planningApproval?: string, mowingSummary?: string,
-  mowingException?: string,
+  mowingException?: string, exceptionReview?: string,
 ): string | null {
   if (mowingException === "created") return "Exceção pós-serviço simulada registrada para revisão humana.";
   if (mowingException === "forbidden") return "Seu usuário não pode avaliar exceção pós-serviço nesta rodovia.";
@@ -151,6 +151,12 @@ function message(
   if (mowingException === "conflict") return "A exceção já existe ou a chave entrou em conflito.";
   if (mowingException === "invalid") return "A justificativa da exceção pós-serviço é inválida.";
   if (mowingException === "service-unavailable") return "O serviço de exceções pós-serviço não está disponível agora.";
+  if (exceptionReview === "recorded") return "Revisão humana da exceção pós-serviço registrada na trilha append-only.";
+  if (exceptionReview === "forbidden") return "Seu usuário não pode revisar esta exceção pós-serviço nesta rodovia.";
+  if (exceptionReview === "missing") return "A exceção pós-serviço simulada não foi encontrada.";
+  if (exceptionReview === "conflict") return "A chave de repetição ou a revisão efetiva da exceção entrou em conflito.";
+  if (exceptionReview === "invalid") return "A decisão da exceção pós-serviço está incompleta ou inconsistente.";
+  if (exceptionReview === "service-unavailable") return "O serviço de revisão da exceção pós-serviço não está disponível agora.";
   if (mowingSummary === "generated") return "Resumo pós-serviço simulado gerado; continua sem conclusão operacional.";
   if (mowingSummary === "forbidden") return "Seu usuário não pode gerar resumo pós-serviço para esta rodovia.";
   if (mowingSummary === "missing") return "A ordem de roçada preparada não foi encontrada.";
@@ -265,7 +271,7 @@ export default async function PhotoReviewsPage({ searchParams }: PageProps) {
   const operationMessage = message(
     query.review, query.summary, query.export, query.proposal, query.proposal_review,
     query.mowing_order, query.resource_plan, query.readiness, query.planning_approval,
-    query.mowing_summary, query.mowing_exception,
+    query.mowing_summary, query.mowing_exception, query.exception_review,
   );
   const summaryByOrder = new Map<string, PreparedInspectionSummary>(
     summaries?.items.map((summary) => [summary.work_order_id, summary]) ?? [],
@@ -374,12 +380,17 @@ export default async function PhotoReviewsPage({ searchParams }: PageProps) {
                         <label htmlFor={`mowing-export-purpose-${mowingSummary.summary_id}`}>Propósito da exportação</label><input defaultValue="Compartilhar pós-serviço simulado para revisão" id={`mowing-export-purpose-${mowingSummary.summary_id}`} maxLength={2000} name="export_purpose" required />
                         <button className="secondary-button" type="submit">Baixar CSV simulado</button><small>CSV auditado, simulado e inelegível para relatório oficial.</small>
                       </form>
-                      {mowingException ? <div className="post-inspection-proposal">
+                      {mowingException ? <><div className="post-inspection-proposal">
                         <div><strong>{mowingPostServiceExceptionHeadline(mowingException)}</strong><span>Máxima {formatHeight(mowingException.maximum_height_cm)} cm · limiar {formatHeight(mowingException.applicable_threshold_cm)} cm</span>{mowingPostServiceExceptionEffectiveDecision(mowingException) ? <span>Decisão efetiva: {mowingPostServiceExceptionEffectiveDecision(mowingException)}</span> : null}</div><span className="status-pill review">{mowingPostServiceExceptionReviewStatus(mowingException)}</span>
                         <small>Regra {mowingException.policy_version}. Exceção simulada: não conclui roçada, não atualiza mapa e não autoriza campo.</small>
                         {mowingException.latest_review_rationale ? <p>{mowingException.latest_review_rationale}</p> : null}
-                        <small>Revise ou corrija a decisão humana em <Link href="/mowing-post-service-summaries">Resumos pós-serviço</Link>.</small>
-                      </div> : <form action={`/api/prepared-mowing-post-service-summaries/${mowingSummary.summary_id}/exceptions`} className="prepared-summary-form" method="post">
+                      </div><form action={`/api/prepared-mowing-post-service-exceptions/${mowingException.exception_id}/decisions`} className="decision-form proposal-review-form" method="post">
+                        <input name="csrf_token" type="hidden" value={session.csrfToken} /><input name="idempotency_key" type="hidden" value={randomUUID()} /><input name="return_path" type="hidden" value="/photo-reviews" />{mowingException.latest_review_id ? <input name="supersedes_review_id" type="hidden" value={mowingException.latest_review_id} /> : null}
+                        <div><label htmlFor={`mowing-exception-decision-${mowingException.exception_id}`}>Decisão humana</label><select id={`mowing-exception-decision-${mowingException.exception_id}`} name="decision"><option value="accepted">Aceitar</option><option value="rejected">Rejeitar</option><option value="adjusted">Ajustar</option></select></div>
+                        <div><label htmlFor={`mowing-exception-adjustment-${mowingException.exception_id}`}>Ajuste, se aplicável</label><select id={`mowing-exception-adjustment-${mowingException.exception_id}`} name="adjusted_recommendation"><option value="">Selecione somente ao ajustar</option><option value="monitor">Monitorar</option><option value="inspect_follow_up">Indicar inspeção de seguimento</option></select></div>
+                        <div className="decision-rationale"><label htmlFor={`mowing-exception-review-rationale-${mowingException.exception_id}`}>Justificativa</label><textarea defaultValue={mowingException.latest_review_decision === "adjusted" ? mowingException.latest_review_rationale ?? "" : ""} id={`mowing-exception-review-rationale-${mowingException.exception_id}`} maxLength={2000} name="rationale" placeholder="Obrigatória ao rejeitar ou ajustar" rows={2} /></div>
+                        <button className="primary-button" type="submit">{mowingException.latest_review_id ? "Registrar correção auditável" : "Registrar decisão humana"}</button><small>A decisão continua limitada a monitoramento ou inspeção de seguimento, sem autorizar campo.</small>
+                      </form></> : <form action={`/api/prepared-mowing-post-service-summaries/${mowingSummary.summary_id}/exceptions`} className="prepared-summary-form" method="post">
                         <input name="csrf_token" type="hidden" value={session.csrfToken} /><input name="idempotency_key" type="hidden" value={randomUUID()} />
                         <label htmlFor={`mowing-exception-rationale-${mowingSummary.summary_id}`}>Justificativa da avaliação de exceção</label><textarea defaultValue="Aplicar limiar preparado ao resumo pós-serviço simulado" id={`mowing-exception-rationale-${mowingSummary.summary_id}`} maxLength={2000} name="creation_rationale" required rows={2} />
                         <button className="primary-button" type="submit">Avaliar exceção pós-serviço</button><small>Se a máxima exceder o limiar, gera somente indicação de inspeção de seguimento com revisão humana.</small>
