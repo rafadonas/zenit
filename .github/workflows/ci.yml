@@ -64,6 +64,15 @@ jobs:
         run: flutter test
       - name: Build debug Android APK
         run: flutter build apk --debug --dart-define=ZENIT_API_BASE_URL=https://api.example.invalid
+      - name: Verify debug Android APK
+        run: |
+          python ../../scripts/verify_android_apk.py \
+            build/app/outputs/flutter-apk/app-debug.apk \
+            --expected-application-id br.com.zenit.zenit_mobile \
+            --expected-version-name 1.0.0 \
+            --expected-version-code 1 \
+            --configured-api-base-url https://api.example.invalid \
+            --evidence-out build/app/outputs/flutter-apk/app-debug.evidence.json
 
   compose-smoke:
     runs-on: ubuntu-latest

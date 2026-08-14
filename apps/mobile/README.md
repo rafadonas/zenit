@@ -89,3 +89,22 @@ source code:
 
 Production builds must use HTTPS. The default HTTP address is intended only for
 an Android emulator connected to the local development API.
+
+The demonstrative debug artifact is built and validated with a reserved,
+non-operational API URL:
+
+```bash
+../../.tools/flutter/bin/flutter build apk --debug \
+  --dart-define=ZENIT_API_BASE_URL=https://api.example.invalid
+python ../../scripts/verify_android_apk.py \
+  build/app/outputs/flutter-apk/app-debug.apk \
+  --expected-application-id br.com.zenit.zenit_mobile \
+  --expected-version-name 1.0.0 \
+  --expected-version-code 1 \
+  --configured-api-base-url https://api.example.invalid \
+  --evidence-out build/app/outputs/flutter-apk/app-debug.evidence.json
+```
+
+The verifier checks archive structure, Flutter native ABIs, package/version,
+Android signature, and SHA-256. Its evidence explicitly marks the debug build
+as ineligible for field execution, official reporting, and model training.
