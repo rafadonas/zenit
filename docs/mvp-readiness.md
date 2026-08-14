@@ -32,7 +32,7 @@ field authorization.
 | Mowing planning and rehearsal | Ready for demonstration | Proposal, human review, non-executable order, candidate resources, manual readiness, planning-only approval, and offline rehearsal are separated and audited. |
 | Post-service feedback | Ready for demonstration | Three separate simulated heights and photos gate a summary, audited export, threshold exception, and append-only human exception review. |
 | History and reporting | Ready only in demonstration scope | Read-only rehearsal history and simulated CSV artifacts are available. Operational map/history updates and official reports are intentionally blocked. |
-| Automated quality gates | Ready | Python, dashboard, Flutter, production dashboard build, migration contract, and fresh-database smoke checks pass locally and are represented in CI. |
+| Automated quality gates | Ready | Python, dashboard, Flutter, production dashboard build, versioned OpenAPI contract, migration contract, and fresh-database smoke checks pass locally and are represented in CI. |
 
 ## Validation record
 
@@ -41,6 +41,7 @@ The local release audit ran these tracked checks successfully:
 ```text
 .venv/bin/ruff check .
 .venv/bin/pytest
+python scripts/export_openapi.py --check
 npm run dashboard:lint
 npm run dashboard:test
 npm run dashboard:build
@@ -67,6 +68,11 @@ network, and volume were removed after validation; the development stack was
 not modified. The tracked smoke verifier is shared with CI and covers 25 HTTP
 contracts from public health and collection responses through the final
 post-service exception review authentication boundary.
+
+The FastAPI OpenAPI document is tracked at `contracts/openapi.json` and checked
+byte for byte in CI. Its repository validator currently covers 34 paths,
+requires versioned application routes, unique operation identifiers, tags and
+responses, and rejects known development credentials.
 
 The local workstation built and validated the demonstrative Android debug APK
 with Flutter 3.44.9, Android API 36, Build Tools 36.0.0, NDK 28.2, and Temurin

@@ -443,8 +443,15 @@ cache.
 source .venv/bin/activate
 ruff check .
 pytest
+python scripts/export_openapi.py --check
 uvicorn zenit_api.main:app --app-dir services/api/src --reload
 ```
+
+O contrato [OpenAPI versionado](contracts/openapi.json) é gerado diretamente
+pela aplicação FastAPI. Após uma alteração intencional de endpoint ou modelo,
+execute `python scripts/export_openapi.py`, revise o diff e mantenha o gate
+`--check` aprovado. O exportador recusa rotas de aplicação fora de `/v1`,
+identificadores de operação duplicados e valores sensíveis conhecidos.
 
 ### Dashboard Next.js
 
@@ -544,6 +551,7 @@ Use `--expect-empty` apenas em um banco recém-inicializado, como o da CI.
 
 - [Manual mestre do projeto](ZENIT_Manual_Mestre_para_Codex.pdf)
 - [Prontidão do MVP demonstrativo](docs/mvp-readiness.md)
+- [Contrato OpenAPI](contracts/openapi.json)
 - [Decisões arquiteturais](docs/decisions)
 - [Relatórios de qualidade dos dados](docs/data-quality)
 - [Arquitetura](docs/architecture)
