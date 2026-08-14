@@ -496,6 +496,15 @@ confere schema PostGIS, healthcheck, resposta satelital vazia com proveniência,
 proteção das rotas de escrita e disponibilidade do dashboard/login sem exigir
 arquivos brutos ou credenciais de provedores.
 
+Com o stack ativo, os mesmos contratos HTTP da CI podem ser verificados
+localmente sem credenciais:
+
+```bash
+python scripts/verify_mvp_stack.py
+```
+
+Use `--expect-empty` apenas em um banco recém-inicializado, como o da CI.
+
 ## Segurança e limitações conhecidas
 
 - A autenticação local do MVP não possui identidade corporativa, refresh token,

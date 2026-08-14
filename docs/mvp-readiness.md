@@ -48,12 +48,15 @@ flutter analyze
 flutter test
 docker compose config --quiet
 fresh PostgreSQL initialization with migrations 0001-0037
+python scripts/verify_mvp_stack.py
 ```
 
 The fresh-database check verified the final summary export, exception, exception
 review tables, and the versioned exception policy. Its isolated container,
 network, and volume were removed after validation; the development stack was
-not modified.
+not modified. The tracked smoke verifier is shared with CI and covers 25 HTTP
+contracts from public health and collection responses through the final
+post-service exception review authentication boundary.
 
 The local workstation has Flutter 3.44.9 but no Android SDK, so the debug APK
 was not built during this audit. Mobile formatting, static analysis, and all 58
