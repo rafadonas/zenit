@@ -83,6 +83,9 @@ PREPARED_MOWING_POST_SERVICE_EXCEPTION_REVIEW_MIGRATION = Path(
 LOGIN_THROTTLE_MIGRATION = Path(
     "infra/migrations/0038_persistent_login_throttle.sql"
 )
+AUTHENTICATION_SESSION_MIGRATION = Path(
+    "infra/migrations/0039_persistent_authentication_sessions.sql"
+)
 
 
 class MigrationContractTests(unittest.TestCase):
@@ -185,7 +188,7 @@ class MigrationContractTests(unittest.TestCase):
         mounts = [
             line.strip() for line in compose.splitlines() if "/docker-entrypoint-initdb.d/" in line
         ]
-        self.assertEqual(len(mounts), 38)
+        self.assertEqual(len(mounts), 39)
         for version, mount in enumerate(mounts, start=1):
             prefix = f"{version:04d}"
             self.assertIn(f"infra/migrations/{prefix}_", mount)
@@ -206,6 +209,19 @@ class MigrationContractTests(unittest.TestCase):
         self.assertIn("CHECK (NOT eligible_for_field_execution)", sql)
         self.assertIn("prepared mowing demo event requires its exact accepted sync event", sql)
         self.assertIn("prepared_mowing_demo_event_immutable", sql)
+
+    def test_authentication_sessions_are_registered_revocable_and_append_only(self) -> None:
+        sql = AUTHENTICATION_SESSION_MIGRATION.read_text(encoding="utf-8")
+
+        self.assertIn("CREATE TABLE authentication_session", sql)
+        self.assertIn("CREATE TABLE authentication_session_revocation", sql)
+        self.assertIn("session_id uuid NOT NULL UNIQUE", sql)
+        self.assertIn("FOREIGN KEY (session_id, revoked_by_user_id)", sql)
+        self.assertIn("reason IN ('user_logout')", sql)
+        self.assertIn("correlation_id uuid NOT NULL", sql)
+        self.assertIn("authentication_session_immutable", sql)
+        self.assertIn("authentication_session_revocation_immutable", sql)
+        self.assertNotIn("access_token", sql)
 
     def test_mowing_post_service_measurement_is_separate_simulated_evidence(self) -> None:
         sql = PREPARED_MOWING_POST_SERVICE_MEASUREMENT_MIGRATION.read_text(

@@ -29,7 +29,9 @@ Current P0 slice:
 - explicit upload of accepted inspection-photo manifests with resumable
   unverified receipts;
 - accepted, rejected, and conflicting outcomes retained locally;
-- logout/session expiry hides but does not delete unacknowledged encrypted data;
+- logout attempts server-side token revocation, then hides access without
+  deleting unacknowledged encrypted data; an offline logout reports that remote
+  revocation remains unconfirmed;
 - Android cloud backup and device-transfer extraction disabled.
 
 Safety boundary: every accepted order must explicitly have

@@ -12,6 +12,7 @@ import '../domain/prepared_photo_draft.dart';
 
 abstract interface class ZenitGateway {
   Future<AuthSession> login(String email, String password);
+  Future<void> logout(String accessToken);
   Future<List<PreparedWorkOrder>> listPreparedOrders(String accessToken);
   Future<List<PreparedMowingPlan>> listPreparedMowingPlans(String accessToken);
   Future<void> registerDevice(
@@ -85,6 +86,23 @@ class HttpZenitGateway implements ZenitGateway {
       userId: user['id']! as String,
       email: user['email']! as String,
       displayName: user['display_name']! as String,
+    );
+  }
+
+  @override
+  Future<void> logout(String accessToken) async {
+    final response = await _client.post(
+      _uri('/v1/auth/logout'),
+      headers: {
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+      },
+    );
+    if (response.statusCode == 204 || response.statusCode == 401) return;
+    final payload = _decodeObject(response);
+    throw ZenitApiException(
+      _errorMessage(payload, 'Não foi possível confirmar a saída remota.'),
+      statusCode: response.statusCode,
     );
   }
 

@@ -6155,6 +6155,63 @@
         ]
       }
     },
+    "/v1/auth/logout": {
+      "post": {
+        "operationId": "logout_session_v1_auth_logout_post",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Request validation failed or the request cannot be processed.",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Request correlation identifier generated or accepted by the API.",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "API error response.",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Request correlation identifier generated or accepted by the API.",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Logout Session",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/v1/auth/me": {
       "get": {
         "operationId": "read_authenticated_context_v1_auth_me_get",

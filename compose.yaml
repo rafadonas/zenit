@@ -49,6 +49,7 @@ services:
       - ./infra/migrations/0036_simulated_mowing_post_service_exception.sql:/docker-entrypoint-initdb.d/0036.sql:ro
       - ./infra/migrations/0037_simulated_mowing_post_service_exception_review.sql:/docker-entrypoint-initdb.d/0037.sql:ro
       - ./infra/migrations/0038_persistent_login_throttle.sql:/docker-entrypoint-initdb.d/0038.sql:ro
+      - ./infra/migrations/0039_persistent_authentication_sessions.sql:/docker-entrypoint-initdb.d/0039.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s

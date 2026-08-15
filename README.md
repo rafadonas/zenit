@@ -310,6 +310,18 @@ Content-Type: application/x-www-form-urlencoded
 username=manager%40example.test&password=<senha-local>
 ```
 
+Cada token emitido possui uma sessão persistente vinculada ao `jti`. A API
+recusa tokens sem sessão ativa e registra a revogação append-only no logout:
+
+```text
+POST /v1/auth/logout
+Authorization: Bearer <access-token>
+```
+
+Tokens emitidos antes da migração `0039` exigem novo login. O dashboard confirma
+a revogação antes de apagar seus cookies; o aplicativo móvel sempre remove o
+acesso local e informa quando estava offline e não pôde confirmar a revogação.
+
 Por padrão, cinco falhas em 15 minutos bloqueiam temporariamente o identificador
 por 15 minutos. O banco armazena somente um digest HMAC e eventos append-only;
 os limites são configuráveis pelas variáveis `AUTH_LOGIN_*` documentadas em
@@ -320,6 +332,7 @@ Rotas centrais do fluxo gerencial:
 | Método e rota | Finalidade |
 | --- | --- |
 | `GET /v1/auth/me` | Identidade e papéis do usuário |
+| `POST /v1/auth/logout` | Revogar a sessão bearer atual |
 | `POST /v1/recommendations/{id}/decisions` | Aceitar, rejeitar ou ajustar recomendação |
 | `POST /v1/work-orders` | Criar ordem preparada de inspeção |
 | `GET /v1/work-orders` | Listar ordens acessíveis ao ator |
@@ -555,10 +568,10 @@ Use `--expect-empty` apenas em um banco recém-inicializado, como o da CI.
 
 ## Segurança e limitações conhecidas
 
-- A autenticação local do MVP possui limitação persistente de tentativas, mas
-  ainda não oferece identidade corporativa, refresh token, recuperação de senha,
-  revogação de sessão ou controles adaptativos. Não deve ser exposta diretamente
-  à internet.
+- A autenticação local do MVP possui limitação persistente de tentativas e
+  revogação individual de sessão, mas ainda não oferece identidade corporativa,
+  refresh token, recuperação de senha, MFA, encerramento administrativo global
+  ou controles adaptativos. Não deve ser exposta diretamente à internet.
 - Staging e produção devem usar HTTPS, `DASHBOARD_COOKIE_SECURE=true` e
   `DASHBOARD_PUBLIC_ORIGIN` com a origem pública exata.
 - A chave AES-256-GCM fica fora do object storage. Perder essa chave torna as

@@ -1,6 +1,6 @@
 import asyncio
 import base64
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 import jwt
@@ -15,16 +15,19 @@ from zenit_api.auth import (
     UserIdentity,
     create_access_token,
     decode_access_token,
+    get_authentication_session_store,
     get_current_user,
     get_identity_reader,
     get_login_throttle,
     get_road_role_reader,
 )
+from zenit_api.auth_sessions import AuthenticationSessionRecord
 from zenit_api.config import Settings
 from zenit_api.login_throttle import LoginThrottlePolicy, digest_login_identifier
 from zenit_api.main import app
 
 USER_ID = UUID("10000000-0000-4000-8000-000000000001")
+SESSION_ID = UUID("20000000-0000-4000-8000-000000000001")
 
 
 class FakeIdentityReader:
@@ -95,9 +98,53 @@ class FakeLoginThrottle:
         self.succeeded_digests.append(identifier_digest)
 
 
+class FakeAuthenticationSessionStore:
+    def __init__(self) -> None:
+        self.sessions: dict[UUID, AuthenticationSessionRecord] = {}
+        self.revoked_session_ids: set[UUID] = set()
+
+    async def register(self, session: AuthenticationSessionRecord) -> None:
+        self.sessions[session.id] = session
+
+    async def is_active(
+        self,
+        session_id: UUID,
+        user_id: UUID,
+        *,
+        token_issuer: str,
+        token_audience: str,
+        now: datetime,
+    ) -> bool:
+        session = self.sessions.get(session_id)
+        return bool(
+            session
+            and session.user_id == user_id
+            and session.token_issuer == token_issuer
+            and session.token_audience == token_audience
+            and session.expires_at > now
+            and session_id not in self.revoked_session_ids
+        )
+
+    async def revoke(
+        self,
+        session_id: UUID,
+        user_id: UUID,
+        *,
+        correlation_id: UUID,
+        revoked_at: datetime,
+    ) -> bool:
+        del correlation_id, revoked_at
+        session = self.sessions.get(session_id)
+        if session is None or session.user_id != user_id:
+            return False
+        self.revoked_session_ids.add(session_id)
+        return True
+
+
 def test_login_returns_a_scoped_expiring_token_without_password_data() -> None:
     reader = FakeIdentityReader()
     throttle = FakeLoginThrottle()
+    session_store = FakeAuthenticationSessionStore()
 
     async def fake_reader() -> FakeIdentityReader:
         return reader
@@ -105,9 +152,13 @@ def test_login_returns_a_scoped_expiring_token_without_password_data() -> None:
     async def fake_throttle() -> FakeLoginThrottle:
         return throttle
 
+    async def fake_session_store() -> FakeAuthenticationSessionStore:
+        return session_store
+
     async def request():
         app.dependency_overrides[get_identity_reader] = fake_reader
         app.dependency_overrides[get_login_throttle] = fake_throttle
+        app.dependency_overrides[get_authentication_session_store] = fake_session_store
         try:
             transport = ASGITransport(app=app)
             async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -129,11 +180,16 @@ def test_login_returns_a_scoped_expiring_token_without_password_data() -> None:
     assert decode_access_token(payload["access_token"], Settings()) == USER_ID
     assert throttle.checked_digests == throttle.succeeded_digests
     assert throttle.failed_digests == []
+    assert len(session_store.sessions) == 1
+    registered_session = next(iter(session_store.sessions.values()))
+    assert registered_session.user_id == USER_ID
+    assert registered_session.correlation_id == UUID(response.headers["x-correlation-id"])
 
 
 def test_login_uses_the_same_generic_failure_for_invalid_credentials() -> None:
     reader = FakeIdentityReader()
     throttle = FakeLoginThrottle()
+    session_store = FakeAuthenticationSessionStore()
 
     async def fake_reader() -> FakeIdentityReader:
         return reader
@@ -141,9 +197,13 @@ def test_login_uses_the_same_generic_failure_for_invalid_credentials() -> None:
     async def fake_throttle() -> FakeLoginThrottle:
         return throttle
 
+    async def fake_session_store() -> FakeAuthenticationSessionStore:
+        return session_store
+
     async def request():
         app.dependency_overrides[get_identity_reader] = fake_reader
         app.dependency_overrides[get_login_throttle] = fake_throttle
+        app.dependency_overrides[get_authentication_session_store] = fake_session_store
         try:
             transport = ASGITransport(app=app)
             async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -170,6 +230,7 @@ def test_login_uses_the_same_generic_failure_for_invalid_credentials() -> None:
 def test_login_throttle_rejects_before_identity_or_password_lookup() -> None:
     reader = FakeIdentityReader()
     throttle = FakeLoginThrottle(retry_after=37)
+    session_store = FakeAuthenticationSessionStore()
 
     async def fake_reader() -> FakeIdentityReader:
         return reader
@@ -177,9 +238,13 @@ def test_login_throttle_rejects_before_identity_or_password_lookup() -> None:
     async def fake_throttle() -> FakeLoginThrottle:
         return throttle
 
+    async def fake_session_store() -> FakeAuthenticationSessionStore:
+        return session_store
+
     async def request():
         app.dependency_overrides[get_identity_reader] = fake_reader
         app.dependency_overrides[get_login_throttle] = fake_throttle
+        app.dependency_overrides[get_authentication_session_store] = fake_session_store
         try:
             transport = ASGITransport(app=app)
             async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -202,6 +267,7 @@ def test_login_throttle_rejects_before_identity_or_password_lookup() -> None:
 def test_login_failure_that_reaches_limit_returns_retry_after() -> None:
     reader = FakeIdentityReader()
     throttle = FakeLoginThrottle(failure_retry_after=900)
+    session_store = FakeAuthenticationSessionStore()
 
     async def fake_reader() -> FakeIdentityReader:
         return reader
@@ -209,9 +275,13 @@ def test_login_failure_that_reaches_limit_returns_retry_after() -> None:
     async def fake_throttle() -> FakeLoginThrottle:
         return throttle
 
+    async def fake_session_store() -> FakeAuthenticationSessionStore:
+        return session_store
+
     async def request():
         app.dependency_overrides[get_identity_reader] = fake_reader
         app.dependency_overrides[get_login_throttle] = fake_throttle
+        app.dependency_overrides[get_authentication_session_store] = fake_session_store
         try:
             transport = ASGITransport(app=app)
             async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -264,6 +334,95 @@ def test_access_token_rejects_an_unexpected_audience() -> None:
         pass
     else:
         raise AssertionError("unexpected JWT audience must be rejected")
+
+
+def test_logout_revokes_a_registered_session_and_is_idempotent() -> None:
+    settings = Settings()
+    issued_at = datetime.now(UTC)
+    token, expires_in = create_access_token(
+        USER_ID,
+        settings,
+        now=issued_at,
+        session_id=SESSION_ID,
+    )
+    reader = FakeIdentityReader()
+    session_store = FakeAuthenticationSessionStore()
+
+    async def fake_reader() -> FakeIdentityReader:
+        return reader
+
+    async def fake_session_store() -> FakeAuthenticationSessionStore:
+        return session_store
+
+    class FakeRoadRoleReader:
+        async def for_user(self, user_id: UUID) -> tuple[RoadRoleAssignment, ...]:
+            assert user_id == USER_ID
+            return ()
+
+    async def fake_roles() -> FakeRoadRoleReader:
+        return FakeRoadRoleReader()
+
+    async def request() -> tuple[int, int, int, int]:
+        await session_store.register(
+            AuthenticationSessionRecord(
+                id=SESSION_ID,
+                user_id=USER_ID,
+                token_issuer=settings.auth_token_issuer,
+                token_audience=settings.auth_token_audience,
+                issued_at=issued_at,
+                expires_at=issued_at + timedelta(seconds=expires_in),
+                correlation_id=UUID("30000000-0000-4000-8000-000000000001"),
+            )
+        )
+        app.dependency_overrides[get_identity_reader] = fake_reader
+        app.dependency_overrides[get_authentication_session_store] = fake_session_store
+        app.dependency_overrides[get_road_role_reader] = fake_roles
+        try:
+            transport = ASGITransport(app=app)
+            headers = {"Authorization": f"Bearer {token}"}
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                before = await client.get("/v1/auth/me", headers=headers)
+                first = await client.post("/v1/auth/logout", headers=headers)
+                second = await client.post("/v1/auth/logout", headers=headers)
+                after = await client.get("/v1/auth/me", headers=headers)
+                return before.status_code, first.status_code, second.status_code, after.status_code
+        finally:
+            app.dependency_overrides.clear()
+
+    before_status, first_status, second_status, after_status = asyncio.run(request())
+
+    assert before_status == 200
+    assert first_status == 204
+    assert second_status == 204
+    assert after_status == 401
+    assert session_store.revoked_session_ids == {SESSION_ID}
+
+
+def test_signed_token_without_a_registered_session_is_rejected() -> None:
+    token, _ = create_access_token(USER_ID, Settings(), session_id=SESSION_ID)
+    reader = FakeIdentityReader()
+    session_store = FakeAuthenticationSessionStore()
+
+    async def fake_reader() -> FakeIdentityReader:
+        return reader
+
+    async def fake_session_store() -> FakeAuthenticationSessionStore:
+        return session_store
+
+    async def request() -> tuple[int, int]:
+        app.dependency_overrides[get_identity_reader] = fake_reader
+        app.dependency_overrides[get_authentication_session_store] = fake_session_store
+        try:
+            transport = ASGITransport(app=app)
+            headers = {"Authorization": f"Bearer {token}"}
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                context = await client.get("/v1/auth/me", headers=headers)
+                logout = await client.post("/v1/auth/logout", headers=headers)
+                return context.status_code, logout.status_code
+        finally:
+            app.dependency_overrides.clear()
+
+    assert asyncio.run(request()) == (401, 401)
 
 
 def test_staging_rejects_the_development_signing_secret() -> None:

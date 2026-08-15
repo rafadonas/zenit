@@ -11,6 +11,9 @@ interface LoginPageProps {
 
 function loginMessage(error: string | undefined, status: string | undefined): string | null {
   if (status === "signed-out") return "Sessão encerrada com segurança.";
+  if (status === "signed-out-local") {
+    return "Sessão local encerrada; a revogação remota não pôde ser confirmada.";
+  }
   if (error === "credentials") return "E-mail ou senha inválidos.";
   if (error === "rate-limited") return "Muitas tentativas. Aguarde antes de tentar novamente.";
   if (error === "session") return "Sua sessão expirou. Entre novamente.";

@@ -555,8 +555,9 @@ void main() {
   test('logout removes the session but retains encrypted local data', () async {
     final vault = MemoryVault()..orders = [preparedOrder()];
     final sessionStore = MemorySessionStore()..value = validSession();
+    final gateway = FakeGateway(orders: [preparedOrder()]);
     final controller = ZenitAppController(
-      gateway: FakeGateway(orders: [preparedOrder()]),
+      gateway: gateway,
       sessionStore: sessionStore,
       vault: vault,
       deviceIdentityStore: MemoryDeviceIdentityStore(),
@@ -570,7 +571,37 @@ void main() {
     expect(vault.orders, isNotEmpty);
     expect(controller.orders, isEmpty);
     expect(controller.isAuthenticated, isFalse);
+    expect(gateway.logoutCalls, 1);
+    expect(controller.errorMessage, isNull);
   });
+
+  test(
+    'offline logout clears local access and reports remote uncertainty',
+    () async {
+      final vault = MemoryVault()..orders = [preparedOrder()];
+      final sessionStore = MemorySessionStore()..value = validSession();
+      final gateway = FakeGateway(
+        orders: [preparedOrder()],
+        logoutFailure: const ZenitApiException('offline'),
+      );
+      final controller = ZenitAppController(
+        gateway: gateway,
+        sessionStore: sessionStore,
+        vault: vault,
+        deviceIdentityStore: MemoryDeviceIdentityStore(),
+        appVersion: 'test',
+        photoCapture: FakePhotoCapture(),
+      );
+      await controller.initialize();
+
+      await controller.logout();
+
+      expect(sessionStore.value, isNull);
+      expect(controller.isAuthenticated, isFalse);
+      expect(vault.orders, isNotEmpty);
+      expect(controller.errorMessage, contains('revogação remota'));
+    },
+  );
 
   test(
     'an unauthorized refresh removes session access but retains encrypted cache',
@@ -971,6 +1002,9 @@ class _UnauthorizedGateway implements ZenitGateway {
   @override
   Future<AuthSession> login(String email, String password) =>
       throw UnimplementedError();
+
+  @override
+  Future<void> logout(String accessToken) => throw UnimplementedError();
 
   @override
   Future<List<PreparedWorkOrder>> listPreparedOrders(String accessToken) =>

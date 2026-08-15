@@ -63,7 +63,7 @@ def test_run_checks_covers_fresh_stack_contracts() -> None:
         opener=_success_opener,
     )
 
-    assert count == 25
+    assert count == 26
 
 
 def test_run_checks_rejects_unprotected_authenticated_route() -> None:

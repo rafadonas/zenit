@@ -7,13 +7,18 @@ from uuid import UUID, uuid4
 
 import jwt
 import psycopg
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordBearer
 from jwt.exceptions import InvalidTokenError
 from pwdlib import PasswordHash
 from pwdlib.exceptions import UnknownHashError
 from pydantic import BaseModel
 
+from zenit_api.auth_sessions import (
+    AuthenticationSessionRecord,
+    AuthenticationSessionStore,
+    PostgresAuthenticationSessionRepository,
+)
 from zenit_api.config import Settings, get_settings
 from zenit_api.error_contract import ApiErrorResponse
 from zenit_api.login_throttle import (
@@ -42,6 +47,22 @@ class AuthenticatedUser:
     id: UUID
     email: str
     display_name: str
+
+
+@dataclass(frozen=True, slots=True)
+class AccessTokenClaims:
+    user_id: UUID
+    session_id: UUID
+    token_issuer: str
+    token_audience: str
+    issued_at: datetime
+    expires_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class AuthenticatedSession:
+    user: AuthenticatedUser
+    session_id: UUID
 
 
 @dataclass(frozen=True, slots=True)
@@ -153,6 +174,10 @@ async def get_login_throttle() -> LoginThrottle:
     return PostgresLoginThrottleRepository(get_settings().database_url)
 
 
+async def get_authentication_session_store() -> AuthenticationSessionStore:
+    return PostgresAuthenticationSessionRepository(get_settings().database_url)
+
+
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/v1/auth/token")
 
 
@@ -161,6 +186,7 @@ def create_access_token(
     settings: Settings,
     *,
     now: datetime | None = None,
+    session_id: UUID | None = None,
 ) -> tuple[str, int]:
     issued_at = now or datetime.now(UTC)
     expires_in = settings.auth_access_token_minutes * 60
@@ -170,7 +196,7 @@ def create_access_token(
         "aud": settings.auth_token_audience,
         "iat": issued_at,
         "exp": issued_at + timedelta(seconds=expires_in),
-        "jti": str(uuid4()),
+        "jti": str(session_id or uuid4()),
     }
     token = jwt.encode(
         payload,
@@ -181,6 +207,10 @@ def create_access_token(
 
 
 def decode_access_token(token: str, settings: Settings) -> UUID:
+    return decode_access_token_claims(token, settings).user_id
+
+
+def decode_access_token_claims(token: str, settings: Settings) -> AccessTokenClaims:
     payload = jwt.decode(
         token,
         settings.auth_secret_key.get_secret_value(),
@@ -189,7 +219,14 @@ def decode_access_token(token: str, settings: Settings) -> UUID:
         issuer=settings.auth_token_issuer,
         options={"require": ["sub", "iss", "aud", "iat", "exp", "jti"]},
     )
-    return UUID(payload["sub"])
+    return AccessTokenClaims(
+        user_id=UUID(payload["sub"]),
+        session_id=UUID(payload["jti"]),
+        token_issuer=payload["iss"],
+        token_audience=payload["aud"],
+        issued_at=datetime.fromtimestamp(payload["iat"], UTC),
+        expires_at=datetime.fromtimestamp(payload["exp"], UTC),
+    )
 
 
 def _credentials_error() -> HTTPException:
@@ -217,24 +254,45 @@ def _login_rate_limit_error(retry_after: int) -> HTTPException:
     )
 
 
-async def get_current_user(
+async def get_current_session(
     token: Annotated[str, Depends(oauth2_scheme)],
     reader: Annotated[IdentityReader, Depends(get_identity_reader)],
+    session_store: Annotated[
+        AuthenticationSessionStore, Depends(get_authentication_session_store)
+    ],
     settings: Annotated[Settings, Depends(get_auth_settings)],
-) -> AuthenticatedUser:
+) -> AuthenticatedSession:
     try:
-        user_id = decode_access_token(token, settings)
-    except (InvalidTokenError, TypeError, ValueError):
+        claims = decode_access_token_claims(token, settings)
+    except (InvalidTokenError, KeyError, TypeError, ValueError):
         raise _credentials_error() from None
 
-    identity = await reader.by_id(user_id)
+    if not await session_store.is_active(
+        claims.session_id,
+        claims.user_id,
+        token_issuer=claims.token_issuer,
+        token_audience=claims.token_audience,
+        now=datetime.now(UTC),
+    ):
+        raise _credentials_error()
+
+    identity = await reader.by_id(claims.user_id)
     if identity is None or identity.status != "active":
         raise _credentials_error()
-    return AuthenticatedUser(
-        id=identity.id,
-        email=identity.email,
-        display_name=identity.display_name,
+    return AuthenticatedSession(
+        user=AuthenticatedUser(
+            id=identity.id,
+            email=identity.email,
+            display_name=identity.display_name,
+        ),
+        session_id=claims.session_id,
     )
+
+
+async def get_current_user(
+    session: Annotated[AuthenticatedSession, Depends(get_current_session)],
+) -> AuthenticatedUser:
+    return session.user
 
 
 router = APIRouter(prefix="/v1/auth", tags=["auth"])
@@ -266,6 +324,9 @@ async def login_for_access_token(
     password: Annotated[str, Form(min_length=1, max_length=1024)],
     reader: Annotated[IdentityReader, Depends(get_identity_reader)],
     throttle: Annotated[LoginThrottle, Depends(get_login_throttle)],
+    session_store: Annotated[
+        AuthenticationSessionStore, Depends(get_authentication_session_store)
+    ],
     settings: Annotated[Settings, Depends(get_auth_settings)],
 ) -> AccessTokenResponse:
     normalized_username = username.strip().lower()
@@ -316,7 +377,25 @@ async def login_for_access_token(
         correlation_id=correlation_id,
         now=now,
     )
-    token, expires_in = create_access_token(identity.id, settings)
+    issued_at = datetime.now(UTC)
+    session_id = uuid4()
+    token, expires_in = create_access_token(
+        identity.id,
+        settings,
+        now=issued_at,
+        session_id=session_id,
+    )
+    await session_store.register(
+        AuthenticationSessionRecord(
+            id=session_id,
+            user_id=identity.id,
+            token_issuer=settings.auth_token_issuer,
+            token_audience=settings.auth_token_audience,
+            issued_at=issued_at,
+            expires_at=issued_at + timedelta(seconds=expires_in),
+            correlation_id=correlation_id,
+        )
+    )
     return AccessTokenResponse(
         access_token=token,
         expires_in=expires_in,
@@ -326,6 +405,34 @@ async def login_for_access_token(
             display_name=identity.display_name,
         ),
     )
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout_session(
+    request: Request,
+    token: Annotated[str, Depends(oauth2_scheme)],
+    session_store: Annotated[
+        AuthenticationSessionStore, Depends(get_authentication_session_store)
+    ],
+    settings: Annotated[Settings, Depends(get_auth_settings)],
+) -> Response:
+    try:
+        claims = decode_access_token_claims(token, settings)
+    except (InvalidTokenError, KeyError, TypeError, ValueError):
+        raise _credentials_error() from None
+
+    request_correlation_id = getattr(request.state, "correlation_id", None)
+    correlation_id = (
+        request_correlation_id if isinstance(request_correlation_id, UUID) else uuid4()
+    )
+    if not await session_store.revoke(
+        claims.session_id,
+        claims.user_id,
+        correlation_id=correlation_id,
+        revoked_at=datetime.now(UTC),
+    ):
+        raise _credentials_error()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/me", response_model=AuthenticatedContextResponse)

@@ -112,6 +112,13 @@ def _protected_checks(api_base: str) -> tuple[StatusCheck, ...]:
     return (
         StatusCheck("current user authentication", api_base, "/v1/auth/me", 401),
         StatusCheck(
+            "session logout authentication",
+            api_base,
+            "/v1/auth/logout",
+            401,
+            "POST",
+        ),
+        StatusCheck(
             "recommendation decision authentication",
             api_base,
             f"/v1/recommendations/{REFERENCE_ID}/decisions",

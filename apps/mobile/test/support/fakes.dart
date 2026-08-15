@@ -120,16 +120,19 @@ class FakeGateway implements ZenitGateway {
     this.orders = const [],
     this.mowingPlans = const [],
     this.syncFailure,
+    this.logoutFailure,
     this.loginSession,
     this.syncResultFactory,
   });
   List<PreparedWorkOrder> orders;
   List<PreparedMowingPlan> mowingPlans;
   Object? syncFailure;
+  Object? logoutFailure;
   AuthSession? loginSession;
   MobileSyncResult Function(PendingSyncBatch batch)? syncResultFactory;
   int registrationCalls = 0;
   int syncCalls = 0;
+  int logoutCalls = 0;
   Object? uploadFailure;
   int? uploadFailureAtCall;
   int uploadCalls = 0;
@@ -144,6 +147,12 @@ class FakeGateway implements ZenitGateway {
   @override
   Future<AuthSession> login(String email, String password) async =>
       loginSession ?? validSession();
+
+  @override
+  Future<void> logout(String accessToken) async {
+    logoutCalls++;
+    if (logoutFailure case final failure?) throw failure;
+  }
 
   @override
   Future<List<PreparedWorkOrder>> listPreparedOrders(

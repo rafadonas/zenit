@@ -133,8 +133,18 @@ class ZenitAppController extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    final accessToken = session?.accessToken;
+    String? logoutWarning;
+    if (accessToken != null) {
+      try {
+        await gateway.logout(accessToken);
+      } on Object {
+        logoutWarning =
+            'Sessão local encerrada; a revogação remota não pôde ser confirmada.';
+      }
+    }
     await _invalidateSession();
-    errorMessage = null;
+    errorMessage = logoutWarning;
     notifyListeners();
   }
 

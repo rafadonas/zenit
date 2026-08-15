@@ -79,6 +79,20 @@ void main() {
     );
   });
 
+  test('logout revokes the current bearer session', () async {
+    final gateway = HttpZenitGateway(
+      baseUrl: 'https://api.example.test',
+      client: MockClient((request) async {
+        expect(request.method, 'POST');
+        expect(request.url.path, '/v1/auth/logout');
+        expect(request.headers['Authorization'], 'Bearer signed-token');
+        return http.Response('', 204);
+      }),
+    );
+
+    await gateway.logout('signed-token');
+  });
+
   test('downloads prepared orders with bearer authentication', () async {
     final gateway = HttpZenitGateway(
       baseUrl: 'https://api.example.test',
