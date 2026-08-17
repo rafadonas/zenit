@@ -35,42 +35,54 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       id="main-content"
     >
       <section className="login-card" aria-labelledby="login-title">
-        <div className="login-brand">
-          <span className="brand-mark" aria-hidden="true"><i /></span>
-          <div><strong>ZENIT</strong><small>Revisão gerencial</small></div>
+        <div className="login-brand-panel">
+          <div className="login-brand">
+            <span className="brand-mark" aria-hidden="true"><i /></span>
+            <div><strong>ZENIT</strong><small>Vegetation intelligence</small></div>
+          </div>
+          <div className="login-brand-copy">
+            <p className="eyebrow">Dados que orientam</p>
+            <h2>Melhores caminhos.</h2>
+            <p>Monitoramento inteligente da vegetação para uma operação mais segura e eficiente.</p>
+          </div>
+          <div className="login-brand-orbit orbit-one" aria-hidden="true" />
+          <div className="login-brand-orbit orbit-two" aria-hidden="true" />
         </div>
-        <p className="eyebrow">Acesso local do MVP</p>
-        <h1 id="login-title">Entrar para revisar</h1>
-        <p className="subtitle">
-          A identidade autenticada será vinculada à decisão. Nenhuma revisão autoriza trabalho de campo.
-        </p>
-        {message ? <p className="form-message" role="status">{message}</p> : null}
-        <form action="/api/auth/session" className="login-form" method="post">
-          <label htmlFor="email">E-mail</label>
-          <input
-            autoComplete="username"
-            id="email"
-            maxLength={320}
-            name="email"
-            required
-            type="email"
-          />
-          <label htmlFor="password">Senha</label>
-          <input
-            autoComplete="current-password"
-            id="password"
-            maxLength={1024}
-            name="password"
-            required
-            type="password"
-          />
-          <button className="primary-button" type="submit">Entrar</button>
-        </form>
-        <div className="login-safety-note">
-          <strong>Identidade local do MVP</strong>
-          <span>Não use credenciais corporativas ou senhas reutilizadas.</span>
+        <div className="login-form-panel">
+          <p className="eyebrow">Acesso local do MVP</p>
+          <h1 id="login-title">Entrar na plataforma</h1>
+          <p className="subtitle">
+            A identidade autenticada será vinculada à decisão. Nenhuma revisão autoriza trabalho de campo.
+          </p>
+          {message ? <p className="form-message" role="status">{message}</p> : null}
+          <form action="/api/auth/session" className="login-form" method="post">
+            <label htmlFor="email">E-mail</label>
+            <input
+              autoComplete="username"
+              id="email"
+              maxLength={320}
+              name="email"
+              placeholder="nome@empresa.com"
+              required
+              type="email"
+            />
+            <label htmlFor="password">Senha</label>
+            <input
+              autoComplete="current-password"
+              id="password"
+              maxLength={1024}
+              name="password"
+              required
+              type="password"
+            />
+            <button className="primary-button" type="submit">Entrar</button>
+          </form>
+          <div className="login-safety-note">
+            <strong>Identidade local do MVP</strong>
+            <span>Não use credenciais corporativas ou senhas reutilizadas.</span>
+          </div>
+          <Link href="/recommendations">Voltar para a fila somente leitura</Link>
         </div>
-        <Link href="/recommendations">Voltar para a fila somente leitura</Link>
       </section>
     </main>
   );
