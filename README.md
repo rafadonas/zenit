@@ -15,6 +15,7 @@ de campo e relatórios auditáveis.
 - [Estado atual](#estado-atual)
 - [Arquitetura do repositório](#arquitetura-do-repositório)
 - [Início rápido](#início-rápido)
+- [Como rodar cada parte do projeto](#como-rodar-cada-parte-do-projeto)
 - [Dados, proveniência e importação](#dados-proveniência-e-importação)
 - [Banco de dados e migrações](#banco-de-dados-e-migrações)
 - [Fluxos e APIs principais](#fluxos-e-apis-principais)
@@ -195,6 +196,157 @@ locais podem ser selecionados assim:
 export PATH="$PWD/.tools/docker/bin:$PATH"
 export DOCKER_HOST="unix:///run/user/$(id -u)/docker.sock"
 ```
+
+## Como rodar cada parte do projeto
+
+Esta seção explica detalhadamente como executar cada componente do sistema, seja de forma orquestrada (tudo junto via Docker) ou individualmente para desenvolvimento e depuração local.
+
+### 1. Plataforma Completa (Docker Compose)
+
+Suba a pilha inteira (PostgreSQL/PostGIS, MinIO, API FastAPI e Dashboard Next.js):
+
+```bash
+docker compose up --build
+```
+
+Serviços disponibilizados:
+- **Dashboard Next.js**: `http://localhost:3000`
+- **API FastAPI**: `http://localhost:8000` (Healthcheck: `http://localhost:8000/health`)
+- **MinIO Console**: `http://localhost:9001` (Usuário: `zenit`, Senha: `change_me`)
+- **PostgreSQL / PostGIS**: `localhost:5432` (Usuário: `zenit`, Banco: `zenit`)
+
+---
+
+### 2. Banco de Dados e Armazenamento (PostgreSQL + MinIO)
+
+Se for desenvolver serviços locais fora do Docker, suba apenas a infraestrutura básica:
+
+```bash
+docker compose up postgres minio -d
+```
+
+---
+
+### 3. Backend - API (FastAPI / Python)
+
+A API (`services/api`) gerencia endpoints REST/GeoJSON, autenticação, política de revisão e persistência.
+
+```bash
+# 1. Ativar o ambiente virtual e instalar dependências em modo editável
+source .venv/bin/activate
+python -m pip install -e '.[dev]'
+
+# 2. Iniciar a API em modo de desenvolvimento (com reload automático)
+uvicorn zenit_api.main:app --app-dir services/api/src --reload
+```
+
+- API Base: `http://localhost:8000`
+- Documentação interativa Swagger: `http://localhost:8000/docs`
+- Healthcheck: `http://localhost:8000/health`
+
+**Testes e verificações:**
+```bash
+ruff check .                                    # Verificação de linting
+pytest                                          # Testes unitários e de integração
+python scripts/export_openapi.py --check        # Validação do contrato OpenAPI
+```
+
+---
+
+### 4. Frontend - Dashboard (Next.js / TypeScript)
+
+O Dashboard (`apps/dashboard`) oferece a interface de gestão de corredor, filas de inspeção e aprovação.
+
+```bash
+# 1. Instalar dependências (executado na raiz do repositório)
+npm install
+
+# 2. Executar em modo de desenvolvimento
+npm run dev --workspace @zenit/dashboard
+```
+
+- Acesso local: `http://localhost:3000`
+
+**Testes e verificações:**
+```bash
+npm run dashboard:lint       # Lint e regras de acessibilidade JSX
+npm run dashboard:typecheck  # Validação de tipos TypeScript
+npm run dashboard:test       # Suíte de testes do Dashboard
+npm run dashboard:build      # Build para produção
+```
+
+---
+
+### 5. Aplicativo Móvel (Flutter / Android)
+
+O app móvel (`apps/mobile`) é uma aplicação Android offline-first para o trabalho de campo.
+
+```bash
+cd apps/mobile
+
+# 1. Obter dependências do Flutter
+../../.tools/flutter/bin/flutter --no-version-check --suppress-analytics pub get --enforce-lockfile
+
+# 2. Executar no emulador Android ou dispositivo conectado
+../../.tools/flutter/bin/flutter run
+```
+
+Para conectar em um servidor API específico (o padrão no emulador é `http://10.0.2.2:8000`):
+```bash
+../../.tools/flutter/bin/flutter run \
+  --dart-define=ZENIT_API_BASE_URL=http://10.0.2.2:8000 \
+  --dart-define=ZENIT_APP_VERSION=1.0.0+1
+```
+
+**Testes, análise e build do APK:**
+```bash
+cd apps/mobile
+../../.tools/flutter/bin/flutter analyze                             # Análise estática do código
+../../.tools/flutter/bin/flutter test                                # Testes do app Flutter
+../../.tools/flutter/bin/dart format --output=none --set-exit-if-changed lib test  # Checar formatação
+../../.tools/flutter/bin/flutter build apk --debug                  # Gerar APK debug demonstrativo
+```
+
+---
+
+### 6. CLIs e Scripts Utilitários
+
+- **Criar usuário gestor local (`zenit-user`)**:
+  ```bash
+  source .venv/bin/activate
+  zenit-user \
+    --email manager@example.test \
+    --display-name "Gestor local do MVP" \
+    --road-code SP021 \
+    --role manager
+  ```
+
+- **Importador de dados brutos (`zenit-import`)**:
+  ```bash
+  source .venv/bin/activate
+  zenit-import --help
+  ```
+
+- **Descoberta de imagens de satélite (`zenit-satellite`)**:
+  ```bash
+  source .venv/bin/activate
+  zenit-satellite --segment-index 195 --zone left --from-date 2026-07-01 --to-date 2026-08-07
+  ```
+
+- **Renderizar prévia NDVI estática**:
+  ```bash
+  python scripts/render_cached_ndvi_preview.py
+  ```
+
+- **Validação de smoke test da stack ativa**:
+  ```bash
+  python scripts/verify_mvp_stack.py
+  ```
+
+- **Validação do manifesto do APK**:
+  ```bash
+  python scripts/verify_release_evidence.py docs/release-evidence/android-mvp-debug-apk-2026-08-14.json
+  ```
 
 ## Dados, proveniência e importação
 
