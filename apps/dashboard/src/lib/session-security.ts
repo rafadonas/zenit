@@ -195,11 +195,26 @@ export function getRequestOrigin(request: Request): string | null {
 }
 
 export function requestOriginMatches(
-  origin: string | null,
+  requestOrOrigin: Request | string | null,
   expectedOrigin: string,
-  appEnvironment: string = "production",
+  appEnvironment?: string,
 ): boolean {
-  if (origin === null) return false;
+  const env =
+    appEnvironment ??
+    process.env.DASHBOARD_APP_ENV ??
+    process.env.APP_ENV ??
+    "development";
+
+  const origin =
+    requestOrOrigin instanceof Request
+      ? getRequestOrigin(requestOrOrigin)
+      : typeof requestOrOrigin === "string"
+        ? requestOrOrigin
+        : null;
+
+  if (origin === null) {
+    return ["development", "test", "demo"].includes(env);
+  }
   try {
     const originUrl = new URL(origin);
     const expectedUrl = new URL(expectedOrigin);
@@ -207,7 +222,7 @@ export function requestOriginMatches(
       return true;
     }
     if (
-      ["development", "test", "demo"].includes(appEnvironment) &&
+      ["development", "test", "demo"].includes(env) &&
       isLoopbackOrLocalHost(originUrl.hostname)
     ) {
       return true;
