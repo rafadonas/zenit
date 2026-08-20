@@ -5,13 +5,15 @@ import {
   CSRF_COOKIE_NAME,
   csrfTokensMatch,
   getDashboardSecurityConfig,
+  getRequestOrigin,
   requestOriginMatches,
   SESSION_COOKIE_NAME,
 } from "../../../../lib/session-security";
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
   const config = getDashboardSecurityConfig();
-  if (!requestOriginMatches(request.headers.get("origin"), config.publicOrigin)) {
+  const requestOrigin = getRequestOrigin(request);
+  if (!requestOriginMatches(requestOrigin, config.publicOrigin, config.appEnvironment)) {
     return NextResponse.json({ detail: "Cross-origin logout rejected" }, { status: 403 });
   }
 
@@ -44,8 +46,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   }
 
   const logoutStatus = remotelyRevoked ? "signed-out" : "signed-out-local";
+  const destinationOrigin = requestOrigin ?? config.publicOrigin;
   const response = NextResponse.redirect(
-    new URL(`/login?status=${logoutStatus}`, config.publicOrigin),
+    new URL(`/login?status=${logoutStatus}`, destinationOrigin),
     303,
   );
   clearDashboardSessionCookies(response, config);

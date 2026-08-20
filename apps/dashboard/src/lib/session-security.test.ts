@@ -32,10 +32,17 @@ describe("dashboard session security", () => {
     ).toThrow(/HTTPS/);
   });
 
-  it("accepts only the exact configured request origin", () => {
-    expect(requestOriginMatches("http://localhost:3000", "http://localhost:3000")).toBe(true);
-    expect(requestOriginMatches("http://attacker.test", "http://localhost:3000")).toBe(false);
-    expect(requestOriginMatches(null, "http://localhost:3000")).toBe(false);
+  it("accepts only the exact configured request origin in production", () => {
+    expect(requestOriginMatches("http://localhost:3000", "http://localhost:3000", "production")).toBe(true);
+    expect(requestOriginMatches("http://127.0.0.1:3000", "http://localhost:3000", "production")).toBe(false);
+    expect(requestOriginMatches("http://attacker.test", "http://localhost:3000", "production")).toBe(false);
+    expect(requestOriginMatches(null, "http://localhost:3000", "production")).toBe(false);
+  });
+
+  it("accepts equivalent loopback origins in development", () => {
+    expect(requestOriginMatches("http://127.0.0.1:3000", "http://localhost:3000", "development")).toBe(true);
+    expect(requestOriginMatches("http://localhost:3000", "http://127.0.0.1:3000", "development")).toBe(true);
+    expect(requestOriginMatches("http://attacker.test", "http://localhost:3000", "development")).toBe(false);
   });
 
   it("compares well-formed CSRF tokens and fails closed", () => {

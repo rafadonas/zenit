@@ -156,10 +156,51 @@ export function getDashboardSecurityConfig(
   };
 }
 
-export function requestOriginMatches(origin: string | null, expectedOrigin: string): boolean {
+function isLoopbackHost(hostname: string): boolean {
+  return (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "[::1]" ||
+    hostname === "::1"
+  );
+}
+
+export function getRequestOrigin(request: Request): string | null {
+  const origin = request.headers.get("origin");
+  if (origin) return origin;
+  const referer = request.headers.get("referer");
+  if (referer) {
+    try {
+      return new URL(referer).origin;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+export function requestOriginMatches(
+  origin: string | null,
+  expectedOrigin: string,
+  appEnvironment: string = "production",
+): boolean {
   if (origin === null) return false;
   try {
-    return new URL(origin).origin === expectedOrigin && origin === expectedOrigin;
+    const originUrl = new URL(origin);
+    const expectedUrl = new URL(expectedOrigin);
+    if (originUrl.origin === expectedUrl.origin && origin === expectedOrigin) {
+      return true;
+    }
+    if (
+      ["development", "test", "demo"].includes(appEnvironment) &&
+      isLoopbackHost(originUrl.hostname) &&
+      isLoopbackHost(expectedUrl.hostname) &&
+      originUrl.port === expectedUrl.port &&
+      originUrl.protocol === expectedUrl.protocol
+    ) {
+      return true;
+    }
+    return false;
   } catch {
     return false;
   }
