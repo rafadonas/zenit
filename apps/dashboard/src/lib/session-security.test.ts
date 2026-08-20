@@ -16,6 +16,7 @@ import {
   parsePreparedProposalReviewSubmission,
   parsePreparedSummaryExportSubmission,
   parsePreparedSummarySubmission,
+  getRequestOrigin,
   requestOriginMatches,
 } from "./session-security";
 
@@ -43,6 +44,23 @@ describe("dashboard session security", () => {
     expect(requestOriginMatches("http://127.0.0.1:3000", "http://localhost:3000", "development")).toBe(true);
     expect(requestOriginMatches("http://localhost:3000", "http://127.0.0.1:3000", "development")).toBe(true);
     expect(requestOriginMatches("http://attacker.test", "http://localhost:3000", "development")).toBe(false);
+  });
+
+  it("extracts request origin from origin, referer, or host headers", () => {
+    const fromOrigin = new Request("http://localhost:3000/api/auth/session", {
+      headers: { origin: "http://localhost:3000" },
+    });
+    expect(getRequestOrigin(fromOrigin)).toBe("http://localhost:3000");
+
+    const fromReferer = new Request("http://localhost:3000/api/auth/session", {
+      headers: { referer: "http://127.0.0.1:3000/login" },
+    });
+    expect(getRequestOrigin(fromReferer)).toBe("http://127.0.0.1:3000");
+
+    const fromHost = new Request("http://localhost:3000/api/auth/session", {
+      headers: { host: "127.0.0.1:3000" },
+    });
+    expect(getRequestOrigin(fromHost)).toBe("http://127.0.0.1:3000");
   });
 
   it("compares well-formed CSRF tokens and fails closed", () => {

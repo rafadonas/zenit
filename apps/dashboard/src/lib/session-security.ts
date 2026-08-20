@@ -156,12 +156,18 @@ export function getDashboardSecurityConfig(
   };
 }
 
-function isLoopbackHost(hostname: string): boolean {
+function isLoopbackOrLocalHost(hostname: string): boolean {
   return (
     hostname === "localhost" ||
     hostname === "127.0.0.1" ||
+    hostname === "0.0.0.0" ||
     hostname === "[::1]" ||
-    hostname === "::1"
+    hostname === "::1" ||
+    hostname.endsWith(".local") ||
+    /^127\.\d+\.\d+\.\d+$/.test(hostname) ||
+    /^192\.168\.\d+\.\d+$/.test(hostname) ||
+    /^10\.\d+\.\d+\.\d+$/.test(hostname) ||
+    /^172\.(1[6-9]|2\d|3[0-1])\.\d+\.\d+$/.test(hostname)
   );
 }
 
@@ -173,7 +179,16 @@ export function getRequestOrigin(request: Request): string | null {
     try {
       return new URL(referer).origin;
     } catch {
-      return null;
+      // ignore
+    }
+  }
+  const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+  if (host) {
+    const proto = request.headers.get("x-forwarded-proto") ?? "http";
+    try {
+      return new URL(`${proto}://${host}`).origin;
+    } catch {
+      // ignore
     }
   }
   return null;
@@ -193,10 +208,7 @@ export function requestOriginMatches(
     }
     if (
       ["development", "test", "demo"].includes(appEnvironment) &&
-      isLoopbackHost(originUrl.hostname) &&
-      isLoopbackHost(expectedUrl.hostname) &&
-      originUrl.port === expectedUrl.port &&
-      originUrl.protocol === expectedUrl.protocol
+      isLoopbackOrLocalHost(originUrl.hostname)
     ) {
       return true;
     }
