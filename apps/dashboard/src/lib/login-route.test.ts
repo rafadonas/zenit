@@ -18,6 +18,24 @@ function loginRequest(origin = "http://localhost:3000"): NextRequest {
   });
 }
 
+function opaqueOriginLoginRequest(): NextRequest {
+  return new NextRequest("http://localhost:3000/api/auth/session", {
+    body: new URLSearchParams({
+      email: "manager@example.test",
+      password: "local-test-password",
+    }),
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      Host: "localhost:3000",
+      Origin: "null",
+      "Sec-Fetch-Dest": "document",
+      "Sec-Fetch-Mode": "navigate",
+      "Sec-Fetch-Site": "same-origin",
+    },
+    method: "POST",
+  });
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
 });
@@ -58,6 +76,29 @@ describe("dashboard login route", () => {
     expect(cookies).toContain(`${CSRF_COOKIE_NAME}=`);
     expect(cookies).toContain("HttpOnly");
     expect(cookies).toContain("SameSite=strict");
+  });
+
+  it("accepts Chrome opaque origins for same-origin local navigation", async () => {
+    const apiFetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          access_token: "signed-token-value-that-is-long-enough",
+          expires_in: 1800,
+          token_type: "bearer",
+          user: { id: "user-1" },
+        }),
+        { headers: { "Content-Type": "application/json" }, status: 200 },
+      ),
+    );
+    vi.stubGlobal("fetch", apiFetch);
+
+    const response = await POST(opaqueOriginLoginRequest());
+
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe(
+      "http://localhost:3000/recommendations?auth=signed-in",
+    );
+    expect(apiFetch).toHaveBeenCalledOnce();
   });
 
   it("preserves the API login-throttle outcome without exposing its body", async () => {

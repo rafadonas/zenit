@@ -182,6 +182,10 @@ export function getRequestOrigin(request: Request): string | null {
       // ignore
     }
   }
+  return getRequestHostOrigin(request);
+}
+
+export function getRequestHostOrigin(request: Request): string | null {
   const host = request.headers.get("x-forwarded-host") ?? request.headers.get("host");
   if (host) {
     const proto = request.headers.get("x-forwarded-proto") ?? "http";
@@ -205,15 +209,32 @@ export function requestOriginMatches(
     process.env.APP_ENV ??
     "development";
 
+  const request = requestOrOrigin instanceof Request ? requestOrOrigin : null;
   const origin =
-    requestOrOrigin instanceof Request
-      ? getRequestOrigin(requestOrOrigin)
+    request
+      ? getRequestOrigin(request)
       : typeof requestOrOrigin === "string"
         ? requestOrOrigin
         : null;
 
   if (origin === null) {
     return ["development", "test", "demo"].includes(env);
+  }
+  if (origin === "null") {
+    if (!request || !["development", "test"].includes(env)) return false;
+    try {
+      const requestHostOrigin = getRequestHostOrigin(request);
+      if (!requestHostOrigin) return false;
+      const requestHostUrl = new URL(requestHostOrigin);
+      return (
+        isLoopbackOrLocalHost(requestHostUrl.hostname) &&
+        request.headers.get("sec-fetch-site") === "same-origin" &&
+        request.headers.get("sec-fetch-mode") === "navigate" &&
+        request.headers.get("sec-fetch-dest") === "document"
+      );
+    } catch {
+      return false;
+    }
   }
   try {
     const originUrl = new URL(origin);

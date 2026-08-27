@@ -661,6 +661,11 @@ do texto secundário nas superfícies principais.
 O servidor do dashboard usa `INTERNAL_API_URL`, cujo padrão é
 `http://localhost:8000`. O token bearer fica em cookie `HttpOnly` no servidor;
 mutações exigem token CSRF, `Origin` exata e cookie `SameSite=Strict`.
+Como compatibilidade restrita ao login local em `development`/`test`, uma
+navegação de documento com `Origin: null` só é aceita quando o `Host` é local e
+os cabeçalhos Fetch Metadata confirmam uma navegação de mesma origem; a exceção
+não se aplica a `demo`, staging, produção ou às demais mutações. Consulte a
+[ADR-0062](docs/decisions/ADR-0062-local-opaque-origin-login-navigation.md).
 Todas as rotas recebem o
 [baseline de headers HTTP](docs/security/dashboard-http-headers.md), incluindo
 anti-clickjacking, `nosniff`, referrer restrito, isolamento de opener e bloqueio

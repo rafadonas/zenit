@@ -63,6 +63,33 @@ describe("dashboard session security", () => {
     expect(getRequestOrigin(fromHost)).toBe("http://127.0.0.1:3000");
   });
 
+  it("accepts an opaque origin only for a same-origin local document navigation", () => {
+    const localNavigation = new Request("http://localhost:3000/api/auth/session", {
+      headers: {
+        host: "localhost:3000",
+        origin: "null",
+        "sec-fetch-dest": "document",
+        "sec-fetch-mode": "navigate",
+        "sec-fetch-site": "same-origin",
+      },
+      method: "POST",
+    });
+    expect(requestOriginMatches(localNavigation, "http://127.0.0.1:3000", "development")).toBe(true);
+    expect(requestOriginMatches(localNavigation, "http://localhost:3000", "production")).toBe(false);
+
+    const crossSiteNavigation = new Request("http://localhost:3000/api/auth/session", {
+      headers: {
+        host: "localhost:3000",
+        origin: "null",
+        "sec-fetch-dest": "document",
+        "sec-fetch-mode": "navigate",
+        "sec-fetch-site": "cross-site",
+      },
+      method: "POST",
+    });
+    expect(requestOriginMatches(crossSiteNavigation, "http://127.0.0.1:3000", "development")).toBe(false);
+  });
+
   it("compares well-formed CSRF tokens and fails closed", () => {
     expect(csrfTokensMatch(csrfToken, csrfToken)).toBe(true);
     expect(csrfTokensMatch(csrfToken, "b".repeat(64))).toBe(false);

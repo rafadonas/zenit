@@ -6,6 +6,7 @@ import { isAccessTokenContract } from "../../../../lib/auth-contracts";
 import { setDashboardSessionCookies } from "../../../../lib/dashboard-cookies";
 import {
   getDashboardSecurityConfig,
+  getRequestHostOrigin,
   getRequestOrigin,
   requestOriginMatches,
 } from "../../../../lib/session-security";
@@ -21,15 +22,19 @@ function redirectToLogin(publicOrigin: string, error: string, requestOrigin?: st
 export async function POST(request: Request): Promise<NextResponse> {
   const config = getDashboardSecurityConfig();
   const requestOrigin = getRequestOrigin(request);
-  if (!requestOriginMatches(requestOrigin, config.publicOrigin, config.appEnvironment)) {
+  if (!requestOriginMatches(request, config.publicOrigin, config.appEnvironment)) {
     return NextResponse.json({ detail: "Cross-origin login rejected" }, { status: 403 });
   }
+  const navigationOrigin =
+    requestOrigin === "null"
+      ? (getRequestHostOrigin(request) ?? config.publicOrigin)
+      : (requestOrigin ?? config.publicOrigin);
 
   let form: FormData;
   try {
     form = await request.formData();
   } catch {
-    return redirectToLogin(config.publicOrigin, "invalid-request", requestOrigin);
+    return redirectToLogin(config.publicOrigin, "invalid-request", navigationOrigin);
   }
   const email = form.get("email");
   const password = form.get("password");
@@ -41,7 +46,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     password.length < 1 ||
     password.length > 1024
   ) {
-    return redirectToLogin(config.publicOrigin, "invalid-request", requestOrigin);
+    return redirectToLogin(config.publicOrigin, "invalid-request", navigationOrigin);
   }
 
   const baseUrl = process.env.INTERNAL_API_URL ?? "http://localhost:8000";
@@ -55,7 +60,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       method: "POST",
     });
   } catch {
-    return redirectToLogin(config.publicOrigin, "service-unavailable", requestOrigin);
+    return redirectToLogin(config.publicOrigin, "service-unavailable", navigationOrigin);
   }
   if (!apiResponse.ok) {
     const error =
@@ -67,18 +72,17 @@ export async function POST(request: Request): Promise<NextResponse> {
     return redirectToLogin(
       config.publicOrigin,
       error,
-      requestOrigin,
+      navigationOrigin,
     );
   }
 
   const payload: unknown = await apiResponse.json();
   if (!isAccessTokenContract(payload)) {
-    return redirectToLogin(config.publicOrigin, "service-unavailable", requestOrigin);
+    return redirectToLogin(config.publicOrigin, "service-unavailable", navigationOrigin);
   }
 
-  const destinationOrigin = requestOrigin ?? config.publicOrigin;
   const response = NextResponse.redirect(
-    new URL("/recommendations?auth=signed-in", destinationOrigin),
+    new URL("/recommendations?auth=signed-in", navigationOrigin),
     303,
   );
   setDashboardSessionCookies(
