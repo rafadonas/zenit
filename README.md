@@ -177,7 +177,8 @@ Serviços locais:
 
 | Serviço | Endereço |
 | --- | --- |
-| Dashboard | `http://localhost:3000` |
+| Dashboard — Gerente MVP | `http://localhost:3000` |
+| Dashboard — Supervisor MVP | `http://localhost:3002` |
 | API | `http://localhost:8000` |
 | Healthcheck | `http://localhost:8000/health` |
 | PostgreSQL/PostGIS | `localhost:5432` |
@@ -210,7 +211,8 @@ docker compose up --build
 ```
 
 Serviços disponibilizados:
-- **Dashboard Next.js**: `http://localhost:3000`
+- **Dashboard Next.js — Gerente MVP**: `http://localhost:3000`
+- **Dashboard Next.js — Supervisor MVP**: `http://localhost:3002`
 - **API FastAPI**: `http://localhost:8000` (Healthcheck: `http://localhost:8000/health`)
 - **MinIO Console**: `http://localhost:9001` (Usuário: `zenit`, Senha: `change_me`)
 - **PostgreSQL / PostGIS**: `localhost:5432` (Usuário: `zenit`, Banco: `zenit`)
@@ -441,6 +443,27 @@ acima do limite aplicável retorna `mowing_review`, que ainda exige decisão
 humana.
 
 ### Autenticação e decisão humana
+
+No Compose local, o dashboard usa sessões fixas por porta para permitir a
+visualização simultânea das telas dos dois usuários preparados, sem formulário
+de login:
+
+| Porta | Identidade fixa padrão |
+| --- | --- |
+| `http://localhost:3000` | `manager@example.com` |
+| `http://localhost:3002` | `supervisor@example.com` |
+
+Os e-mails podem ser trocados por `DASHBOARD_MANAGER_EMAIL` e
+`DASHBOARD_SUPERVISOR_EMAIL`. Os nomes de cookie são diferentes entre as
+instâncias porque cookies de `localhost` são compartilhados entre portas. O
+dashboard cria automaticamente um token curto e uma sessão persistida; assim,
+ações continuam vinculadas ao usuário fixo da porta e sujeitas ao RBAC da API.
+
+Esse acesso direto é restrito a `development` e `demo`. Qualquer pessoa que
+alcance uma dessas portas pode agir como a identidade correspondente, portanto
+as portas não devem ser publicadas na internet nem usadas em homologação ou
+produção. Para desativar o modo, use `AUTH_FIXED_SESSION_ENABLED=false` e remova
+`DASHBOARD_FIXED_USER_EMAIL`/`DASHBOARD_FIXED_SESSION_SECRET` da instância.
 
 Crie um usuário local após a migração `0009`; nenhuma credencial padrão é
 versionada:

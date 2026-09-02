@@ -36,6 +36,10 @@ class Settings(BaseSettings):
         max_length=100,
         pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$",
     )
+    auth_fixed_session_enabled: bool = False
+    auth_fixed_session_secret: SecretStr = SecretStr(
+        "development-only-change-this-fixed-session-secret"
+    )
     recommendation_review_policy_version: str = "recommendation-review-mvp-v1"
     inspection_order_policy_version: str = "prepared-inspection-order-v1"
     prepared_photo_review_policy_version: str = "prepared-photo-review-v1"
@@ -92,6 +96,20 @@ class Settings(BaseSettings):
         ):
             raise ValueError(
                 "AUTH_SECRET_KEY must be a non-default value of at least 32 characters"
+            )
+        if self.auth_fixed_session_enabled and self.app_env not in {
+            "development",
+            "test",
+            "demo",
+        }:
+            raise ValueError(
+                "AUTH_FIXED_SESSION_ENABLED is restricted to development, test, and demo"
+            )
+        if self.auth_fixed_session_enabled and len(
+            self.auth_fixed_session_secret.get_secret_value()
+        ) < 32:
+            raise ValueError(
+                "AUTH_FIXED_SESSION_SECRET must contain at least 32 characters"
             )
         if self.app_env in {"staging", "production"} and (
             self.object_storage_secret_key.get_secret_value() == "change_me"

@@ -15,6 +15,7 @@ from zenit_api.auth import (
     UserIdentity,
     create_access_token,
     decode_access_token,
+    get_auth_settings,
     get_authentication_session_store,
     get_current_user,
     get_identity_reader,
@@ -184,6 +185,96 @@ def test_login_returns_a_scoped_expiring_token_without_password_data() -> None:
     registered_session = next(iter(session_store.sessions.values()))
     assert registered_session.user_id == USER_ID
     assert registered_session.correlation_id == UUID(response.headers["x-correlation-id"])
+
+
+def test_fixed_dashboard_session_issues_an_audited_user_token_without_a_password() -> None:
+    reader = FakeIdentityReader()
+    session_store = FakeAuthenticationSessionStore()
+    settings = Settings(
+        app_env="test",
+        auth_fixed_session_enabled=True,
+        auth_fixed_session_secret="fixed-session-secret-that-is-long-enough",
+    )
+
+    async def fake_reader() -> FakeIdentityReader:
+        return reader
+
+    async def fake_session_store() -> FakeAuthenticationSessionStore:
+        return session_store
+
+    async def fake_settings() -> Settings:
+        return settings
+
+    async def request():
+        app.dependency_overrides[get_identity_reader] = fake_reader
+        app.dependency_overrides[get_authentication_session_store] = fake_session_store
+        app.dependency_overrides[get_auth_settings] = fake_settings
+        try:
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                return await client.post(
+                    "/v1/auth/fixed-session",
+                    json={"email": " Manager@Example.Test "},
+                    headers={
+                        "X-Zenit-Fixed-Session-Secret": (
+                            "fixed-session-secret-that-is-long-enough"
+                        )
+                    },
+                )
+        finally:
+            app.dependency_overrides.clear()
+
+    response = asyncio.run(request())
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["user"]["id"] == str(USER_ID)
+    assert "password" not in response.text
+    assert decode_access_token(payload["access_token"], settings) == USER_ID
+    assert len(session_store.sessions) == 1
+    registered_session = next(iter(session_store.sessions.values()))
+    assert registered_session.user_id == USER_ID
+    assert registered_session.correlation_id == UUID(response.headers["x-correlation-id"])
+
+
+def test_fixed_dashboard_session_is_hidden_when_disabled_or_rejects_bad_secret() -> None:
+    reader = FakeIdentityReader()
+    session_store = FakeAuthenticationSessionStore()
+
+    async def fake_reader() -> FakeIdentityReader:
+        return reader
+
+    async def fake_session_store() -> FakeAuthenticationSessionStore:
+        return session_store
+
+    async def request(settings: Settings, secret: str) -> int:
+        async def fake_settings() -> Settings:
+            return settings
+
+        app.dependency_overrides[get_identity_reader] = fake_reader
+        app.dependency_overrides[get_authentication_session_store] = fake_session_store
+        app.dependency_overrides[get_auth_settings] = fake_settings
+        try:
+            transport = ASGITransport(app=app)
+            async with AsyncClient(transport=transport, base_url="http://test") as client:
+                response = await client.post(
+                    "/v1/auth/fixed-session",
+                    json={"email": "manager@example.test"},
+                    headers={"X-Zenit-Fixed-Session-Secret": secret},
+                )
+                return response.status_code
+        finally:
+            app.dependency_overrides.clear()
+
+    disabled = Settings(app_env="test")
+    enabled = Settings(
+        app_env="test",
+        auth_fixed_session_enabled=True,
+        auth_fixed_session_secret="fixed-session-secret-that-is-long-enough",
+    )
+    assert asyncio.run(request(disabled, "fixed-session-secret-that-is-long-enough")) == 404
+    assert asyncio.run(request(enabled, "incorrect-fixed-session-secret-value")) == 401
+    assert session_store.sessions == {}
 
 
 def test_login_uses_the_same_generic_failure_for_invalid_credentials() -> None:
@@ -428,6 +519,18 @@ def test_signed_token_without_a_registered_session_is_rejected() -> None:
 def test_staging_rejects_the_development_signing_secret() -> None:
     with pytest.raises(ValidationError, match="AUTH_SECRET_KEY"):
         Settings(app_env="staging")
+
+
+def test_fixed_dashboard_session_cannot_be_enabled_in_staging() -> None:
+    with pytest.raises(ValidationError, match="AUTH_FIXED_SESSION_ENABLED"):
+        Settings(
+            app_env="staging",
+            auth_secret_key="a" * 32,
+            auth_fixed_session_enabled=True,
+            auth_fixed_session_secret="fixed-session-secret-that-is-long-enough",
+            object_storage_secret_key="non-default-secret",
+            object_storage_media_encryption_key=base64.b64encode(b"k" * 32).decode(),
+        )
 
 
 def test_login_throttle_policy_version_rejects_untracked_free_text() -> None:

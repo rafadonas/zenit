@@ -93,6 +93,8 @@ services:
       AUTH_LOGIN_WINDOW_SECONDS: ${AUTH_LOGIN_WINDOW_SECONDS:-900}
       AUTH_LOGIN_BLOCK_SECONDS: ${AUTH_LOGIN_BLOCK_SECONDS:-900}
       AUTH_LOGIN_THROTTLE_POLICY_VERSION: ${AUTH_LOGIN_THROTTLE_POLICY_VERSION:-local-login-throttle-v1}
+      AUTH_FIXED_SESSION_ENABLED: ${AUTH_FIXED_SESSION_ENABLED:-true}
+      AUTH_FIXED_SESSION_SECRET: ${AUTH_FIXED_SESSION_SECRET:-development-only-change-this-fixed-session-secret}
       RECOMMENDATION_REVIEW_POLICY_VERSION: ${RECOMMENDATION_REVIEW_POLICY_VERSION:-recommendation-review-mvp-v1}
       INSPECTION_ORDER_POLICY_VERSION: ${INSPECTION_ORDER_POLICY_VERSION:-prepared-inspection-order-v1}
       PREPARED_PHOTO_REVIEW_POLICY_VERSION: ${PREPARED_PHOTO_REVIEW_POLICY_VERSION:-prepared-photo-review-v1}
@@ -125,6 +127,7 @@ services:
     restart: unless-stopped
 
   dashboard:
+    image: zenit-dashboard
     build:
       context: .
       dockerfile: apps/dashboard/Dockerfile
@@ -133,8 +136,35 @@ services:
       DASHBOARD_APP_ENV: ${APP_ENV:-development}
       DASHBOARD_PUBLIC_ORIGIN: ${DASHBOARD_PUBLIC_ORIGIN:-http://localhost:3000}
       DASHBOARD_COOKIE_SECURE: ${DASHBOARD_COOKIE_SECURE:-false}
+      DASHBOARD_FIXED_USER_EMAIL: ${DASHBOARD_MANAGER_EMAIL:-manager@example.com}
+      DASHBOARD_FIXED_SESSION_SECRET: ${AUTH_FIXED_SESSION_SECRET:-development-only-change-this-fixed-session-secret}
+      DASHBOARD_SESSION_COOKIE_NAME: zenit_manager_session
+      DASHBOARD_CSRF_COOKIE_NAME: zenit_manager_csrf
     ports:
       - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:3000/api/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  dashboard-supervisor:
+    image: zenit-dashboard
+    environment:
+      INTERNAL_API_URL: http://api:8000
+      DASHBOARD_APP_ENV: ${APP_ENV:-development}
+      DASHBOARD_PUBLIC_ORIGIN: ${DASHBOARD_SUPERVISOR_PUBLIC_ORIGIN:-http://localhost:3002}
+      DASHBOARD_COOKIE_SECURE: ${DASHBOARD_COOKIE_SECURE:-false}
+      DASHBOARD_FIXED_USER_EMAIL: ${DASHBOARD_SUPERVISOR_EMAIL:-supervisor@example.com}
+      DASHBOARD_FIXED_SESSION_SECRET: ${AUTH_FIXED_SESSION_SECRET:-development-only-change-this-fixed-session-secret}
+      DASHBOARD_SESSION_COOKIE_NAME: zenit_supervisor_session
+      DASHBOARD_CSRF_COOKIE_NAME: zenit_supervisor_csrf
+    ports:
+      - "3002:3000"
     depends_on:
       api:
         condition: service_healthy

@@ -2,17 +2,18 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from secrets import compare_digest
 from typing import Annotated, Literal, Protocol
 from uuid import UUID, uuid4
 
 import jwt
 import psycopg
-from fastapi import APIRouter, Depends, Form, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, Form, Header, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordBearer
 from jwt.exceptions import InvalidTokenError
 from pwdlib import PasswordHash
 from pwdlib.exceptions import UnknownHashError
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from zenit_api.auth_sessions import (
     AuthenticationSessionRecord,
@@ -158,6 +159,10 @@ class AuthenticatedContextResponse(BaseModel):
     road_roles: list[RoadRoleResponse]
 
 
+class FixedSessionRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+
+
 async def get_identity_reader() -> IdentityReader:
     return PostgresIdentityRepository(get_settings().database_url)
 
@@ -251,6 +256,47 @@ def _login_rate_limit_error(retry_after: int) -> HTTPException:
         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
         detail="Too many login attempts; retry later",
         headers={"Retry-After": str(retry_after)},
+    )
+
+
+async def _issue_access_token(
+    identity: UserIdentity,
+    *,
+    request: Request,
+    session_store: AuthenticationSessionStore,
+    settings: Settings,
+) -> AccessTokenResponse:
+    issued_at = datetime.now(UTC)
+    session_id = uuid4()
+    token, expires_in = create_access_token(
+        identity.id,
+        settings,
+        now=issued_at,
+        session_id=session_id,
+    )
+    request_correlation_id = getattr(request.state, "correlation_id", None)
+    correlation_id = (
+        request_correlation_id if isinstance(request_correlation_id, UUID) else uuid4()
+    )
+    await session_store.register(
+        AuthenticationSessionRecord(
+            id=session_id,
+            user_id=identity.id,
+            token_issuer=settings.auth_token_issuer,
+            token_audience=settings.auth_token_audience,
+            issued_at=issued_at,
+            expires_at=issued_at + timedelta(seconds=expires_in),
+            correlation_id=correlation_id,
+        )
+    )
+    return AccessTokenResponse(
+        access_token=token,
+        expires_in=expires_in,
+        user=AuthenticatedUserResponse(
+            id=identity.id,
+            email=identity.email,
+            display_name=identity.display_name,
+        ),
     )
 
 
@@ -377,33 +423,51 @@ async def login_for_access_token(
         correlation_id=correlation_id,
         now=now,
     )
-    issued_at = datetime.now(UTC)
-    session_id = uuid4()
-    token, expires_in = create_access_token(
-        identity.id,
-        settings,
-        now=issued_at,
-        session_id=session_id,
+    return await _issue_access_token(
+        identity,
+        request=request,
+        session_store=session_store,
+        settings=settings,
     )
-    await session_store.register(
-        AuthenticationSessionRecord(
-            id=session_id,
-            user_id=identity.id,
-            token_issuer=settings.auth_token_issuer,
-            token_audience=settings.auth_token_audience,
-            issued_at=issued_at,
-            expires_at=issued_at + timedelta(seconds=expires_in),
-            correlation_id=correlation_id,
-        )
-    )
-    return AccessTokenResponse(
-        access_token=token,
-        expires_in=expires_in,
-        user=AuthenticatedUserResponse(
-            id=identity.id,
-            email=identity.email,
-            display_name=identity.display_name,
-        ),
+
+
+@router.post(
+    "/fixed-session",
+    response_model=AccessTokenResponse,
+    include_in_schema=False,
+)
+async def create_fixed_dashboard_session(
+    payload: FixedSessionRequest,
+    request: Request,
+    reader: Annotated[IdentityReader, Depends(get_identity_reader)],
+    session_store: Annotated[
+        AuthenticationSessionStore, Depends(get_authentication_session_store)
+    ],
+    settings: Annotated[Settings, Depends(get_auth_settings)],
+    fixed_session_secret: Annotated[
+        str | None,
+        Header(alias="X-Zenit-Fixed-Session-Secret"),
+    ] = None,
+) -> AccessTokenResponse:
+    if not settings.auth_fixed_session_enabled:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    configured_secret = settings.auth_fixed_session_secret.get_secret_value()
+    if fixed_session_secret is None or not compare_digest(
+        fixed_session_secret,
+        configured_secret,
+    ):
+        raise _credentials_error()
+    normalized_email = payload.email.strip().lower()
+    if len(normalized_email) < 3 or len(normalized_email) > 320:
+        raise _credentials_error()
+    identity = await reader.by_email(normalized_email)
+    if identity is None or identity.status != "active":
+        raise _credentials_error()
+    return await _issue_access_token(
+        identity,
+        request=request,
+        session_store=session_store,
+        settings=settings,
     )
 
 

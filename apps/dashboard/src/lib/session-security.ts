@@ -1,7 +1,23 @@
 import { timingSafeEqual } from "node:crypto";
 
-export const SESSION_COOKIE_NAME = "zenit_session";
-export const CSRF_COOKIE_NAME = "zenit_csrf";
+const COOKIE_NAME_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
+function configuredCookieName(environmentName: string, fallback: string): string {
+  const value = process.env[environmentName] ?? fallback;
+  if (!COOKIE_NAME_PATTERN.test(value)) {
+    throw new Error(`${environmentName} is invalid`);
+  }
+  return value;
+}
+
+export const SESSION_COOKIE_NAME = configuredCookieName(
+  "DASHBOARD_SESSION_COOKIE_NAME",
+  "zenit_session",
+);
+export const CSRF_COOKIE_NAME = configuredCookieName(
+  "DASHBOARD_CSRF_COOKIE_NAME",
+  "zenit_csrf",
+);
 
 export interface DashboardSecurityConfig {
   appEnvironment: "development" | "test" | "demo" | "staging" | "production";
