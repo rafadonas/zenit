@@ -448,10 +448,10 @@ No Compose local, o dashboard usa sessões fixas por porta para permitir a
 visualização simultânea das telas dos dois usuários preparados, sem formulário
 de login:
 
-| Porta | Identidade fixa padrão |
-| --- | --- |
-| `http://localhost:3000` | `manager@example.com` |
-| `http://localhost:3002` | `supervisor@example.com` |
+| Porta | Identidade fixa padrão | Área inicial |
+| --- | --- | --- |
+| `http://localhost:3000` | `manager@example.com` | Recomendações e planejamento |
+| `http://localhost:3002` | `supervisor@example.com` | Revisão de fotos pós-serviço |
 
 Os e-mails podem ser trocados por `DASHBOARD_MANAGER_EMAIL` e
 `DASHBOARD_SUPERVISOR_EMAIL`. Os nomes de cookie são diferentes entre as

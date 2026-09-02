@@ -1,5 +1,6 @@
 export interface FixedDashboardSessionConfig {
   email: string;
+  homePath: string;
   secret: string;
 }
 
@@ -25,7 +26,12 @@ export function getFixedDashboardSessionConfig(
   if (secret.length < 32) {
     throw new Error("DASHBOARD_FIXED_SESSION_SECRET must contain at least 32 characters");
   }
-  return { email, secret };
+  const configuredHomePath = environment.DASHBOARD_FIXED_HOME_PATH ?? "/recommendations";
+  const homePath = safeReturnPath(configuredHomePath);
+  if (homePath === "/" && configuredHomePath !== "/") {
+    throw new Error("DASHBOARD_FIXED_HOME_PATH is invalid");
+  }
+  return { email, homePath, secret };
 }
 
 export function safeReturnPath(value: string | null): string {

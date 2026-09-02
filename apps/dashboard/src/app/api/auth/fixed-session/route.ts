@@ -52,7 +52,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   const securityConfig = getDashboardSecurityConfig();
-  const returnPath = safeReturnPath(request.nextUrl.searchParams.get("return_to"));
+  const requestedReturnPath = safeReturnPath(request.nextUrl.searchParams.get("return_to"));
+  const returnPath = requestedReturnPath === "/" ? fixedConfig.homePath : requestedReturnPath;
   const response = NextResponse.redirect(new URL(returnPath, securityConfig.publicOrigin), 303);
   setDashboardSessionCookies(
     response,

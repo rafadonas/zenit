@@ -14,12 +14,14 @@ describe("fixed dashboard session configuration", () => {
   it("accepts a complete local fixed identity", () => {
     expect(
       getFixedDashboardSessionConfig({
-        DASHBOARD_APP_ENV: "demo",
+      DASHBOARD_APP_ENV: "demo",
+      DASHBOARD_FIXED_HOME_PATH: "/photo-reviews",
         DASHBOARD_FIXED_SESSION_SECRET: "fixed-session-secret-that-is-long-enough",
         DASHBOARD_FIXED_USER_EMAIL: " Manager@Example.Test ",
       }),
     ).toEqual({
       email: "manager@example.test",
+      homePath: "/photo-reviews",
       secret: "fixed-session-secret-that-is-long-enough",
     });
   });

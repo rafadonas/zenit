@@ -14,8 +14,8 @@ export function proxy(request: NextRequest): NextResponse {
   destination.pathname = "/api/auth/fixed-session";
   destination.search = "";
   const returnPath =
-    request.nextUrl.pathname === "/login"
-      ? "/"
+    request.nextUrl.pathname === "/login" || request.nextUrl.pathname === "/"
+      ? fixedConfig.homePath
       : `${request.nextUrl.pathname}${request.nextUrl.search}`;
   destination.searchParams.set("return_to", returnPath);
   return NextResponse.redirect(destination);
