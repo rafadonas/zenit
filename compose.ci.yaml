@@ -1,0 +1,13 @@
+# Fresh-database smoke checks exercise ordinary login without seeded identities.
+services:
+  api:
+    environment:
+      AUTH_FIXED_SESSION_ENABLED: "false"
+  dashboard:
+    environment:
+      DASHBOARD_FIXED_USER_EMAIL: ""
+      DASHBOARD_FIXED_SESSION_SECRET: ""
+  dashboard-supervisor:
+    environment:
+      DASHBOARD_FIXED_USER_EMAIL: ""
+      DASHBOARD_FIXED_SESSION_SECRET: ""

@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -24,6 +25,10 @@ REQUIRED_ENTRIES = (
     "assets/flutter_assets/kernel_blob.bin",
 )
 RunCommand = Callable[..., subprocess.CompletedProcess[str]]
+SIGNER_CERTIFICATE_FIELD = re.compile(
+    r"(?P<signer>Signer #\d+|Signer \(minSdkVersion=\d+(?: \(dev release=true\))?, "
+    r"maxSdkVersion=\d+\)) certificate (?P<field>DN|SHA-256 digest): (?P<value>.+)"
+)
 
 
 class ApkVerificationError(RuntimeError):
@@ -179,6 +184,45 @@ def _signature_value(output: str, label: str) -> str:
     raise ApkVerificationError(f"APK signature output is missing {label!r}")
 
 
+def _debug_signer_sha256(output: str) -> str:
+    """Read numbered or SDK-targeted signers without accepting certificate rotation."""
+    certificates: dict[str, dict[str, str]] = {}
+    for line in output.splitlines():
+        match = SIGNER_CERTIFICATE_FIELD.fullmatch(line.strip())
+        if match is None:
+            continue
+        signer, field, value = match.group("signer", "field", "value")
+        if signer.startswith("Signer #") and signer != "Signer #1":
+            raise ApkVerificationError("APK must have exactly one debug signer")
+        certificate = certificates.setdefault(signer, {})
+        if field in certificate:
+            raise ApkVerificationError(f"APK signature output repeats {signer} certificate {field}")
+        certificate[field] = value.strip()
+
+    if not certificates:
+        raise ApkVerificationError("APK signature output is missing signer certificate details")
+    if "Signer #1" in certificates and len(certificates) != 1:
+        raise ApkVerificationError("APK signature output mixes numbered and SDK-targeted signers")
+
+    digests = set()
+    for signer, certificate in certificates.items():
+        if certificate.keys() != {"DN", "SHA-256 digest"}:
+            raise ApkVerificationError(
+                f"APK signature output is missing {signer} certificate fields"
+            )
+        # The default debug DN can be rendered in either RDN order by SDK/JDK versions.
+        dn_parts = [part.strip() for part in certificate["DN"].split(",")]
+        if len(dn_parts) != 3 or set(dn_parts) != {"C=US", "O=Android", "CN=Android Debug"}:
+            raise ApkVerificationError("APK signer is not the expected Android debug signer")
+        digest = certificate["SHA-256 digest"]
+        if len(digest) != 64 or any(character not in "0123456789abcdef" for character in digest):
+            raise ApkVerificationError("APK signer certificate SHA-256 digest is invalid")
+        digests.add(digest)
+    if len(digests) != 1:
+        raise ApkVerificationError("APK must use the same debug certificate for every SDK range")
+    return digests.pop()
+
+
 def verify_apk(
     apk_path: Path,
     *,
@@ -256,18 +300,7 @@ def verify_apk(
         raise ApkVerificationError("APK signature does not use the required v2 scheme")
     if _signature_value(signature_output, "Number of signers") != "1":
         raise ApkVerificationError("APK must have exactly one debug signer")
-    signer_dn = _signature_value(signature_output, "Signer #1 certificate DN")
-    if signer_dn != "C=US, O=Android, CN=Android Debug":
-        raise ApkVerificationError(
-            f"APK signer is not the expected Android debug signer: {signer_dn}"
-        )
-    signer_certificate_sha256 = _signature_value(
-        signature_output, "Signer #1 certificate SHA-256 digest"
-    )
-    if len(signer_certificate_sha256) != 64 or any(
-        character not in "0123456789abcdef" for character in signer_certificate_sha256
-    ):
-        raise ApkVerificationError("APK signer certificate SHA-256 digest is invalid")
+    signer_certificate_sha256 = _debug_signer_sha256(signature_output)
     return ApkEvidence(
         artifact_role="zenit_mvp_demonstration_android_debug_apk",
         artifact_status="demonstration_build",
