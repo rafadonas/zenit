@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { explanationReasons, isRecommendationQueue } from "./recommendations";
+import {
+  explanationReasonLabel,
+  explanationReasons,
+  isRecommendationQueue,
+  recommendationLabel,
+  zoneLabel,
+} from "./recommendations";
 
 const item = {
   vegetation_analysis_id: "analysis-1",
@@ -92,5 +98,16 @@ describe("recommendation queue contract", () => {
       "One",
       "Two",
     ]);
+  });
+
+  it("presents domain values without losing unknown reasons", () => {
+    expect(recommendationLabel("mowing_review")).toBe("Avaliar roçada");
+    expect(zoneLabel("median")).toBe("Canteiro central");
+    expect(explanationReasonLabel("Low confidence requires inspection")).toContain(
+      "confiança é baixa",
+    );
+    expect(explanationReasonLabel("Reason from a future processor")).toBe(
+      "Reason from a future processor",
+    );
   });
 });

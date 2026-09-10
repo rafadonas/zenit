@@ -144,3 +144,33 @@ export function explanationReasons(explanation: Record<string, unknown>): string
   if (!Array.isArray(reasons)) return [];
   return reasons.filter((reason): reason is string => typeof reason === "string");
 }
+
+const reasonLabels: Record<string, string> = {
+  "Low confidence requires inspection":
+    "A confiança é baixa; uma inspeção em campo é necessária.",
+  "The AOI is derived from an estimated axis with a non-official development buffer.":
+    "A área analisada usa um eixo estimado, ainda não oficial.",
+  "Statistical API quality does not establish vegetation height.":
+    "A qualidade dos pixels não comprova a altura da vegetação.",
+  "A field inspection and validated corridor geometry are required.":
+    "É necessária uma inspeção em campo e a validação da geometria.",
+};
+
+export function explanationReasonLabel(reason: string): string {
+  return reasonLabels[reason] ?? reason;
+}
+
+export function zoneLabel(zone: RecommendationQueueItem["zone_type"]): string {
+  if (zone === "left") return "Lado esquerdo";
+  if (zone === "right") return "Lado direito";
+  if (zone === "median") return "Canteiro central";
+  return "Área especial";
+}
+
+export function recommendationLabel(
+  recommendation: RecommendationQueueItem["recommendation"],
+): string {
+  if (recommendation === "inspect") return "Inspecionar";
+  if (recommendation === "mowing_review") return "Avaliar roçada";
+  return "Monitorar";
+}

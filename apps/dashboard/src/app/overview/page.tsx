@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { DashboardHeader } from "../../components/dashboard-header";
 import { loadDashboardSession } from "../../lib/dashboard-session";
 import {
   buildOverviewMetrics,
@@ -61,28 +62,13 @@ export default async function OverviewPage() {
 
   return (
     <main className="overview-shell" data-zenit-smoke-page="overview" id="main-content">
-      <header className="topbar">
-        <div className="brand-block">
-          <span className="brand-mark" aria-hidden="true"><i /></span>
-          <div><strong>ZENIT</strong><small>Vegetação rodoviária</small></div>
-        </div>
-        <nav className="topnav" aria-label="Navegação principal">
-          <Link aria-current="page" href="/overview">Visão geral</Link>
-          <Link href="/corridor">Mapa</Link>
-          <Link href="/recommendations">Decisões</Link>
-          <Link href="/photo-reviews">Campo</Link>
-          <Link href="/mowing-post-service-summaries">Resultados</Link>
-        </nav>
-        {session ? (
-          <div className="session-context">
-            <span>{session.user.display_name}</span>
-            <form action="/api/auth/logout" method="post">
-              <input name="csrf_token" type="hidden" value={session.csrfToken} />
-              <button type="submit">Sair</button>
-            </form>
-          </div>
-        ) : null}
-      </header>
+      <DashboardHeader
+        active="overview"
+        session={session ? {
+          csrfToken: session.csrfToken,
+          displayName: session.user.display_name,
+        } : null}
+      />
 
       <div className="overview-content">
         <section className="overview-hero">

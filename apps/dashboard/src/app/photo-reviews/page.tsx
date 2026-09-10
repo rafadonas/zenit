@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
 import Image from "next/image";
 import Link from "next/link";
+import { DashboardHeader } from "../../components/dashboard-header";
 
 import { loadDashboardSession } from "../../lib/dashboard-session";
 import {
@@ -291,11 +292,14 @@ export default async function PhotoReviewsPage({ searchParams }: PageProps) {
     orderGroups.set(item.work_order_id, group);
   }
   return <main className="recommendations-shell" id="main-content">
-    <header className="topbar">
-      <div className="brand-block"><span className="brand-mark" aria-hidden="true"><i /></span><div><strong>ZENIT</strong><small>Vegetação rodoviária</small></div></div>
-      <nav className="topnav" aria-label="Navegação principal"><Link href="/overview">Visão geral</Link><Link href="/corridor">Corredor</Link><Link href="/recommendations">Recomendações</Link><Link aria-current="page" href="/photo-reviews">Fotos de inspeção</Link><Link href="/mowing-photo-reviews">Fotos pós-serviço</Link><Link href="/mowing-post-service-summaries">Resumos pós-serviço</Link></nav>
-      {session ? <div className="session-context"><span>{session.user.display_name}</span><form action="/api/auth/logout" method="post"><input name="csrf_token" type="hidden" value={session.csrfToken} /><button type="submit">Sair</button></form></div> : <div className="update-context"><span>Dados</span><strong>preparados</strong></div>}
-    </header>
+    <DashboardHeader
+      active="field"
+      context={{ label: "Dados", value: "preparados" }}
+      session={session ? {
+        csrfToken: session.csrfToken,
+        displayName: session.user.display_name,
+      } : null}
+    />
     <section className="queue-heading">
       <div><p className="eyebrow">Revisão humana</p><h1>Fotos preparadas</h1><p className="subtitle">Qualidade visual e presença de régua, sem inferência automática de altura.</p></div>
       <div className="warning-banner" role="status"><span className="warning-icon" aria-hidden="true">!</span><div><strong>Nenhuma revisão autoriza campo</strong><span>Mesmo aceita, a foto não entra em treino ou relatório oficial.</span></div></div>

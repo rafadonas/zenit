@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { cookies } from "next/headers";
 import Link from "next/link";
 
+import { DashboardHeader } from "../../components/dashboard-header";
 import { loadDashboardSession } from "../../lib/dashboard-session";
 import {
   isMowingPostServiceExceptionCollection,
@@ -99,34 +100,13 @@ export default async function MowingPostServiceSummariesPage({ searchParams }: P
 
   return (
     <main className="recommendations-shell" id="main-content">
-      <header className="topbar">
-        <div className="brand-block">
-          <span aria-hidden="true" className="brand-mark"><i /></span>
-          <div>
-            <strong>ZENIT</strong>
-            <small>Vegetação rodoviária</small>
-          </div>
-        </div>
-        <nav aria-label="Navegação principal" className="topnav">
-          <Link href="/overview">Visão geral</Link>
-          <Link href="/corridor">Corredor</Link>
-          <Link href="/recommendations">Recomendações</Link>
-          <Link href="/photo-reviews">Fotos de inspeção</Link>
-          <Link href="/mowing-photo-reviews">Fotos pós-serviço</Link>
-          <Link aria-current="page" href="/mowing-post-service-summaries">
-            Resumos pós-serviço
-          </Link>
-        </nav>
-        {session ? (
-          <div className="session-context">
-            <span>{session.user.display_name}</span>
-            <form action="/api/auth/logout" method="post">
-              <input name="csrf_token" type="hidden" value={session.csrfToken} />
-              <button type="submit">Sair</button>
-            </form>
-          </div>
-        ) : null}
-      </header>
+      <DashboardHeader
+        active="results"
+        session={session ? {
+          csrfToken: session.csrfToken,
+          displayName: session.user.display_name,
+        } : null}
+      />
 
       <section className="queue-heading">
         <div>

@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
+
+import { DashboardHeader } from "./dashboard-header";
 
 import {
   createMapProjection,
@@ -275,24 +276,10 @@ export function CorridorDashboard({
       data-zenit-smoke-page="corridor"
       id="main-content"
     >
-      <header className="topbar">
-        <div className="brand-block">
-          <span className="brand-mark" aria-hidden="true"><i /></span>
-          <div><strong>ZENIT</strong><small>Vegetação rodoviária</small></div>
-        </div>
-        <nav className="topnav" aria-label="Navegação principal">
-          <Link href="/overview">Visão geral</Link>
-          <Link aria-current="page" href="/corridor">Corredor</Link>
-          <Link href="/recommendations">Recomendações</Link>
-          <Link href="/photo-reviews">Fotos de inspeção</Link>
-          <Link href="/mowing-photo-reviews">Fotos pós-serviço</Link>
-          <Link href="/mowing-post-service-summaries">Resumos pós-serviço</Link>
-        </nav>
-        <div className="update-context">
-          <span>Geometria</span>
-          <strong>candidata v1</strong>
-        </div>
-      </header>
+      <DashboardHeader
+        active="corridor"
+        context={{ label: "Geometria", value: "candidata v1" }}
+      />
 
       <section className="hero-row">
         <div>

@@ -62,9 +62,9 @@ These elements remain available in details or audit views; they are not deleted:
 
 ## Increment plan
 
-1. Introduce the simplified manager overview and make it the local entry point.
-2. Extract one shared application shell and reduce the primary navigation.
-3. Redesign recommendation review around progressive disclosure.
+1. Introduce the simplified manager overview and make it the local entry point. **Done.**
+2. Extract one shared application shell and reduce the primary navigation. **Done.**
+3. Redesign recommendation review around progressive disclosure. **Done.**
 4. Combine field evidence queues into one field workspace.
 5. Consolidate results, history, and limitations into the closing view.
 
