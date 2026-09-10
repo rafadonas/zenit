@@ -22,7 +22,7 @@ field authorization.
 
 | Capability | Demonstration status | Evidence and boundary |
 | --- | --- | --- |
-| Reproducible foundation | Ready | Compose defines healthy PostgreSQL/PostGIS, MinIO, API, and dashboard services. Dashboard readiness fails closed when its server-side API dependency is unavailable. A fresh database applies migrations `0001`-`0038`. |
+| Reproducible foundation | Ready | Compose defines healthy PostgreSQL/PostGIS, MinIO, API, and dashboard services. Dashboard readiness fails closed when its server-side API dependency is unavailable. A fresh database applies migrations `0001`-`0039`. |
 | Source audit and ingestion | Ready | Immutable source catalog, checksums, lineage, idempotent imports, and deterministic parser fixtures are covered by tests and data-quality reports. |
 | Segments, zones, and map | Ready with estimated data | The dashboard exposes 100 m segments and separate zones. The candidate axis remains `estimated`, `needs_validation`, and non-operational. |
 | Satellite baseline | Ready with partial cache | Discovery, quality gates, explainable rules, provenance, and a checksum-bound NDVI preview exist. No complete source scene is approved for operations. |
@@ -63,7 +63,7 @@ python scripts/verify_release_evidence.py \
   docs/release-evidence/android-mvp-debug-apk-2026-08-14.json \
   --artifact apps/mobile/build/app/outputs/flutter-apk/app-debug.apk
 docker compose config --quiet
-fresh PostgreSQL initialization with migrations 0001-0038
+fresh PostgreSQL initialization with migrations 0001-0039
 python scripts/verify_mvp_stack.py
 ```
 
@@ -80,7 +80,7 @@ The Compose dashboard probe separately validates its bounded server-side path to
 the dependency-aware API health endpoint without loading the segment collection.
 
 The FastAPI OpenAPI document is tracked at `contracts/openapi.json` and checked
-byte for byte in CI. Its repository validator currently covers 34 paths,
+byte for byte in CI. Its repository validator currently covers 35 paths,
 requires versioned application routes, unique operation identifiers, tags and
 responses, the stable API error envelope with UUID correlation headers, and
 rejects known development credentials. Runtime tests cover generated,

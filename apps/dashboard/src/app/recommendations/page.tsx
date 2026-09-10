@@ -71,7 +71,8 @@ export default async function RecommendationsPage({ searchParams }: Recommendati
           <div><strong>ZENIT</strong><small>Vegetação rodoviária</small></div>
         </div>
         <nav className="topnav" aria-label="Navegação principal">
-          <Link href="/">Corredor</Link>
+          <Link href="/overview">Visão geral</Link>
+          <Link href="/corridor">Corredor</Link>
           <Link aria-current="page" href="/recommendations">Recomendações</Link>
           <Link href="/photo-reviews">Fotos de inspeção</Link>
           <Link href="/mowing-photo-reviews">Fotos pós-serviço</Link>
@@ -260,7 +261,7 @@ export default async function RecommendationsPage({ searchParams }: Recommendati
               ) : null}
               <footer>
                 <span>Regra {item.rule_version} · processador {item.processor_version}</span>
-                <div><strong>Uso em campo: bloqueado</strong><Link href={`/?segment=${item.segment_index}`}>Ver trecho e evidências</Link></div>
+                <div><strong>Uso em campo: bloqueado</strong><Link href={`/corridor?segment=${item.segment_index}`}>Ver trecho e evidências</Link></div>
               </footer>
             </article>
           );

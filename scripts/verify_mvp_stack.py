@@ -8,9 +8,10 @@ import json
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
+from http.cookiejar import CookieJar
 from typing import Protocol
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import HTTPCookieProcessor, Request, build_opener, urlopen
 
 REFERENCE_ID = "00000000-0000-4000-8000-000000000001"
 
@@ -340,9 +341,12 @@ def run_checks(
     opener: Opener | None = None,
 ) -> int:
     check_count = 0
+    request_opener = opener
+    if request_opener is None:
+        request_opener = build_opener(HTTPCookieProcessor(CookieJar())).open
 
     health = StatusCheck("API health", api_base, "/health", 200)
-    health_body = _expect_status(health, timeout=timeout, opener=opener)
+    health_body = _expect_status(health, timeout=timeout, opener=request_opener)
     _verify_health(health_body)
     check_count += 1
 
@@ -356,27 +360,18 @@ def run_checks(
         StatusCheck("recommendation collection", api_base, "/v1/recommendations", 200),
     )
     for check in collections:
-        body = _expect_status(check, timeout=timeout, opener=opener)
+        body = _expect_status(check, timeout=timeout, opener=request_opener)
         _verify_collection(body, check.name, expect_empty=expect_empty)
         check_count += 1
 
     for check in _protected_checks(api_base):
-        _expect_status(check, timeout=timeout, opener=opener)
+        _expect_status(check, timeout=timeout, opener=request_opener)
         check_count += 1
 
-    for check, marker in (
-        (
-            StatusCheck("dashboard", dashboard_base, "/", 200),
-            'data-zenit-smoke-page="corridor"',
-        ),
-        (
-            StatusCheck("dashboard login", dashboard_base, "/login", 200),
-            'data-zenit-smoke-page="login"',
-        ),
-    ):
-        body = _expect_status(check, timeout=timeout, opener=opener)
-        _verify_dashboard_page(body, check.name, marker)
-        check_count += 1
+    dashboard = StatusCheck("dashboard", dashboard_base, "/", 200)
+    body = _expect_status(dashboard, timeout=timeout, opener=request_opener)
+    _verify_dashboard_page(body, dashboard.name, 'data-zenit-smoke-page="overview"')
+    check_count += 1
 
     return check_count
 

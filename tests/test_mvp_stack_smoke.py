@@ -45,12 +45,7 @@ def _success_opener(request: object, *, timeout: float) -> FakeResponse:
     if url == "http://dashboard.test/":
         return FakeResponse(
             200,
-            b'<html><main data-zenit-smoke-page="corridor"></main></html>',
-        )
-    if url == "http://dashboard.test/login":
-        return FakeResponse(
-            200,
-            b'<html><main data-zenit-smoke-page="login"></main></html>',
+            b'<html><main data-zenit-smoke-page="overview"></main></html>',
         )
     raise HTTPError(url, 401, "Unauthorized", {}, io.BytesIO(b'{"detail":"unauthorized"}'))
 
@@ -63,7 +58,7 @@ def test_run_checks_covers_fresh_stack_contracts() -> None:
         opener=_success_opener,
     )
 
-    assert count == 26
+    assert count == 25
 
 
 def test_run_checks_rejects_unprotected_authenticated_route() -> None:

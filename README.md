@@ -257,7 +257,10 @@ python scripts/export_openapi.py --check        # Validação do contrato OpenAP
 
 ### 4. Frontend - Dashboard (Next.js / TypeScript)
 
-O Dashboard (`apps/dashboard`) oferece a interface de gestão de corredor, filas de inspeção e aprovação.
+O Dashboard (`apps/dashboard`) oferece uma visão geral do fluxo em `/overview`,
+além da interface de corredor, filas de inspeção e aprovação. No Compose local,
+o gestor entra pela visão geral para apresentar monitoramento, análise, decisão,
+campo e resultado antes dos detalhes técnicos.
 
 ```bash
 # 1. Instalar dependências (executado na raiz do repositório)

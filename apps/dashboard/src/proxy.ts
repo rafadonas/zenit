@@ -8,6 +8,9 @@ export function proxy(request: NextRequest): NextResponse {
   if (!fixedConfig) return NextResponse.next();
 
   const hasSession = Boolean(request.cookies.get(SESSION_COOKIE_NAME)?.value);
+  if (hasSession && request.nextUrl.pathname === "/" && fixedConfig.homePath !== "/") {
+    return NextResponse.redirect(new URL(fixedConfig.homePath, request.url));
+  }
   if (hasSession && request.nextUrl.pathname !== "/login") return NextResponse.next();
 
   const destination = request.nextUrl.clone();

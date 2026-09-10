@@ -8,10 +8,10 @@ afterEach(() => {
 });
 
 describe("fixed dashboard proxy", () => {
-  it("sends the root of a manager dashboard to recommendations", () => {
+  it("sends the root of a manager dashboard to the simplified overview", () => {
     vi.stubEnv("DASHBOARD_APP_ENV", "test");
     vi.stubEnv("DASHBOARD_FIXED_USER_EMAIL", "manager@example.com");
-    vi.stubEnv("DASHBOARD_FIXED_HOME_PATH", "/recommendations");
+    vi.stubEnv("DASHBOARD_FIXED_HOME_PATH", "/overview");
     vi.stubEnv(
       "DASHBOARD_FIXED_SESSION_SECRET",
       "fixed-session-secret-that-is-long-enough",
@@ -20,7 +20,7 @@ describe("fixed dashboard proxy", () => {
     const response = proxy(new NextRequest("http://localhost:3000/"));
 
     expect(response.headers.get("location")).toBe(
-      "http://localhost:3000/api/auth/fixed-session?return_to=%2Frecommendations",
+      "http://localhost:3000/api/auth/fixed-session?return_to=%2Foverview",
     );
   });
 
@@ -38,5 +38,23 @@ describe("fixed dashboard proxy", () => {
     expect(response.headers.get("location")).toBe(
       "http://localhost:3002/api/auth/fixed-session?return_to=%2Fmowing-photo-reviews",
     );
+  });
+
+  it("sends an existing fixed manager session from the root to its overview", () => {
+    vi.stubEnv("DASHBOARD_APP_ENV", "test");
+    vi.stubEnv("DASHBOARD_FIXED_USER_EMAIL", "manager@example.com");
+    vi.stubEnv("DASHBOARD_FIXED_HOME_PATH", "/overview");
+    vi.stubEnv(
+      "DASHBOARD_FIXED_SESSION_SECRET",
+      "fixed-session-secret-that-is-long-enough",
+    );
+
+    const response = proxy(
+      new NextRequest("http://localhost:3000/", {
+        headers: { cookie: "zenit_session=existing" },
+      }),
+    );
+
+    expect(response.headers.get("location")).toBe("http://localhost:3000/overview");
   });
 });

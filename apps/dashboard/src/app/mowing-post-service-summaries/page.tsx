@@ -108,7 +108,8 @@ export default async function MowingPostServiceSummariesPage({ searchParams }: P
           </div>
         </div>
         <nav aria-label="Navegação principal" className="topnav">
-          <Link href="/">Corredor</Link>
+          <Link href="/overview">Visão geral</Link>
+          <Link href="/corridor">Corredor</Link>
           <Link href="/recommendations">Recomendações</Link>
           <Link href="/photo-reviews">Fotos de inspeção</Link>
           <Link href="/mowing-photo-reviews">Fotos pós-serviço</Link>

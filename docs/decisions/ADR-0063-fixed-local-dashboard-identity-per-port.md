@@ -19,9 +19,10 @@ ADR-0008 and ADR-0009.
 
 Run two instances of the same dashboard image in the local Compose stack. Port
 `3000` is fixed to the prepared manager email and port `3002` is fixed to the
-prepared supervisor email. The manager starts in the recommendation and
-planning workspace; the supervisor starts in the post-service-photo review
-workspace. Give each instance distinct session and CSRF cookie names.
+prepared supervisor email. The manager starts in the simplified product
+overview; the supervisor starts in the post-service-photo review workspace.
+Give each instance distinct session and CSRF cookie names. ADR-0064 records the
+manager entry-point change.
 
 When a browser without that instance's cookie requests a page, the dashboard
 obtains a short-lived API token through a server-to-server fixed-session

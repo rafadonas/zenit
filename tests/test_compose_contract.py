@@ -24,7 +24,7 @@ def test_local_dashboards_use_distinct_ports_identities_and_cookies() -> None:
 
     assert '"3000:3000"' in manager
     assert "DASHBOARD_FIXED_USER_EMAIL: ${DASHBOARD_MANAGER_EMAIL" in manager
-    assert "DASHBOARD_FIXED_HOME_PATH: /recommendations" in manager
+    assert "DASHBOARD_FIXED_HOME_PATH: /overview" in manager
     assert "DASHBOARD_SESSION_COOKIE_NAME: zenit_manager_session" in manager
     assert '"3002:3000"' in supervisor
     assert "DASHBOARD_FIXED_USER_EMAIL: ${DASHBOARD_SUPERVISOR_EMAIL" in supervisor

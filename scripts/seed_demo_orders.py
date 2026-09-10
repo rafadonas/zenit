@@ -3,11 +3,12 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
-import hashlib
-from datetime import datetime, timezone
-from uuid import uuid4, UUID
+from datetime import UTC, datetime
+from uuid import uuid4
+
 import psycopg
 
 DATABASE_URL = os.getenv(
@@ -16,7 +17,7 @@ DATABASE_URL = os.getenv(
 ).replace("postgresql+psycopg://", "postgresql://", 1)
 
 def main() -> None:
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     with psycopg.connect(DATABASE_URL) as conn:
         with conn.cursor() as cur:
             # 1. Get road
@@ -60,7 +61,9 @@ def main() -> None:
                 segment_id, metric_geom = cur.fetchone()
                 cur.execute(
                     """
-                    INSERT INTO segment_zone (road_segment_id, zone_type, threshold_cm, metric_geometry, data_status)
+                    INSERT INTO segment_zone (
+                        road_segment_id, zone_type, threshold_cm, metric_geometry, data_status
+                    )
                     VALUES (%s, 'left', 30.00, %s, 'prepared')
                     RETURNING id
                     """,
@@ -83,11 +86,13 @@ def main() -> None:
             cur.execute(
                 """
                 INSERT INTO satellite_scene (
-                    id, provider, external_scene_id, sensor, collection, catalog_checksum_sha256, acquired_at
+                    id, provider, external_scene_id, sensor, collection,
+                    catalog_checksum_sha256, acquired_at
                 ) VALUES (
                     %s, 'sentinel', %s, 'sentinel-2', 'sentinel-2-l2a', %s, %s
                 )
-                ON CONFLICT (provider, external_scene_id) DO UPDATE SET acquired_at = EXCLUDED.acquired_at
+                ON CONFLICT (provider, external_scene_id)
+                DO UPDATE SET acquired_at = EXCLUDED.acquired_at
                 RETURNING id
                 """,
                 (scene_id, f"scene-{scene_id}", scene_checksum, now),
@@ -99,7 +104,8 @@ def main() -> None:
             cur.execute(
                 """
                 INSERT INTO analysis_run (
-                    id, satellite_scene_id, rule_version, processor_version, idempotency_key, status, completed_at
+                    id, satellite_scene_id, rule_version, processor_version,
+                    idempotency_key, status, completed_at
                 ) VALUES (
                     %s, %s, 'v1', 'v1', %s, 'completed', %s
                 )
@@ -155,7 +161,8 @@ def main() -> None:
                 INSERT INTO work_order (
                     id, source_review_id, segment_zone_id, creation_policy_id, created_by_user_id,
                     idempotency_key, order_type, status, version, planning_rationale, data_status,
-                    authorizes_field_work, eligible_for_field_execution, eligible_for_official_reporting,
+                    authorizes_field_work, eligible_for_field_execution,
+                    eligible_for_official_reporting,
                     order_metadata
                 ) VALUES (
                     %s, %s, %s, '91000000-0000-4000-8000-000000000001', %s,

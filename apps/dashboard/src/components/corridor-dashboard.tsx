@@ -252,7 +252,7 @@ export function CorridorDashboard({
     setSegmentSearch(String(segmentIndex));
     setSearchError(null);
     setNdviVisible(false);
-    window.history.replaceState(null, "", `/?segment=${segmentIndex}`);
+    window.history.replaceState(null, "", `/corridor?segment=${segmentIndex}`);
     if (focus) {
       requestAnimationFrame(() => document.getElementById(`segment-${segmentId}`)?.focus());
     }
@@ -281,7 +281,8 @@ export function CorridorDashboard({
           <div><strong>ZENIT</strong><small>Vegetação rodoviária</small></div>
         </div>
         <nav className="topnav" aria-label="Navegação principal">
-          <Link aria-current="page" href="/">Corredor</Link>
+          <Link href="/overview">Visão geral</Link>
+          <Link aria-current="page" href="/corridor">Corredor</Link>
           <Link href="/recommendations">Recomendações</Link>
           <Link href="/photo-reviews">Fotos de inspeção</Link>
           <Link href="/mowing-photo-reviews">Fotos pós-serviço</Link>
