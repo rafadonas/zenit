@@ -370,7 +370,7 @@ def run_checks(
 
     dashboard = StatusCheck("dashboard", dashboard_base, "/", 200)
     body = _expect_status(dashboard, timeout=timeout, opener=request_opener)
-    _verify_dashboard_page(body, dashboard.name, 'data-zenit-smoke-page="overview"')
+    _verify_dashboard_page(body, dashboard.name, 'data-zenit-smoke-page="corridor"')
     check_count += 1
 
     return check_count
