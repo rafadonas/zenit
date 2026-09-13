@@ -11,6 +11,10 @@ Before significant work, read:
 For team-distributed work, also read `docs/team/README.md` and the complete work
 package assigned in `docs/team/work-packages.md` before editing code.
 
+When a contributor identifies as Rafael, Guilherme, Lucas, or Gabriel, read
+`docs/team/team-assignments.md`, continue that person's existing branch/PR first,
+and otherwise select only the first eligible package in that person's queue.
+
 ## Product goal
 
 Build a road-vegetation monitoring platform connecting satellite data,

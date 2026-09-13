@@ -340,6 +340,19 @@ cd apps/mobile
   zenit-satellite --segment-index 195 --zone left --from-date 2026-07-01 --to-date 2026-08-07
   ```
 
+- **Descoberta PlanetScope sem download (`zenit-planet-catalog`)**:
+  ```bash
+  source .venv/bin/activate
+  zenit-planet-catalog \
+    --bbox -46.80 -23.55 -46.76 -23.50 \
+    --from-date 2026-08-01 \
+    --to-date 2026-08-07
+  ```
+
+  Requer `PL_API_KEY` no `.env`. O comando consulta somente metadados `PSScene`,
+  não cria pedido, não baixa cena e sempre informa
+  `operationally_eligible=false`.
+
 - **Renderizar prévia NDVI estática**:
   ```bash
   python scripts/render_cached_ndvi_preview.py
@@ -382,6 +395,10 @@ zenit-satellite \
 Ele é restrito à geometria preparada e não operacional. Leia
 [`docs/architecture/satellite-discovery.md`](docs/architecture/satellite-discovery.md)
 antes de alterar AOI ou período.
+
+A integração Planet está inicialmente limitada à descoberta de catálogo. Tiles,
+downloads e persistência exigem tickets separados para proteger a chave, a cota
+e a proveniência. Consulte o ADR-0067 e o guia de serviços externos.
 
 ## Banco de dados e migrações
 

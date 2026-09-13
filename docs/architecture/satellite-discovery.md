@@ -28,10 +28,31 @@ be used for operational dispatch.
   cache with early renewal.
 - CBERS-4A WPM/WFI: public INPE BDC STAC search, complementary source. A BDC
   access token is optional and is sent only when configured.
+- PlanetScope PSScene: authenticated Planet Data API quick search, optional
+  high-resolution source. The current integration discovers metadata only and
+  never orders or downloads an asset.
 
 Sentinel and CBERS observations are separate product series. WPM Digital Number,
 WFI Surface Reflectance, and Sentinel L2A reflectance must not be treated as
 interchangeable measurements.
+
+PlanetScope is also a separate product series. Planet `cloud_cover` is a fraction
+and is normalized to percent at the provider boundary. Scene asset URLs are not
+retained by discovery because access and quota must be controlled explicitly.
+The API key is sent only in a backend `Authorization: api-key ...` header; it is
+never placed in a browser-facing tile URL.
+
+## Planet foundation status
+
+- `PL_API_KEY` is loaded as a secret from the backend environment.
+- `zenit-planet-catalog` performs bounded PSScene metadata discovery for a bbox
+  and UTC date window without requesting downloads.
+- Offline fixtures cover AOI/date filters, fractional cloud normalization,
+  pagination host validation, and credential isolation.
+- Planet persistence is intentionally disabled until a migration extends the
+  current `satellite_scene.sensor` constraint to `planet-scope`.
+- Orders API, scene downloads, basemap discovery, tile proxy/cache, quota ledger,
+  raster checksums, and processing provenance remain future reviewed increments.
 
 ## HTTP safety
 

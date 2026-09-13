@@ -6,6 +6,26 @@ Fazer com que assistentes diferentes produzam mudanças pequenas, compatíveis e
 auditáveis. A IA ajuda a investigar e implementar; decisões de domínio, marca,
 operação, privacidade e promoção de modelo continuam humanas.
 
+## Roteamento por integrante
+
+Quando a primeira mensagem identificar Rafael, Guilherme, Lucas ou Gabriel, leia
+[`team-assignments.md`](team-assignments.md) antes de escolher trabalho. Continue
+primeiro qualquer branch/PR em andamento daquela pessoa; caso não exista, escolha
+o primeiro pacote elegível de sua fila. O nome identifica uma trilha, mas não
+remove predecessores, bloqueios, revisões ou limites de escopo.
+
+Resposta inicial esperada da IA:
+
+```text
+Pessoa identificada: <nome>
+Trilha: <frente>
+Ticket selecionado/continuado: <ID>
+Predecessores: <estado e evidência>
+Branch exclusiva: <nome>
+Arquivos reservados: <lista>
+Fora de escopo: <lista>
+```
+
 ## Prompt inicial recomendado
 
 Copie e preencha:

@@ -73,6 +73,7 @@ class Settings(BaseSettings):
     copernicus_client_id: str | None = None
     copernicus_client_secret: str | None = None
     bdc_access_token: str | None = None
+    planet_api_key: SecretStr | None = Field(default=None, validation_alias="PL_API_KEY")
 
     @model_validator(mode="after")
     def validate_security_settings(self) -> "Settings":

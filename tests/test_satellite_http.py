@@ -8,13 +8,14 @@ from unittest.mock import patch
 from zenit_geospatial.satellite_http import (
     COPERNICUS_TOKEN_URL,
     CopernicusTokenProvider,
+    PlanetCatalogClient,
     RetryPolicy,
     SatelliteAuthenticationError,
     SatelliteHttpError,
     SentinelCatalogClient,
     UrllibJsonTransport,
 )
-from zenit_geospatial.satellite_providers import SENTINEL_CATALOG_URL
+from zenit_geospatial.satellite_providers import PLANET_DATA_SEARCH_URL, SENTINEL_CATALOG_URL
 
 
 class FakeTransport:
@@ -80,6 +81,26 @@ class SatelliteHttpTests(unittest.TestCase):
         self.assertEqual(url, SENTINEL_CATALOG_URL)
         self.assertEqual(payload, request)
         self.assertEqual(headers, {"Authorization": "Bearer private-token"})
+
+    def test_planet_client_uses_backend_header_without_putting_key_in_url(self) -> None:
+        transport = FakeTransport()
+        request = {"item_types": ["PSScene"], "filter": {}, "_page_size": 25}
+
+        page = PlanetCatalogClient(transport, "private-planet-key").search(request)
+
+        self.assertEqual(page.acquisitions, ())
+        url, payload, headers = transport.json_calls[0]
+        self.assertEqual(url, f"{PLANET_DATA_SEARCH_URL}?_page_size=25")
+        self.assertNotIn("private-planet-key", url)
+        self.assertEqual(payload, {"item_types": ["PSScene"], "filter": {}})
+        self.assertEqual(headers, {"Authorization": "api-key private-planet-key"})
+
+    def test_planet_client_rejects_empty_key_before_request(self) -> None:
+        transport = FakeTransport()
+
+        with self.assertRaisesRegex(SatelliteAuthenticationError, "not configured"):
+            PlanetCatalogClient(transport, "")
+        self.assertEqual(transport.json_calls, [])
 
     def test_transport_retries_429_without_exposing_response_body(self) -> None:
         attempts = []
