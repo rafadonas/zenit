@@ -12,6 +12,7 @@ de campo e relatórios auditáveis.
 ## Sumário
 
 - [Objetivo e regras essenciais](#objetivo-e-regras-essenciais)
+- [Trabalho em equipe](#trabalho-em-equipe)
 - [Estado atual](#estado-atual)
 - [Arquitetura do repositório](#arquitetura-do-repositório)
 - [Início rápido](#início-rápido)
@@ -22,6 +23,36 @@ de campo e relatórios auditáveis.
 - [Desenvolvimento e validação](#desenvolvimento-e-validação)
 - [Segurança e limitações conhecidas](#segurança-e-limitações-conhecidas)
 - [Documentação](#documentação)
+
+## Trabalho em equipe
+
+O desenvolvimento está dividido em quatro trilhas fixas para reduzir conflitos
+entre pessoas e assistentes de IA:
+
+| Pessoa | Trilha principal |
+| --- | --- |
+| Rafael | integração, API, autenticação, segurança e coordenação de PRs |
+| Guilherme | marca, design system, dashboard e mapa |
+| Lucas | geoespacial, Planet, qualidade de dados e inteligência vegetal |
+| Gabriel | aplicativo mobile, coleta de campo, offline e sincronização |
+
+Ao abrir uma conversa com uma IA no repositório, comece identificando a pessoa:
+
+```text
+Sou Guilherme. Continue minha trilha do projeto ZENIT.
+```
+
+A IA deve ler [`docs/team/team-assignments.md`](docs/team/team-assignments.md),
+procurar primeiro uma branch ou PR em andamento daquela pessoa e somente depois
+selecionar o primeiro ticket elegível de sua fila. Cada ticket usa uma branch
+exclusiva `codex/<ticket>-<slug>`, commit em inglês, testes proporcionais ao risco
+e pull request para `main`. Push direto em `main` e force-push são proibidos.
+
+Antes de editar, cada integrante também deve consultar o
+[`hub do time`](docs/team/README.md), o
+[`pacote de trabalho completo`](docs/team/work-packages.md) e o
+[`fluxo Git`](docs/team/git-collaboration-workflow.md). Arquivos compartilhados,
+migrações, contratos e lockfiles precisam ser reservados no quadro do grupo.
 
 ## Objetivo e regras essenciais
 
@@ -811,6 +842,7 @@ Use `--expect-empty` apenas em um banco recém-inicializado, como o da CI.
 ## Documentação
 
 - [Hub de execução do time e das IAs](docs/team/README.md)
+- [Divisão nominal de Rafael, Guilherme, Lucas e Gabriel](docs/team/team-assignments.md)
 - [Estado atual e lacunas](docs/team/current-state-and-gaps.md)
 - [Roteiro e pacotes de trabalho](docs/team/execution-roadmap.md)
 - [Fluxo Git para trabalho paralelo](docs/team/git-collaboration-workflow.md)
