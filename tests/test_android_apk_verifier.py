@@ -20,6 +20,7 @@ DEV_RELEASE_SIGNERS = (
     "Signer (minSdkVersion=33, maxSdkVersion=2147483647, devRelease=true)",
     "Signer #1 (minSdkVersion=24, maxSdkVersion=2147483647)",
 )
+SCHEME_SIGNERS = ("V2 Signer: Signer #1", "V2 Signer")
 
 
 def _certificate(signer: str, *, dn: str = DEBUG_DN, digest: str = "a" * 64) -> str:
@@ -87,6 +88,7 @@ def _runner(command: list[str], **kwargs: object) -> subprocess.CompletedProcess
         ("Signer #1",),
         SDK_SIGNERS,
         *((signer,) for signer in DEV_RELEASE_SIGNERS),
+        *((signer,) for signer in SCHEME_SIGNERS),
     ],
 )
 @pytest.mark.parametrize("dn", [DEBUG_DN, "CN=Android Debug, O=Android, C=US"])

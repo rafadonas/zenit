@@ -26,7 +26,8 @@ REQUIRED_ENTRIES = (
 )
 RunCommand = Callable[..., subprocess.CompletedProcess[str]]
 SIGNER_CERTIFICATE_FIELD = re.compile(
-    r"(?P<signer>Signer [^\r\n]+?) certificate "
+    r"(?:V\d+(?:\.\d+)? Signer:\s*)?"
+    r"(?P<signer>Signer [^\r\n]+?|V\d+(?:\.\d+)? Signer) certificate "
     r"(?P<field>DN|SHA-256 digest)(?: [^:\r\n]+)?: (?P<value>.+)"
 )
 NUMBERED_SIGNER = re.compile(r"Signer #(?P<number>\d+)(?:\s.*)?")
@@ -192,11 +193,14 @@ def _debug_signer_sha256(output: str) -> str:
         match = SIGNER_CERTIFICATE_FIELD.fullmatch(line.strip())
         if match is None:
             continue
-        signer, field, value = match.group("signer", "field", "value")
+        signer = match.group("signer")
+        field, value = match.group("field", "value")
         numbered_signer = NUMBERED_SIGNER.fullmatch(signer)
         if numbered_signer is not None:
             if numbered_signer.group("number") != "1":
                 raise ApkVerificationError("APK must have exactly one debug signer")
+        elif signer.startswith("V") and signer.endswith(" Signer"):
+            pass
         elif "minSdkVersion=" not in signer or "maxSdkVersion=" not in signer:
             continue
         certificate = certificates.setdefault(signer, {})
