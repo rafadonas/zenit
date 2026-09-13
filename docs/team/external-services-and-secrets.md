@@ -17,6 +17,7 @@ Data do inventário do código: **2026-09-12**.
 | chave de criptografia de mídia | padrão somente local | — | chave forte e custodiada obrigatória |
 | Copernicus/Sentinel | não | obrigatório para `zenit-satellite` | conta técnica/rotação |
 | INPE BDC/CBERS | não | token opcional | decidir conforme política do provedor |
+| Planet | não | `PL_API_KEY` para catálogo | conta técnica, proxy/cache e controle de cota |
 | mapa-base | OSM local sem chave | URL de outro provedor | serviço/SLA/licença aprovados |
 | API do mobile | URL local | — | URL HTTPS e certificado válido |
 | assinatura Android | debug automática | — | keystore/custódia obrigatórios |
@@ -150,6 +151,42 @@ ilegíveis. Produção exige KMS/secret manager, backup seguro, controle de aces
 versionamento e procedimento de rotação/recriptografia.
 
 ## 3. Credenciais de satélite
+
+### `PL_API_KEY`
+
+**Necessidade:** obrigatória somente para consultar APIs Planet. A fundação atual
+usa a Data API para descobrir metadados `PSScene`; ela não cria Orders nem baixa
+ativos.
+
+**Origem:** página de configurações/desenvolvedor da conta Planet autorizada. Não
+cole a chave em código, PR, issue, screenshot ou conversa. Configure localmente:
+
+```text
+PL_API_KEY=<planet-api-key>
+```
+
+**Proteção:** a chave fica no backend/worker e segue em header de autorização.
+Ela nunca pode entrar em `NEXT_PUBLIC_*`, `MAP_TILE_URL`, aplicativo Flutter ou
+URL entregue ao navegador. Tiles futuros precisam de proxy/cache autenticado no
+backend com limites por usuário e registro de consumo.
+
+**Produtos disponíveis informados para a conta:** basemap tiles e scene tiles
+possuem cotas próprias; scene downloads possuem cota por área. A disponibilidade
+exata de mosaicos, item types, assets e product bundles deve ser consultada pela
+API/conta antes de cada fluxo, sem presumir que toda cena encontrada pode ser
+baixada.
+
+Comando de descoberta sem download:
+
+```bash
+zenit-planet-catalog \
+  --bbox -46.80 -23.55 -46.76 -23.50 \
+  --from-date 2026-08-01 \
+  --to-date 2026-08-07
+```
+
+Esse comando não persiste cenas e não consome a cota de download. Não execute
+contra a conta compartilhada sem combinar AOI e período com o grupo.
 
 ### `COPERNICUS_CLIENT_ID`
 

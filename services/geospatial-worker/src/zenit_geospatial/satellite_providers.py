@@ -6,15 +6,18 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Literal, Protocol
+from urllib.parse import parse_qsl, urlparse
 
 SENTINEL_CATALOG_URL = "https://sh.dataspace.copernicus.eu/catalog/v1/search"
 CBERS_STAC_URL = "https://data.inpe.br/bdc/stac/v1/search"
+PLANET_DATA_SEARCH_URL = "https://api.planet.com/data/v1/quick-search"
 SENTINEL_COLLECTION = "sentinel-2-l2a"
 CBERS_WPM_COLLECTION = "CB4A-WPM-L4-DN-1"
 CBERS_WFI_COLLECTION = "CB4A-WFI-L4-SR-1"
+PLANET_PS_SCENE_COLLECTION = "PSScene"
 
-ProviderName = Literal["copernicus_sentinel_hub", "inpe_bdc"]
-SensorName = Literal["sentinel-2", "cbers-4a"]
+ProviderName = Literal["copernicus_sentinel_hub", "inpe_bdc", "planet"]
+SensorName = Literal["sentinel-2", "cbers-4a", "planet-scope"]
 
 
 class ProviderResponseError(ValueError):
@@ -159,6 +162,67 @@ class CbersStacProvider:
         return SearchPage(acquisitions=acquisitions, next_url=_next_link(payload))
 
 
+class PlanetDataProvider:
+    """Normalize Planet Data API PSScene discovery without consuming download quota."""
+
+    provider_name: ProviderName = "planet"
+
+    def build_search_request(
+        self, bbox: BoundingBox, window: SearchWindow, *, limit: int = 100
+    ) -> Mapping[str, Any]:
+        _validate_limit(limit, maximum=250)
+        min_lon, min_lat, max_lon, max_lat = bbox.as_list()
+        geometry = {
+            "type": "Polygon",
+            "coordinates": [
+                [
+                    [min_lon, min_lat],
+                    [max_lon, min_lat],
+                    [max_lon, max_lat],
+                    [min_lon, max_lat],
+                    [min_lon, min_lat],
+                ]
+            ],
+        }
+        return {
+            "item_types": [PLANET_PS_SCENE_COLLECTION],
+            "filter": {
+                "type": "AndFilter",
+                "config": [
+                    {
+                        "type": "GeometryFilter",
+                        "field_name": "geometry",
+                        "config": geometry,
+                    },
+                    {
+                        "type": "DateRangeFilter",
+                        "field_name": "acquired",
+                        "config": {
+                            "gte": _format_utc(window.start),
+                            "lte": _format_utc(window.end),
+                        },
+                    },
+                ],
+            },
+            "_page_size": limit,
+        }
+
+    def parse_search_page(self, payload: Mapping[str, Any]) -> SearchPage:
+        acquisitions = tuple(
+            _parse_feature(
+                feature,
+                provider=self.provider_name,
+                default_collection=PLANET_PS_SCENE_COLLECTION,
+                sensor="planet-scope",
+                include_assets=False,
+                datetime_property="acquired",
+                cloud_cover_multiplier=100.0,
+            )
+            for feature in _features(payload)
+        )
+        return SearchPage(acquisitions=acquisitions, next_url=_planet_next_link(payload))
+
+
 def _format_utc(value: datetime) -> str:
     return value.astimezone(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
 
@@ -184,6 +248,8 @@ def _parse_feature(
     default_collection: str,
     sensor: SensorName,
     include_assets: bool,
+    datetime_property: str = "datetime",
+    cloud_cover_multiplier: float = 1.0,
 ) -> Acquisition:
     scene_id = feature.get("id")
     if not isinstance(scene_id, str) or not scene_id:
@@ -191,15 +257,16 @@ def _parse_feature(
     properties = feature.get("properties")
     if not isinstance(properties, Mapping):
         raise ProviderResponseError(f"provider feature {scene_id!r} has no properties object")
-    acquired_at = _parse_datetime(properties.get("datetime"), scene_id)
-    collection_value = feature.get("collection", default_collection)
+    acquired_at = _parse_datetime(properties.get(datetime_property), scene_id)
+    collection_value = feature.get("collection", feature.get("item_type", default_collection))
     if not isinstance(collection_value, str) or not collection_value:
         raise ProviderResponseError(f"provider feature {scene_id!r} has an invalid collection")
 
     bbox = _parse_bbox(feature.get("bbox"), scene_id)
     geometry_value = feature.get("geometry")
     geometry = geometry_value if isinstance(geometry_value, Mapping) else None
-    cloud_cover = _optional_percentage(properties.get("eo:cloud_cover"), scene_id)
+    cloud_cover_value = properties.get("eo:cloud_cover", properties.get("cloud_cover"))
+    cloud_cover = _optional_percentage(cloud_cover_value, scene_id, cloud_cover_multiplier)
     assets = _asset_hrefs(feature.get("assets"), scene_id) if include_assets else {}
 
     return Acquisition(
@@ -244,11 +311,11 @@ def _parse_bbox(value: Any, scene_id: str) -> tuple[float, float, float, float] 
     return numbers  # type: ignore[return-value]
 
 
-def _optional_percentage(value: Any, scene_id: str) -> float | None:
+def _optional_percentage(value: Any, scene_id: str, multiplier: float = 1.0) -> float | None:
     if value is None:
         return None
     try:
-        number = float(value)
+        number = float(value) * multiplier
     except (TypeError, ValueError) as error:
         raise ProviderResponseError(
             f"provider feature {scene_id!r} has invalid cloud cover"
@@ -256,6 +323,31 @@ def _optional_percentage(value: Any, scene_id: str) -> float | None:
     if not 0 <= number <= 100:
         raise ProviderResponseError(f"provider feature {scene_id!r} cloud cover is out of range")
     return number
+
+
+def _planet_next_link(payload: Mapping[str, Any]) -> str | None:
+    links = payload.get("_links")
+    if links is None:
+        return None
+    if not isinstance(links, Mapping):
+        raise ProviderResponseError("Planet response _links must be an object")
+    next_url = links.get("_next")
+    if next_url is None:
+        return None
+    if not isinstance(next_url, str):
+        raise ProviderResponseError("Planet response has an invalid next link")
+    parsed = urlparse(next_url)
+    if (
+        parsed.scheme != "https"
+        or parsed.hostname != "api.planet.com"
+        or parsed.username is not None
+        or parsed.password is not None
+        or not parsed.path.startswith("/data/v1/")
+    ):
+        raise ProviderResponseError("Planet response has an invalid next link")
+    if any(key.casefold() == "api_key" for key, _ in parse_qsl(parsed.query)):
+        raise ProviderResponseError("Planet response next link contains a credential")
+    return next_url
 
 
 def _asset_hrefs(value: Any, scene_id: str) -> Mapping[str, str]:

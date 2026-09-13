@@ -15,8 +15,10 @@ from typing import Any, Protocol
 
 from zenit_geospatial.satellite_providers import (
     CBERS_STAC_URL,
+    PLANET_DATA_SEARCH_URL,
     SENTINEL_CATALOG_URL,
     CbersStacProvider,
+    PlanetDataProvider,
     SearchPage,
     SentinelCatalogProvider,
 )
@@ -258,4 +260,33 @@ class CbersCatalogClient:
     def search(self, payload: Mapping[str, Any], access_token: str | None = None) -> SearchPage:
         headers = {"Authorization": f"Bearer {access_token}"} if access_token else None
         response = self._transport.post_json(CBERS_STAC_URL, payload, headers=headers)
+        return self._provider.parse_search_page(response)
+
+
+class PlanetCatalogClient:
+    """Backend-only Planet catalog client; never places the API key in a URL."""
+
+    def __init__(
+        self,
+        transport: JsonTransport,
+        api_key: str,
+        provider: PlanetDataProvider | None = None,
+    ) -> None:
+        if not api_key:
+            raise SatelliteAuthenticationError("Planet API key is not configured")
+        self._transport = transport
+        self._api_key = api_key
+        self._provider = provider or PlanetDataProvider()
+
+    def search(self, payload: Mapping[str, Any]) -> SearchPage:
+        page_size = payload.get("_page_size")
+        if not isinstance(page_size, int) or not 1 <= page_size <= 250:
+            raise ValueError("Planet search _page_size must be between 1 and 250")
+        request_body = {key: value for key, value in payload.items() if key != "_page_size"}
+        url = f"{PLANET_DATA_SEARCH_URL}?{urllib.parse.urlencode({'_page_size': page_size})}"
+        response = self._transport.post_json(
+            url,
+            request_body,
+            headers={"Authorization": f"api-key {self._api_key}"},
+        )
         return self._provider.parse_search_page(response)

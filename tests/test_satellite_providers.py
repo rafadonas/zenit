@@ -5,6 +5,7 @@ from zenit_geospatial.satellite_providers import (
     CBERS_WFI_COLLECTION,
     BoundingBox,
     CbersStacProvider,
+    PlanetDataProvider,
     ProviderResponseError,
     SearchWindow,
     SentinelCatalogProvider,
@@ -82,6 +83,76 @@ class SatelliteProviderTests(unittest.TestCase):
                 "BAND16": "https://provider.invalid/nir.tif",
             },
         )
+
+    def test_planet_request_uses_psscene_aoi_and_acquisition_window(self) -> None:
+        request = PlanetDataProvider().build_search_request(self.bbox, self.window, limit=25)
+
+        self.assertEqual(request["item_types"], ["PSScene"])
+        self.assertEqual(request["_page_size"], 25)
+        filters = request["filter"]["config"]
+        self.assertEqual(filters[0]["type"], "GeometryFilter")
+        self.assertEqual(
+            filters[0]["config"]["coordinates"][0][0],
+            [-46.80, -23.55],
+        )
+        self.assertEqual(
+            filters[1]["config"],
+            {"gte": "2026-08-01T00:00:00Z", "lte": "2026-08-07T00:00:00Z"},
+        )
+
+    def test_planet_page_normalizes_fractional_cloud_cover_without_asset_urls(self) -> None:
+        page = PlanetDataProvider().parse_search_page(
+            {
+                "features": [
+                    {
+                        "id": "planet-scene-1",
+                        "item_type": "PSScene",
+                        "bbox": [-46.8, -23.55, -46.76, -23.5],
+                        "geometry": {"type": "Polygon", "coordinates": []},
+                        "properties": {
+                            "acquired": "2026-08-05T13:10:00Z",
+                            "cloud_cover": 0.125,
+                            "quality_category": "standard",
+                        },
+                        "assets": {"ortho_visual": {"href": "https://private.invalid/asset.tif"}},
+                    }
+                ],
+                "_links": {"_next": "https://api.planet.com/data/v1/quick-search?page_marker=next"},
+            }
+        )
+
+        acquisition = page.acquisitions[0]
+        self.assertEqual(acquisition.provider, "planet")
+        self.assertEqual(acquisition.sensor, "planet-scope")
+        self.assertEqual(acquisition.collection, "PSScene")
+        self.assertEqual(acquisition.cloud_cover_percent, 12.5)
+        self.assertEqual(acquisition.assets, {})
+        self.assertEqual(
+            page.next_url,
+            "https://api.planet.com/data/v1/quick-search?page_marker=next",
+        )
+
+    def test_planet_page_rejects_credential_in_pagination_link(self) -> None:
+        with self.assertRaisesRegex(ProviderResponseError, "contains a credential"):
+            PlanetDataProvider().parse_search_page(
+                {
+                    "features": [],
+                    "_links": {
+                        "_next": "https://api.planet.com/data/v1/quick-search?api_key=secret"
+                    },
+                }
+            )
+
+    def test_planet_page_rejects_pagination_link_from_another_host(self) -> None:
+        with self.assertRaisesRegex(ProviderResponseError, "invalid next link"):
+            PlanetDataProvider().parse_search_page(
+                {
+                    "features": [],
+                    "_links": {
+                        "_next": "https://api.planet.com.attacker.invalid/data/v1/quick-search"
+                    },
+                }
+            )
 
     def test_invalid_or_ambiguous_provider_payload_fails_closed(self) -> None:
         with self.assertRaisesRegex(ProviderResponseError, "features array"):

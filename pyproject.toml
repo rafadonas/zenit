@@ -23,6 +23,7 @@ dependencies = [
 [project.scripts]
 zenit-import = "zenit_geospatial.cli:main"
 zenit-satellite = "zenit_geospatial.satellite_cli:main"
+zenit-planet-catalog = "zenit_geospatial.planet_cli:main"
 zenit-user = "zenit_api.auth_cli:main"
 
 [project.optional-dependencies]
