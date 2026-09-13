@@ -842,6 +842,7 @@ Use `--expect-empty` apenas em um banco recém-inicializado, como o da CI.
 ## Documentação
 
 - [Hub de execução do time e das IAs](docs/team/README.md)
+- [Modelo multimodal de inteligência vegetal v2](docs/architecture/vegetation-intelligence-model-v2.md)
 - [Divisão nominal de Rafael, Guilherme, Lucas e Gabriel](docs/team/team-assignments.md)
 - [Estado atual e lacunas](docs/team/current-state-and-gaps.md)
 - [Roteiro e pacotes de trabalho](docs/team/execution-roadmap.md)
