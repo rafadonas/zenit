@@ -16,6 +16,7 @@ DATABASE_URL = os.getenv(
     "postgresql://zenit:change_me@localhost:5432/zenit",
 ).replace("postgresql+psycopg://", "postgresql://", 1)
 
+
 def main() -> None:
     now = datetime.now(UTC)
     with psycopg.connect(DATABASE_URL) as conn:
@@ -162,8 +163,7 @@ def main() -> None:
                     id, source_review_id, segment_zone_id, creation_policy_id, created_by_user_id,
                     idempotency_key, order_type, status, version, planning_rationale, data_status,
                     authorizes_field_work, eligible_for_field_execution,
-                    eligible_for_official_reporting,
-                    order_metadata
+                    eligible_for_official_reporting, order_metadata
                 ) VALUES (
                     %s, %s, %s, '91000000-0000-4000-8000-000000000001', %s,
                     %s, 'inspection', 'prepared', 1, 'Inspeção preventiva de borda', 'prepared',
@@ -181,7 +181,7 @@ def main() -> None:
             )
 
             # 8. Create 3 work_order_planned_points
-            fractions = [1.0/6.0, 0.5, 5.0/6.0]
+            fractions = [1.0 / 6.0, 0.5, 5.0 / 6.0]
             for seq, frac in enumerate(fractions, start=1):
                 pt_id = uuid4()
                 cur.execute(
@@ -203,6 +203,7 @@ def main() -> None:
 
         conn.commit()
         print(f"SEED COMPLETED SUCCESSFULLY: Created work_order {wo_id}")
+
 
 if __name__ == "__main__":
     main()

@@ -735,6 +735,17 @@ confere schema PostGIS, healthcheck, resposta satelital vazia com proveniência,
 proteção das rotas de escrita e a renderização identificável do dashboard/login
 sem exigir arquivos brutos ou credenciais de provedores.
 
+O job `compose-smoke` combina `compose.yaml` com `compose.ci.yaml` para usar o
+login comum em um banco vazio. O override desativa as sessões fixas da API e
+limpa a identidade automática dos dois dashboards, pois os usuários locais de
+demonstração não existem nesse banco. A configuração local padrão continua
+abrindo os espaços de gerente e supervisor por porta. Para reproduzir esse
+ambiente, use um projeto Compose separado e os dois arquivos; não aplique o
+override a uma instância operacional.
+
+O verificador do APK reconhece certificados numerados e por faixa de SDK,
+exigindo o mesmo certificado debug em todas as faixas, além da assinatura v2.
+
 O manifesto versionado do APK também possui um gate independente para schema,
 proveniência, hashes e bloqueios de uso operacional:
 

@@ -6,7 +6,17 @@ import zipfile
 from pathlib import Path
 
 import pytest
-from scripts.verify_android_apk import ApkVerificationError, verify_apk
+from scripts.verify_android_apk import ApkVerificationError, _debug_signer_sha256, verify_apk
+
+DEBUG_DN = "C=US, O=Android, CN=Android Debug"
+SDK_SIGNERS = (
+    "Signer (minSdkVersion=33, maxSdkVersion=2147483647)",
+    "Signer (minSdkVersion=24, maxSdkVersion=32)",
+)
+
+
+def _certificate(signer: str, *, dn: str = DEBUG_DN, digest: str = "a" * 64) -> str:
+    return f"{signer} certificate DN: {dn}\n{signer} certificate SHA-256 digest: {digest}"
 
 
 def _write_apk(path: Path, *, omit: str | None = None) -> None:
@@ -57,9 +67,36 @@ def _runner(command: list[str], **kwargs: object) -> subprocess.CompletedProcess
     return subprocess.CompletedProcess(command, 0, output, "")
 
 
-def test_verify_apk_records_non_operational_evidence(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "signers",
+    [
+        ("Signer #1",),
+        SDK_SIGNERS,
+        ("Signer (minSdkVersion=33 (dev release=true), maxSdkVersion=2147483647)",),
+    ],
+)
+@pytest.mark.parametrize("dn", [DEBUG_DN, "CN=Android Debug, O=Android, C=US"])
+def test_verify_apk_records_non_operational_evidence(
+    tmp_path: Path, signers: tuple[str, ...], dn: str
+) -> None:
     apk = tmp_path / "app-debug.apk"
     _write_apk(apk)
+
+    def runner(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        result = _runner(command, **kwargs)
+        if "verify" in command:
+            assert "--verbose" in command and "--print-certs" in command
+            result.stdout = "\n".join(
+                (
+                    "Verifies",
+                    "Verified using v2 scheme (APK Signature Scheme v2): true",
+                    "Verified using v3.1 scheme (APK Signature Scheme v3.1): true",
+                    "Number of signers: 1",
+                    *(_certificate(signer, dn=dn) for signer in signers),
+                    _certificate("Source Stamp Signer", dn="CN=Unrelated", digest="b" * 64),
+                )
+            )
+        return result
 
     evidence = verify_apk(
         apk,
@@ -71,7 +108,7 @@ def test_verify_apk_records_non_operational_evidence(tmp_path: Path) -> None:
         configured_api_base_url="https://api.example.invalid",
         apkanalyzer_path=_tool(tmp_path / "apkanalyzer"),
         apksigner_path=_tool(tmp_path / "apksigner"),
-        runner=_runner,
+        runner=runner,
     )
 
     payload = json.loads(json.dumps(evidence.__dict__))
@@ -87,6 +124,40 @@ def test_verify_apk_records_non_operational_evidence(tmp_path: Path) -> None:
     assert payload["eligible_for_field_execution"] is False
     assert payload["eligible_for_official_reporting"] is False
     assert payload["eligible_for_model_training"] is False
+
+
+@pytest.mark.parametrize(
+    ("output", "message"),
+    [
+        ("", "missing signer certificate details"),
+        (_certificate("Source Stamp Signer"), "missing signer certificate details"),
+        (f"Signer #1 certificate DN: {DEBUG_DN}", "missing Signer #1 certificate fields"),
+        ("Signer #1 certificate SHA-256 digest: " + "a" * 64, "missing Signer #1 certificate"),
+        (_certificate("Signer #2"), "exactly one debug signer"),
+        (_certificate("Signer #1", dn="CN=Release, O=Android, C=US"), "expected Android debug"),
+        (_certificate("Signer #1", dn=DEBUG_DN + ", C=US"), "expected Android debug"),
+        (_certificate("Signer #1", digest="g" * 64), "SHA-256 digest is invalid"),
+        (_certificate("Signer #1", digest="a" * 63), "SHA-256 digest is invalid"),
+        (_certificate("Signer #1") + "\n" + _certificate("Signer #1"), "repeats Signer #1"),
+        (
+            _certificate(SDK_SIGNERS[0]) + "\n" + _certificate(SDK_SIGNERS[1], digest="b" * 64),
+            "same debug certificate for every SDK range",
+        ),
+        (
+            _certificate("Signer #1") + "\n" + _certificate(SDK_SIGNERS[0]),
+            "mixes numbered and SDK-targeted signers",
+        ),
+        (
+            _certificate(SDK_SIGNERS[0]) + f"\n{SDK_SIGNERS[1]} certificate DN: {DEBUG_DN}",
+            "missing .* certificate fields",
+        ),
+    ],
+)
+def test_signer_certificate_parser_rejects_incomplete_or_ambiguous_evidence(
+    output: str, message: str
+) -> None:
+    with pytest.raises(ApkVerificationError, match=message):
+        _debug_signer_sha256(output)
 
 
 def test_verify_apk_rejects_incomplete_flutter_archive(tmp_path: Path) -> None:
