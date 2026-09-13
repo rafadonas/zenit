@@ -4,6 +4,10 @@ Este guia cobre ambiente limpo, stack inteira, execução por componente, dados
 locais e diagnóstico. Use credenciais exclusivamente locais. Não copie segredos
 reais para comandos, commits, screenshots ou conversas de IA.
 
+Para o inventário completo de chaves, serviços externos, formatos e requisitos
+por ambiente, leia
+[`external-services-and-secrets.md`](external-services-and-secrets.md).
+
 ## 1. Versões suportadas
 
 | Ferramenta | Versão/base |

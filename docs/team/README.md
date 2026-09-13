@@ -35,6 +35,7 @@ Não use apenas este diretório para decidir regras de domínio. Se houver confl
 | [`vegetation-intelligence-plan.md`](vegetation-intelligence-plan.md) | trabalhar com árvore, grama, imagens, satélite, rótulos ou modelos |
 | [`mobile-app-plan.md`](mobile-app-plan.md) | trabalhar no Flutter, experiência de campo ou sincronização |
 | [`development-setup.md`](development-setup.md) | instalar, executar, testar ou diagnosticar o ambiente |
+| [`external-services-and-secrets.md`](external-services-and-secrets.md) | descobrir chaves, credenciais, serviços e requisitos por ambiente |
 | [`ai-contributor-playbook.md`](ai-contributor-playbook.md) | orientar uma IA, abrir uma frente ou entregar uma mudança |
 | [`git-collaboration-workflow.md`](git-collaboration-workflow.md) | criar branch, validar, commitar, enviar e abrir PR |
 

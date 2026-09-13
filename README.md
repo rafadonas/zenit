@@ -798,6 +798,7 @@ Use `--expect-empty` apenas em um banco recém-inicializado, como o da CI.
 - [Roteiro e pacotes de trabalho](docs/team/execution-roadmap.md)
 - [Fluxo Git para trabalho paralelo](docs/team/git-collaboration-workflow.md)
 - [Setup completo de desenvolvimento](docs/team/development-setup.md)
+- [Serviços externos, chaves e segredos](docs/team/external-services-and-secrets.md)
 - [Design system executável](docs/team/design-system.md)
 - [Manual mestre do projeto](ZENIT_Manual_Mestre_para_Codex.pdf)
 - [Prontidão do MVP demonstrativo](docs/mvp-readiness.md)
