@@ -17,6 +17,7 @@ DEV_RELEASE_SIGNERS = (
     "Signer (minSdkVersion=33 (dev release=true), maxSdkVersion=2147483647)",
     "Signer (minSdkVersion=33, maxSdkVersion=2147483647 (dev release=true))",
     "Signer (minSdkVersion=33, maxSdkVersion=2147483647) (dev release=true)",
+    "Signer (minSdkVersion=33, maxSdkVersion=2147483647, devRelease=true)",
 )
 
 
