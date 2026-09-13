@@ -26,9 +26,10 @@ REQUIRED_ENTRIES = (
 )
 RunCommand = Callable[..., subprocess.CompletedProcess[str]]
 SIGNER_CERTIFICATE_FIELD = re.compile(
-    r"(?P<signer>Signer #\d+|Signer \(minSdkVersion=\d+[^\r\n]*maxSdkVersion=\d+[^\r\n]*\)) "
-    r"certificate (?P<field>DN|SHA-256 digest): (?P<value>.+)"
+    r"(?P<signer>Signer [^\r\n]+?) certificate "
+    r"(?P<field>DN|SHA-256 digest)(?: [^:\r\n]+)?: (?P<value>.+)"
 )
+NUMBERED_SIGNER = re.compile(r"Signer #(?P<number>\d+)(?:\s.*)?")
 
 
 class ApkVerificationError(RuntimeError):
@@ -192,8 +193,12 @@ def _debug_signer_sha256(output: str) -> str:
         if match is None:
             continue
         signer, field, value = match.group("signer", "field", "value")
-        if signer.startswith("Signer #") and signer != "Signer #1":
-            raise ApkVerificationError("APK must have exactly one debug signer")
+        numbered_signer = NUMBERED_SIGNER.fullmatch(signer)
+        if numbered_signer is not None:
+            if numbered_signer.group("number") != "1":
+                raise ApkVerificationError("APK must have exactly one debug signer")
+        elif "minSdkVersion=" not in signer or "maxSdkVersion=" not in signer:
+            continue
         certificate = certificates.setdefault(signer, {})
         if field in certificate:
             raise ApkVerificationError(f"APK signature output repeats {signer} certificate {field}")
@@ -201,7 +206,7 @@ def _debug_signer_sha256(output: str) -> str:
 
     if not certificates:
         raise ApkVerificationError("APK signature output is missing signer certificate details")
-    if "Signer #1" in certificates and len(certificates) != 1:
+    if any(NUMBERED_SIGNER.fullmatch(signer) for signer in certificates) and len(certificates) != 1:
         raise ApkVerificationError("APK signature output mixes numbered and SDK-targeted signers")
 
     digests = set()

@@ -18,11 +18,19 @@ DEV_RELEASE_SIGNERS = (
     "Signer (minSdkVersion=33, maxSdkVersion=2147483647 (dev release=true))",
     "Signer (minSdkVersion=33, maxSdkVersion=2147483647) (dev release=true)",
     "Signer (minSdkVersion=33, maxSdkVersion=2147483647, devRelease=true)",
+    "Signer #1 (minSdkVersion=24, maxSdkVersion=2147483647)",
 )
 
 
 def _certificate(signer: str, *, dn: str = DEBUG_DN, digest: str = "a" * 64) -> str:
     return f"{signer} certificate DN: {dn}\n{signer} certificate SHA-256 digest: {digest}"
+
+
+def _certificate_with_field_metadata(signer: str) -> str:
+    return (
+        f"{signer} certificate DN (dev release=true): {DEBUG_DN}\n"
+        f"{signer} certificate SHA-256 digest (dev release=true): {'a' * 64}"
+    )
 
 
 def _write_apk(path: Path, *, omit: str | None = None) -> None:
@@ -164,6 +172,10 @@ def test_signer_certificate_parser_rejects_incomplete_or_ambiguous_evidence(
 ) -> None:
     with pytest.raises(ApkVerificationError, match=message):
         _debug_signer_sha256(output)
+
+
+def test_signer_certificate_parser_accepts_field_metadata() -> None:
+    assert _debug_signer_sha256(_certificate_with_field_metadata("Signer #1")) == "a" * 64
 
 
 def test_verify_apk_rejects_incomplete_flutter_archive(tmp_path: Path) -> None:
