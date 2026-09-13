@@ -38,8 +38,11 @@ não há alteração local antes de criar a sua branch:
 ```bash
 git switch main
 git pull --ff-only
-git switch -c codex/<ticket>-<slug>
+git switch -c feature/<ticket>-<slug>
 ```
+
+Use `fix/<ticket>-<slug>` para correções e `docs/<ticket>-<slug>` para mudanças
+exclusivamente documentais.
 
 Se o grupo usar worktrees, crie um diretório irmão com uma branch exclusiva. Não
 compartilhe a mesma working tree entre duas IAs.

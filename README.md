@@ -45,8 +45,10 @@ Sou Guilherme. Continue minha trilha do projeto ZENIT.
 A IA deve ler [`docs/team/team-assignments.md`](docs/team/team-assignments.md),
 procurar primeiro uma branch ou PR em andamento daquela pessoa e somente depois
 selecionar o primeiro ticket elegível de sua fila. Cada ticket usa uma branch
-exclusiva `codex/<ticket>-<slug>`, commit em inglês, testes proporcionais ao risco
-e pull request para `main`. Push direto em `main` e force-push são proibidos.
+exclusiva `feature/<ticket>-<slug>`, `fix/<ticket>-<slug>` ou
+`docs/<ticket>-<slug>`, conforme o tipo da mudança, com commit em inglês, testes
+proporcionais ao risco e pull request para `main`. Push direto em `main` e
+force-push são proibidos no fluxo distribuído.
 
 Antes de editar, cada integrante também deve consultar o
 [`hub do time`](docs/team/README.md), o

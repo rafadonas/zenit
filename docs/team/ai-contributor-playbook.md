@@ -117,9 +117,12 @@ validação manual reproduzível. “Está correto” sem evidência não conclu
 
 ## Convenção de branch e commit
 
-- branch: `codex/<ticket-lowercase>-<short-slug>`;
+- feature/refatoração: `feature/<ticket-lowercase>-<short-slug>`;
+- correção/regressão: `fix/<ticket-lowercase>-<short-slug>`;
+- documentação: `docs/<ticket-lowercase>-<short-slug>`;
 - um pacote por branch;
-- exemplos: `codex/web-002-ui-primitives`, `codex/mob-001-feature-split`;
+- exemplos: `feature/web-002-ui-primitives`, `fix/api-001-pagination` e
+  `docs/gov-001-visual-inventory`;
 - commit: `Add dashboard data status primitives`, `Refactor mobile order flow`;
 - não usar “misc”, “changes” ou commit misturando frontend, modelo e infra sem
   necessidade contratual demonstrada.

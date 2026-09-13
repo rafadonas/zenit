@@ -52,6 +52,13 @@ photos/GPS/measurements, and operational reporting.
 - Use migrations, type checks, lint, tests, idempotent imports, and explicit SRIDs.
 - Ask before adding production dependencies or enabling network access.
 
+## Branch naming
+
+- Use `feature/<ticket>-<slug>` for features and cohesive refactors.
+- Use `fix/<ticket>-<slug>` for bug fixes and regressions.
+- Use `docs/<ticket>-<slug>` for documentation-only changes.
+- Keep branch names lowercase, hyphenated, and limited to one cohesive task.
+
 ## Work protocol
 
 1. Inspect instructions, repository state, and task scope.

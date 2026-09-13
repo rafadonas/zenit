@@ -32,8 +32,9 @@ quem está trabalhando antes de editar.
    implementar a parte bloqueada.
 5. Declarar ticket, resultado esperado, branch, arquivos reservados, fora de
    escopo e testes antes de editar.
-6. Criar/continuar uma branch exclusiva `codex/<ticket>-<slug>` baseada na
-   `origin/main` atual. Nunca reutilizar a branch de outro ticket.
+6. Criar/continuar uma branch exclusiva `feature/<ticket>-<slug>`,
+   `fix/<ticket>-<slug>` ou `docs/<ticket>-<slug>`, conforme o tipo da mudança,
+   baseada na `origin/main` atual. Nunca reutilizar a branch de outro ticket.
 7. Implementar, confirmar cada critério com evidência, atualizar documentação,
    fazer commit em inglês, sincronizar sem reescrever histórico, fazer push da
    branch e abrir PR. Nunca enviar diretamente para `main`.
@@ -169,7 +170,7 @@ não usem o mesmo arquivo Markdown editado por quatro branches ao mesmo tempo.
 
 | Ticket | Pessoa | Branch | Arquivos reservados | Estado | Base | PR |
 | --- | --- | --- | --- | --- | --- | --- |
-| exemplo | Guilherme | `codex/web-001-design-tokens` | `apps/dashboard/src/styles/` | `IN_PROGRESS` | `<sha>` | `<url>` |
+| exemplo | Guilherme | `feature/web-001-design-tokens` | `apps/dashboard/src/styles/` | `IN_PROGRESS` | `<sha>` | `<url>` |
 
 Estados permitidos: `READY`, `IN_PROGRESS`, `IN_REVIEW`, `BLOCKED` e `DONE`.
 
