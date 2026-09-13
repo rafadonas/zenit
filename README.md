@@ -796,6 +796,7 @@ Use `--expect-empty` apenas em um banco recém-inicializado, como o da CI.
 - [Hub de execução do time e das IAs](docs/team/README.md)
 - [Estado atual e lacunas](docs/team/current-state-and-gaps.md)
 - [Roteiro e pacotes de trabalho](docs/team/execution-roadmap.md)
+- [Fluxo Git para trabalho paralelo](docs/team/git-collaboration-workflow.md)
 - [Setup completo de desenvolvimento](docs/team/development-setup.md)
 - [Design system executável](docs/team/design-system.md)
 - [Manual mestre do projeto](ZENIT_Manual_Mestre_para_Codex.pdf)

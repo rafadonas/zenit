@@ -57,13 +57,14 @@ photos/GPS/measurements, and operational reporting.
 5. Review scope, security, provenance, and simulation labels.
 6. Update documentation, ADRs, and contracts when behavior changes.
 7. Commit every completed repository change before reporting it; never leave
-   completed work uncommitted. Keep each commit cohesive and do not push unless
-   explicitly requested.
+   completed work uncommitted. Keep each commit cohesive. For team-distributed
+   work, push the validated ticket branch and hand it off through a pull request;
+   never push directly to `main`.
 8. Report changes, tests, limitations, and the recommended next step.
 
 ## Forbidden without explicit request
 
-- Push, force push, history rewrite, hard reset, or branch deletion.
+- Direct push to `main`, force push, history rewrite, hard reset, or branch deletion.
 - Disabling sandbox or approvals.
 - Reading or printing secrets.
 - Replacing raw data, deleting evidence, or automatically promoting a model.

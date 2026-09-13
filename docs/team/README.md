@@ -36,6 +36,7 @@ Não use apenas este diretório para decidir regras de domínio. Se houver confl
 | [`mobile-app-plan.md`](mobile-app-plan.md) | trabalhar no Flutter, experiência de campo ou sincronização |
 | [`development-setup.md`](development-setup.md) | instalar, executar, testar ou diagnosticar o ambiente |
 | [`ai-contributor-playbook.md`](ai-contributor-playbook.md) | orientar uma IA, abrir uma frente ou entregar uma mudança |
+| [`git-collaboration-workflow.md`](git-collaboration-workflow.md) | criar branch, validar, commitar, enviar e abrir PR |
 
 ## Prioridades
 
@@ -59,7 +60,9 @@ P0 não significa “produção”. O estado atual é um MVP demonstrativo/prepa
 5. Trabalhe em branch/worktree própria. Não edite simultaneamente arquivos que
    outra frente reservou.
 6. Execute todos os gates do ticket e os gates globais afetados.
-7. Entregue commit coeso, riscos, evidências, limitações e próximos passos.
+7. Confirme os critérios de aceite com evidências, não apenas com “parece correto”.
+8. Entregue commit coeso, faça push da própria branch e abra um pull request.
+9. Registre riscos, testes, limitações e próximos passos no handoff/PR.
 
 ## Estado inicial deste plano
 
