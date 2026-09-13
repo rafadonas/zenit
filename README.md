@@ -385,7 +385,7 @@ antes de alterar AOI ou período.
 
 ## Banco de dados e migrações
 
-O banco atual exige as migrações `0001` a `0038`, sempre em ordem numérica. Um
+O banco atual exige as migrações `0001` a `0039`, sempre em ordem numérica. Um
 volume novo do Compose executa todas automaticamente por
 `/docker-entrypoint-initdb.d`. Volumes existentes não são atualizados por esse
 mecanismo.
@@ -793,6 +793,11 @@ Use `--expect-empty` apenas em um banco recém-inicializado, como o da CI.
 
 ## Documentação
 
+- [Hub de execução do time e das IAs](docs/team/README.md)
+- [Estado atual e lacunas](docs/team/current-state-and-gaps.md)
+- [Roteiro e pacotes de trabalho](docs/team/execution-roadmap.md)
+- [Setup completo de desenvolvimento](docs/team/development-setup.md)
+- [Design system executável](docs/team/design-system.md)
 - [Manual mestre do projeto](ZENIT_Manual_Mestre_para_Codex.pdf)
 - [Prontidão do MVP demonstrativo](docs/mvp-readiness.md)
 - [Contrato OpenAPI](contracts/openapi.json)

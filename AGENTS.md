@@ -8,6 +8,9 @@ Before significant work, read:
 2. `README.md`
 3. Relevant files in `docs/decisions/` and `docs/data-quality/`
 
+For team-distributed work, also read `docs/team/README.md` and the complete work
+package assigned in `docs/team/work-packages.md` before editing code.
+
 ## Product goal
 
 Build a road-vegetation monitoring platform connecting satellite data,
