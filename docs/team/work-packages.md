@@ -6,6 +6,10 @@ significa que falta decisão ou evidência externa. Ao começar, troque para
 `IN_PROGRESS`, registre responsável e branch no quadro do grupo. Não use este
 arquivo como substituto de uma ferramenta de gestão concorrente.
 
+A atribuição nominal e a ordem de trabalho de Rafael, Guilherme, Lucas e Gabriel
+estão em [`team-assignments.md`](team-assignments.md). A fila pessoal não torna
+um ticket bloqueado elegível nem substitui seus predecessores.
+
 ## Modelo de cabeçalho para cada execução
 
 ```text

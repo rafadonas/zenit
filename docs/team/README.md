@@ -15,10 +15,12 @@ Antes de editar código, leia nesta ordem:
 3. [`../../README.md`](../../README.md) — arquitetura e comandos já existentes;
 4. [`current-state-and-gaps.md`](current-state-and-gaps.md) — o que existe e o
    que ainda falta;
-5. [`execution-roadmap.md`](execution-roadmap.md) — ordem, dependências e divisão
+5. [`team-assignments.md`](team-assignments.md) — identificar Rafael, Guilherme,
+   Lucas ou Gabriel e selecionar a trilha correta;
+6. [`execution-roadmap.md`](execution-roadmap.md) — ordem, dependências e divisão
    entre frentes;
-6. o plano da sua frente;
-7. ADRs, contratos e documentos de qualidade citados no ticket escolhido.
+7. o plano da sua frente;
+8. ADRs, contratos e documentos de qualidade citados no ticket escolhido.
 
 Não use apenas este diretório para decidir regras de domínio. Se houver conflito,
 `AGENTS.md`, ADRs aceitos, contratos versionados e o Manual Mestre têm precedência.
@@ -27,6 +29,7 @@ Não use apenas este diretório para decidir regras de domínio. Se houver confl
 
 | Documento | Use quando |
 | --- | --- |
+| [`team-assignments.md`](team-assignments.md) | informar quem está trabalhando e descobrir sua fila, limites e revisores |
 | [`current-state-and-gaps.md`](current-state-and-gaps.md) | precisar entender o que é real, preparado, simulado ou ausente |
 | [`execution-roadmap.md`](execution-roadmap.md) | escolher a próxima onda e saber o que bloqueia o quê |
 | [`work-packages.md`](work-packages.md) | assumir um ticket com escopo, arquivos e aceite definidos |
@@ -52,18 +55,21 @@ P0 não significa “produção”. O estado atual é um MVP demonstrativo/prepa
 
 ## Como uma pessoa assume trabalho
 
-1. Escolha somente um pacote `READY` de [`work-packages.md`](work-packages.md).
-2. Confirme que seus predecessores estão `DONE` ou que a execução paralela está
+1. Informe seu nome e consulte sua trilha em
+   [`team-assignments.md`](team-assignments.md).
+2. Escolha somente o primeiro pacote elegível `READY` da sua fila em
+   [`work-packages.md`](work-packages.md).
+3. Confirme que seus predecessores estão `DONE` ou que a execução paralela está
    explicitamente autorizada.
-3. Registre responsável, branch `codex/<ticket>-<slug>` e arquivos reservados no
+4. Registre responsável, branch `codex/<ticket>-<slug>` e arquivos reservados no
    quadro compartilhado do grupo.
-4. Cole o ticket completo na conversa da IA; não mande apenas o título.
-5. Trabalhe em branch/worktree própria. Não edite simultaneamente arquivos que
+5. Cole o ticket completo na conversa da IA; não mande apenas o título.
+6. Trabalhe em branch/worktree própria. Não edite simultaneamente arquivos que
    outra frente reservou.
-6. Execute todos os gates do ticket e os gates globais afetados.
-7. Confirme os critérios de aceite com evidências, não apenas com “parece correto”.
-8. Entregue commit coeso, faça push da própria branch e abra um pull request.
-9. Registre riscos, testes, limitações e próximos passos no handoff/PR.
+7. Execute todos os gates do ticket e os gates globais afetados.
+8. Confirme os critérios de aceite com evidências, não apenas com “parece correto”.
+9. Entregue commit coeso, faça push da própria branch e abra um pull request.
+10. Registre riscos, testes, limitações e próximos passos no handoff/PR.
 
 ## Estado inicial deste plano
 
