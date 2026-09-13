@@ -68,6 +68,10 @@ These elements remain available in details or audit views; they are not deleted:
 4. Combine field evidence queues into one field workspace.
 5. Consolidate results, history, and limitations into the closing view.
 
+The map stage now uses a real cartographic base and the imported historical
+vegetation polygons. It remains explicitly limited to SP-021 monitoring data;
+surrounding roads belong to the base map and do not imply ZENIT coverage.
+
 Each increment must keep the old routes functional until its replacement is
 verified. No raw data, migrations, audit events, or operational safeguards are
 removed as part of visual simplification.

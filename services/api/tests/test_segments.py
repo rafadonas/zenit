@@ -6,9 +6,13 @@ from zenit_api.main import app
 from zenit_api.segments import (
     BoundingBox,
     LineStringGeometry,
+    MultiPolygonGeometry,
     SegmentFeature,
     SegmentFeatureCollection,
     SegmentProperties,
+    VegetationMapFeature,
+    VegetationMapFeatureCollection,
+    VegetationMapProperties,
     get_segment_reader,
 )
 
@@ -33,6 +37,42 @@ class FakeSegmentReader:
                 )
             ],
             metadata={"road_code": road_code},
+        )
+
+    async def vegetation_by_bbox(
+        self,
+        road_code: str,
+        bbox: BoundingBox,
+    ) -> VegetationMapFeatureCollection:
+        assert road_code == "SP021"
+        assert bbox.max_latitude == -23.4
+        return VegetationMapFeatureCollection(
+            features=[
+                VegetationMapFeature(
+                    geometry=MultiPolygonGeometry(
+                        coordinates=[
+                            [[[-46.83, -23.63], [-46.82, -23.63], [-46.83, -23.63]]]
+                        ]
+                    ),
+                    properties=VegetationMapProperties(
+                        polygon_id="polygon-1",
+                        source_index=1,
+                        road_code=road_code,
+                        nearest_segment_id="segment-1",
+                        segment_index=0,
+                        vegetation_class="N3",
+                        reference_date="2025-03-28",
+                        version_label="reference-v2",
+                        equipment_class="manual",
+                        original_geometry_valid=True,
+                    ),
+                )
+            ],
+            metadata={
+                "reference_date": "2025-03-28",
+                "data_status": "historical",
+                "mapping_status": "inferred_needs_validation",
+            },
         )
 
 
@@ -82,3 +122,23 @@ def test_segments_rejects_inverted_bbox_before_repository_call() -> None:
     assert payload["code"] == "unprocessable_content"
     assert payload["message"] == "Bounding box minimums must be below maximums"
     assert payload["correlation_id"] == response.headers["x-correlation-id"]
+
+
+def test_vegetation_map_labels_historical_inferred_data() -> None:
+    app.dependency_overrides[get_segment_reader] = fake_segment_reader
+    try:
+        response = asyncio.run(
+            get(
+                "/v1/roads/SP021/vegetation-map"
+                "?min_lon=-46.84&min_lat=-23.64&max_lon=-46.72&max_lat=-23.40"
+            )
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["features"][0]["properties"]["vegetation_class"] == "N3"
+    assert payload["features"][0]["properties"]["eligible_for_operations"] is False
+    assert payload["metadata"]["reference_date"] == "2025-03-28"
+    assert payload["metadata"]["mapping_status"] == "inferred_needs_validation"

@@ -37,6 +37,11 @@ The ordinary password login remains available when fixed-session configuration
 is absent. Staging and production reject fixed-session mode during settings
 validation.
 
+When fixed-session configuration is present, `/login` explains which identity
+is assigned to the current port and offers a passwordless retry action. A
+failed server-to-server session attempt returns to that explanation instead of
+leaving the evaluator on a raw API error response.
+
 ## Consequences
 
 - Local users can open both dashboards without entering passwords.

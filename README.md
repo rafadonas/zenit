@@ -64,7 +64,9 @@ descrevem a condição atual da vegetação e não formam uma série de crescime
 - Catálogo imutável de fontes, checksums, linhagem e importações idempotentes.
 - Parsers tipados para KMZ/KML e planilhas, com anomalias documentadas.
 - Eixo candidato derivado dos marcos e dividido em 309 segmentos geométricos.
-- API GeoJSON por `bbox` e dashboard de corredor somente leitura.
+- API GeoJSON por `bbox` e dashboard de corredor somente leitura com base
+  OpenStreetMap, segmentos e 642 polígonos históricos coloridos. A URL dos
+  tiles pode ser configurada por `MAP_TILE_URL`.
 
 O eixo candidato é apenas para desenvolvimento. Como não foi fornecido um eixo
 rodoviário oficial e os marcos contêm inversões e lacunas conhecidas, ele é
@@ -455,6 +457,11 @@ de login:
 | --- | --- | --- |
 | `http://localhost:3000` | `manager@example.com` | Recomendações e planejamento |
 | `http://localhost:3002` | `supervisor@example.com` | Revisão de fotos pós-serviço |
+
+Abra diretamente uma dessas portas. A rota `/login` identifica o perfil
+configurado naquela instância e permite refazer o acesso demonstrativo sem
+pedir senha. Se o formulário de e-mail e senha aparecer, a sessão fixa não está
+configurada e a instância está no modo de login local comum.
 
 Os e-mails podem ser trocados por `DASHBOARD_MANAGER_EMAIL` e
 `DASHBOARD_SUPERVISOR_EMAIL`. Os nomes de cookie são diferentes entre as

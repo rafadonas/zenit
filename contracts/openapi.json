@@ -1909,6 +1909,37 @@
         "title": "MowingPostServiceSummaryResponse",
         "type": "object"
       },
+      "MultiPolygonGeometry": {
+        "properties": {
+          "coordinates": {
+            "items": {
+              "items": {
+                "items": {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              "type": "array"
+            },
+            "title": "Coordinates",
+            "type": "array"
+          },
+          "type": {
+            "const": "MultiPolygon",
+            "default": "MultiPolygon",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "coordinates"
+        ],
+        "title": "MultiPolygonGeometry",
+        "type": "object"
+      },
       "PhotoReviewQueue": {
         "properties": {
           "items": {
@@ -6006,6 +6037,138 @@
         ],
         "title": "SegmentProperties",
         "type": "object"
+      },
+      "VegetationMapFeature": {
+        "properties": {
+          "geometry": {
+            "$ref": "#/components/schemas/MultiPolygonGeometry"
+          },
+          "properties": {
+            "$ref": "#/components/schemas/VegetationMapProperties"
+          },
+          "type": {
+            "const": "Feature",
+            "default": "Feature",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "geometry",
+          "properties"
+        ],
+        "title": "VegetationMapFeature",
+        "type": "object"
+      },
+      "VegetationMapFeatureCollection": {
+        "properties": {
+          "features": {
+            "items": {
+              "$ref": "#/components/schemas/VegetationMapFeature"
+            },
+            "title": "Features",
+            "type": "array"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "title": "Metadata",
+            "type": "object"
+          },
+          "type": {
+            "const": "FeatureCollection",
+            "default": "FeatureCollection",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "features"
+        ],
+        "title": "VegetationMapFeatureCollection",
+        "type": "object"
+      },
+      "VegetationMapProperties": {
+        "properties": {
+          "data_status": {
+            "const": "historical",
+            "default": "historical",
+            "title": "Data Status",
+            "type": "string"
+          },
+          "eligible_for_operations": {
+            "const": false,
+            "default": false,
+            "title": "Eligible For Operations",
+            "type": "boolean"
+          },
+          "equipment_class": {
+            "title": "Equipment Class",
+            "type": "string"
+          },
+          "mapping_status": {
+            "const": "inferred_needs_validation",
+            "default": "inferred_needs_validation",
+            "title": "Mapping Status",
+            "type": "string"
+          },
+          "nearest_segment_id": {
+            "title": "Nearest Segment Id",
+            "type": "string"
+          },
+          "original_geometry_valid": {
+            "title": "Original Geometry Valid",
+            "type": "boolean"
+          },
+          "polygon_id": {
+            "title": "Polygon Id",
+            "type": "string"
+          },
+          "reference_date": {
+            "title": "Reference Date",
+            "type": "string"
+          },
+          "road_code": {
+            "title": "Road Code",
+            "type": "string"
+          },
+          "segment_index": {
+            "title": "Segment Index",
+            "type": "integer"
+          },
+          "source_index": {
+            "title": "Source Index",
+            "type": "integer"
+          },
+          "vegetation_class": {
+            "enum": [
+              "N1",
+              "N2",
+              "N3",
+              "X",
+              "unknown"
+            ],
+            "title": "Vegetation Class",
+            "type": "string"
+          },
+          "version_label": {
+            "title": "Version Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "polygon_id",
+          "source_index",
+          "road_code",
+          "nearest_segment_id",
+          "segment_index",
+          "vegetation_class",
+          "reference_date",
+          "version_label",
+          "equipment_class",
+          "original_geometry_valid"
+        ],
+        "title": "VegetationMapProperties",
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -8919,6 +9082,120 @@
           }
         },
         "summary": "List Segments",
+        "tags": [
+          "segments"
+        ]
+      }
+    },
+    "/v1/roads/{road_code}/vegetation-map": {
+      "get": {
+        "operationId": "list_vegetation_map_v1_roads__road_code__vegetation_map_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "road_code",
+            "required": true,
+            "schema": {
+              "title": "Road Code",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "min_lon",
+            "required": true,
+            "schema": {
+              "maximum": 180,
+              "minimum": -180,
+              "title": "Min Lon",
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "min_lat",
+            "required": true,
+            "schema": {
+              "maximum": 90,
+              "minimum": -90,
+              "title": "Min Lat",
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "max_lon",
+            "required": true,
+            "schema": {
+              "maximum": 180,
+              "minimum": -180,
+              "title": "Max Lon",
+              "type": "number"
+            }
+          },
+          {
+            "in": "query",
+            "name": "max_lat",
+            "required": true,
+            "schema": {
+              "maximum": 90,
+              "minimum": -90,
+              "title": "Max Lat",
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VegetationMapFeatureCollection"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Request validation failed or the request cannot be processed.",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Request correlation identifier generated or accepted by the API.",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "API error response.",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Request correlation identifier generated or accepted by the API.",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "summary": "List Vegetation Map",
         "tags": [
           "segments"
         ]

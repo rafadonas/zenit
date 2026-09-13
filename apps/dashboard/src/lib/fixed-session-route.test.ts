@@ -55,7 +55,7 @@ describe("fixed dashboard session route", () => {
     expect(cookies).toContain("SameSite=strict");
   });
 
-  it("does not expose the upstream response when session creation fails", async () => {
+  it("returns to an explanatory login screen without exposing an upstream failure", async () => {
     vi.stubEnv("DASHBOARD_APP_ENV", "test");
     vi.stubEnv("DASHBOARD_FIXED_USER_EMAIL", "manager@example.com");
     vi.stubEnv(
@@ -68,7 +68,10 @@ describe("fixed dashboard session route", () => {
       new NextRequest("http://localhost:3000/api/auth/fixed-session"),
     );
 
-    expect(response.status).toBe(401);
+    expect(response.status).toBe(303);
+    expect(response.headers.get("location")).toBe(
+      "http://localhost:3000/login?error=service-unavailable",
+    );
     expect(await response.text()).not.toContain("private detail");
   });
 });

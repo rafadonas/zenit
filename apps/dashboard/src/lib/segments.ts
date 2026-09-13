@@ -135,3 +135,9 @@ export function findSegmentIdByIndex(
       .segment_id ?? null
   );
 }
+
+export function parseSegmentIndex(value: string): number | null {
+  if (value.trim() === "") return null;
+  const segmentIndex = Number(value);
+  return Number.isInteger(segmentIndex) && segmentIndex >= 0 ? segmentIndex : null;
+}

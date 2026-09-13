@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { loadDashboardSession } from "../../lib/dashboard-session";
+import { getFixedDashboardSessionConfig } from "../../lib/fixed-dashboard-session";
 
 export const dynamic = "force-dynamic";
 
@@ -23,8 +24,9 @@ function loginMessage(error: string | undefined, status: string | undefined): st
 }
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
+  const fixedSession = getFixedDashboardSessionConfig();
   const session = await loadDashboardSession();
-  if (session) redirect("/recommendations");
+  if (session) redirect(fixedSession?.homePath ?? "/recommendations");
   const query = await searchParams;
   const message = loginMessage(query.error, query.status);
 
@@ -49,13 +51,29 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           <div className="login-brand-orbit orbit-two" aria-hidden="true" />
         </div>
         <div className="login-form-panel">
-          <p className="eyebrow">Acesso local do MVP</p>
+          <p className="eyebrow">{fixedSession ? "Ambiente demonstrativo" : "Acesso local do MVP"}</p>
           <h1 id="login-title">Entrar na plataforma</h1>
           <p className="subtitle">
-            A identidade autenticada será vinculada à decisão. Nenhuma revisão autoriza trabalho de campo.
+            {fixedSession
+              ? "Esta porta usa um perfil demonstrativo fixo. Não é necessário informar e-mail ou senha."
+              : "A identidade autenticada será vinculada à decisão. Nenhuma revisão autoriza trabalho de campo."}
           </p>
           {message ? <p className="form-message" role="status">{message}</p> : null}
-          <form action="/api/auth/session" className="login-form" method="post">
+          {fixedSession ? (
+            <div className="demo-access-card">
+              <span>Perfil configurado nesta porta</span>
+              <strong>{fixedSession.email}</strong>
+              <small>
+                O gestor usa a porta 3000 e o supervisor usa a porta 3002 no Compose local.
+              </small>
+              <Link
+                className="primary-button"
+                href={`/api/auth/fixed-session?return_to=${encodeURIComponent(fixedSession.homePath)}`}
+              >
+                Acessar demonstração
+              </Link>
+            </div>
+          ) : <form action="/api/auth/session" className="login-form" method="post">
             <label htmlFor="email">E-mail</label>
             <input
               autoComplete="username"
@@ -76,7 +94,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
               type="password"
             />
             <button className="primary-button" type="submit">Entrar</button>
-          </form>
+          </form>}
           <div className="login-safety-note">
             <strong>Identidade local do MVP</strong>
             <span>Não use credenciais corporativas ou senhas reutilizadas.</span>

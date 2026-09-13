@@ -11,15 +11,17 @@ export function proxy(request: NextRequest): NextResponse {
   if (hasSession && request.nextUrl.pathname === "/" && fixedConfig.homePath !== "/") {
     return NextResponse.redirect(new URL(fixedConfig.homePath, request.url));
   }
-  if (hasSession && request.nextUrl.pathname !== "/login") return NextResponse.next();
+  if (hasSession && request.nextUrl.pathname === "/login") {
+    return NextResponse.redirect(new URL(fixedConfig.homePath, request.url));
+  }
+  if (hasSession || request.nextUrl.pathname === "/login") return NextResponse.next();
 
   const destination = request.nextUrl.clone();
   destination.pathname = "/api/auth/fixed-session";
   destination.search = "";
-  const returnPath =
-    request.nextUrl.pathname === "/login" || request.nextUrl.pathname === "/"
-      ? fixedConfig.homePath
-      : `${request.nextUrl.pathname}${request.nextUrl.search}`;
+  const returnPath = request.nextUrl.pathname === "/"
+    ? fixedConfig.homePath
+    : `${request.nextUrl.pathname}${request.nextUrl.search}`;
   destination.searchParams.set("return_to", returnPath);
   return NextResponse.redirect(destination);
 }

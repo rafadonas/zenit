@@ -5,6 +5,7 @@ import {
   findSegmentIdByIndex,
   formatDistance,
   isSegmentCollection,
+  parseSegmentIndex,
   projectSegments,
   type SegmentFeature,
 } from "./segments";
@@ -63,5 +64,13 @@ describe("segment utilities", () => {
     expect(findSegmentIdByIndex([feature], 1)).toBe("segment-1");
     expect(findSegmentIdByIndex([feature], 195)).toBeNull();
     expect(findSegmentIdByIndex([feature], 1.5)).toBeNull();
+  });
+
+  it("does not interpret an empty segment search as segment zero", () => {
+    expect(parseSegmentIndex("")).toBeNull();
+    expect(parseSegmentIndex("   ")).toBeNull();
+    expect(parseSegmentIndex("1.5")).toBeNull();
+    expect(parseSegmentIndex("0")).toBe(0);
+    expect(parseSegmentIndex("195")).toBe(195);
   });
 });

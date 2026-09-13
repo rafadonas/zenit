@@ -1,5 +1,9 @@
 import { CorridorDashboard } from "../components/corridor-dashboard";
 import { isSegmentCollection, type SegmentCollection } from "../lib/segments";
+import {
+  isVegetationMapCollection,
+  type VegetationMapCollection,
+} from "../lib/vegetation-map";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +32,24 @@ async function loadSegments(): Promise<SegmentCollection> {
   return payload;
 }
 
+async function loadVegetationMap(): Promise<VegetationMapCollection> {
+  const baseUrl = process.env.INTERNAL_API_URL ?? "http://localhost:8000";
+  const search = new URLSearchParams(
+    Object.entries(FULL_CORRIDOR_BBOX).map(([key, value]) => [key, String(value)]),
+  );
+  const response = await fetch(`${baseUrl}/v1/roads/SP021/vegetation-map?${search}`, {
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    throw new Error(`Vegetation map API returned HTTP ${response.status}`);
+  }
+  const payload: unknown = await response.json();
+  if (!isVegetationMapCollection(payload)) {
+    throw new Error("Vegetation map API returned an invalid safety contract");
+  }
+  return payload;
+}
+
 export default async function Home({
   searchParams,
 }: {
@@ -40,11 +62,13 @@ export default async function Home({
     parsedSegment !== null && Number.isInteger(parsedSegment) && parsedSegment >= 0
       ? parsedSegment
       : null;
-  const segments = await loadSegments();
+  const [segments, vegetationMap] = await Promise.all([loadSegments(), loadVegetationMap()]);
   return (
     <CorridorDashboard
       collection={segments}
       initialSegmentIndex={initialSegmentIndex}
+      mapTileUrl={process.env.MAP_TILE_URL ?? "https://tile.openstreetmap.org/{z}/{x}/{y}.png"}
+      vegetationMap={vegetationMap}
     />
   );
 }

@@ -19,6 +19,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   }
 
   const baseUrl = process.env.INTERNAL_API_URL ?? "http://localhost:8000";
+  const securityConfig = getDashboardSecurityConfig();
+  const unavailable = () => NextResponse.redirect(
+    new URL("/login?error=service-unavailable", securityConfig.publicOrigin),
+    303,
+  );
   let apiResponse: Response;
   try {
     apiResponse = await fetch(`${baseUrl}/v1/auth/fixed-session`, {
@@ -31,27 +36,17 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       method: "POST",
     });
   } catch {
-    return NextResponse.json(
-      { detail: "Fixed dashboard session is unavailable" },
-      { status: 503 },
-    );
+    return unavailable();
   }
   if (!apiResponse.ok) {
-    return NextResponse.json(
-      { detail: "Fixed dashboard session could not be created" },
-      { status: apiResponse.status === 401 ? 401 : 503 },
-    );
+    return unavailable();
   }
 
   const payload: unknown = await apiResponse.json();
   if (!isAccessTokenContract(payload)) {
-    return NextResponse.json(
-      { detail: "Fixed dashboard session returned an invalid contract" },
-      { status: 503 },
-    );
+    return unavailable();
   }
 
-  const securityConfig = getDashboardSecurityConfig();
   const requestedReturnPath = safeReturnPath(request.nextUrl.searchParams.get("return_to"));
   const returnPath = requestedReturnPath === "/" ? fixedConfig.homePath : requestedReturnPath;
   const response = NextResponse.redirect(new URL(returnPath, securityConfig.publicOrigin), 303);

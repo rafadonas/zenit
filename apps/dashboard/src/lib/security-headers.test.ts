@@ -19,7 +19,7 @@ describe("dashboard security headers", () => {
         "Content-Security-Policy": "base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
         "Cross-Origin-Opener-Policy": "same-origin",
         "Permissions-Policy": "camera=(), geolocation=(), microphone=()",
-        "Referrer-Policy": "no-referrer",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
         "X-Content-Type-Options": "nosniff",
         "X-DNS-Prefetch-Control": "off",
         "X-Frame-Options": "DENY",
