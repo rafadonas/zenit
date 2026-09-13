@@ -24,7 +24,7 @@ Antes de editar, registre no quadro do grupo:
 Ticket: WEB-006
 Responsável: <pessoa>
 Assistente de IA: <ferramenta/conversa, se útil>
-Branch: codex/web-006-corridor-map-v2
+Branch: feature/web-006-corridor-map-v2
 Arquivos reservados: <lista>
 Base commit: <git rev-parse HEAD>
 Estado: IN_PROGRESS
@@ -42,9 +42,18 @@ Com working tree limpa:
 git status --short --branch
 git switch main
 git pull --ff-only origin main
-git switch -c codex/<ticket-lowercase>-<slug>
+git switch -c feature/<ticket-lowercase>-<slug>
 git status --short --branch
 ```
+
+Escolha o prefixo pelo tipo predominante da mudança:
+
+- `feature/` para funcionalidades e refatorações coesas;
+- `fix/` para correções e regressões;
+- `docs/` para mudanças exclusivamente documentais.
+
+Use nomes em minúsculas, separados por hífen e limitados a um ticket. Nos
+comandos abaixo, substitua `feature/` pelo prefixo adequado quando necessário.
 
 Se já houver modificações locais, pare e identifique quem é o dono. Não use stash,
 reset ou checkout para esconder/apagar trabalho sem entender sua origem.
@@ -55,7 +64,7 @@ reset ou checkout para esconder/apagar trabalho sem entender sua origem.
 
 ```bash
 git fetch origin
-git worktree add -b codex/<ticket-lowercase>-<slug> \
+git worktree add -b feature/<ticket-lowercase>-<slug> \
   ../zenit-<ticket-lowercase> origin/main
 ```
 
@@ -157,7 +166,7 @@ Descubra e confira o nome antes de enviar:
 ```bash
 git branch --show-current
 git status --short --branch
-git push -u origin codex/<ticket-lowercase>-<slug>
+git push -u origin feature/<ticket-lowercase>-<slug>
 ```
 
 O nome retornado por `git branch --show-current` deve ser exatamente a branch do
@@ -212,11 +221,12 @@ API + consumidor para contrato/migração.
 ## Instrução curta para colar em toda conversa de IA
 
 ```text
-Trabalhe exclusivamente na branch codex/<ticket>-<slug>. Ao terminar, compare
-cada critério de aceite com evidência objetiva, revise o diff completo, execute
-todos os testes aplicáveis, confirme que não há segredo/dado bruto/alteração fora
-do escopo, faça commit coeso em inglês, sincronize com origin/main por merge sem
-reescrever histórico, repita os gates afetados e dê push somente nessa branch.
+Trabalhe exclusivamente na branch <prefixo>/<ticket>-<slug>, usando feature, fix
+ou docs conforme o tipo da mudança. Ao terminar, compare cada critério de aceite
+com evidência objetiva, revise o diff completo, execute todos os testes aplicáveis,
+confirme que não há segredo/dado bruto/alteração fora do escopo, faça commit coeso
+em inglês, sincronize com origin/main por merge sem reescrever histórico, repita
+os gates afetados e dê push somente nessa branch.
 Nunca faça push direto em main nem use force-push. Entregue a descrição completa
 do pull request e não declare sucesso para testes que não executou.
 ```

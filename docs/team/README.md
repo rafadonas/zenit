@@ -61,8 +61,9 @@ P0 não significa “produção”. O estado atual é um MVP demonstrativo/prepa
    [`work-packages.md`](work-packages.md).
 3. Confirme que seus predecessores estão `DONE` ou que a execução paralela está
    explicitamente autorizada.
-4. Registre responsável, branch `codex/<ticket>-<slug>` e arquivos reservados no
-   quadro compartilhado do grupo.
+4. Registre responsável, branch `feature/<ticket>-<slug>`,
+   `fix/<ticket>-<slug>` ou `docs/<ticket>-<slug>` e arquivos reservados no quadro
+   compartilhado do grupo.
 5. Cole o ticket completo na conversa da IA; não mande apenas o título.
 6. Trabalhe em branch/worktree própria. Não edite simultaneamente arquivos que
    outra frente reservou.
