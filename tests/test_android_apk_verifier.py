@@ -178,6 +178,16 @@ def test_signer_certificate_parser_accepts_field_metadata() -> None:
     assert _debug_signer_sha256(_certificate_with_field_metadata("Signer #1")) == "a" * 64
 
 
+def test_signer_certificate_parser_diagnostic_redacts_values() -> None:
+    output = "Signer format changed: sensitive-certificate-value"
+
+    with pytest.raises(ApkVerificationError) as error:
+        _debug_signer_sha256(output)
+
+    assert "Signer format changed" in str(error.value)
+    assert "sensitive-certificate-value" not in str(error.value)
+
+
 def test_verify_apk_accepts_successful_signature_report_on_stderr(tmp_path: Path) -> None:
     apk = tmp_path / "app-debug.apk"
     _write_apk(apk)

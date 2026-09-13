@@ -205,7 +205,16 @@ def _debug_signer_sha256(output: str) -> str:
         certificate[field] = value.strip()
 
     if not certificates:
-        raise ApkVerificationError("APK signature output is missing signer certificate details")
+        structural_lines = [
+            line.strip().partition(":")[0]
+            for line in output.splitlines()
+            if "signer" in line.casefold() or "certificate" in line.casefold()
+        ]
+        diagnostic = "; ".join(structural_lines[:12]) or "no signer or certificate lines"
+        raise ApkVerificationError(
+            "APK signature output is missing signer certificate details "
+            f"(structural lines: {diagnostic})"
+        )
     if any(NUMBERED_SIGNER.fullmatch(signer) for signer in certificates) and len(certificates) != 1:
         raise ApkVerificationError("APK signature output mixes numbered and SDK-targeted signers")
 
