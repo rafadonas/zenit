@@ -21,6 +21,7 @@ from zenit_api.mowing_post_service_exceptions import (
     MowingPostServiceExceptionResponse,
     MowingPostServiceExceptionReviewRequest,
     MowingPostServiceExceptionReviewResponse,
+    PostgresMowingPostServiceExceptionRepository,
     get_exception_repository,
 )
 
@@ -275,3 +276,13 @@ def test_lists_actor_scoped_simulated_exceptions():
     assert payload["items"][0]["recommendation"] == "inspect_follow_up"
     assert payload["items"][0]["authorizes_field_work"] is False
     assert payload["warning"].startswith("Simulated post-service exceptions")
+
+
+def test_exception_list_query_applies_safety_filters_before_pagination():
+    query = PostgresMowingPostServiceExceptionRepository._list_query()
+
+    assert "AND exception.phase = 'post_service'" in query
+    assert query.index("AND exception.phase = 'post_service'") < query.rindex(
+        "ORDER BY exception.created_at DESC, exception.id"
+    )
+    assert query.rstrip().endswith("ORDER BY exception.created_at DESC, exception.id LIMIT %s")

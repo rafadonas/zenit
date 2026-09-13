@@ -281,13 +281,7 @@ class PostgresMowingPostServiceExceptionRepository:
         connection = await psycopg.AsyncConnection.connect(self._database_url)
         async with connection, connection.cursor() as cursor:
             await cursor.execute(
-                self._query(
-                    """EXISTS (SELECT 1 FROM road_user_role assignment
-                       WHERE assignment.user_id=%s AND assignment.road_id=axis.road_id
-                         AND assignment.role IN ('manager','supervisor')
-                         AND assignment.data_status <> 'simulated')
-                       ORDER BY exception.created_at DESC, exception.id LIMIT %s"""
-                ),
+                self._list_query(),
                 (actor.id, limit + 1),
             )
             rows = await cursor.fetchall()
@@ -486,6 +480,18 @@ class PostgresMowingPostServiceExceptionRepository:
               AND NOT exception.eligible_for_official_reporting
               AND NOT exception.authorizes_field_work
             """
+
+    @classmethod
+    def _list_query(cls) -> str:
+        return (
+            cls._query(
+                """EXISTS (SELECT 1 FROM road_user_role assignment
+                   WHERE assignment.user_id=%s AND assignment.road_id=axis.road_id
+                     AND assignment.role IN ('manager','supervisor')
+                     AND assignment.data_status <> 'simulated')"""
+            )
+            + " ORDER BY exception.created_at DESC, exception.id LIMIT %s"
+        )
 
     @staticmethod
     def _row(row) -> MowingPostServiceExceptionResponse:
