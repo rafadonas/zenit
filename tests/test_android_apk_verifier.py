@@ -178,6 +178,33 @@ def test_signer_certificate_parser_accepts_field_metadata() -> None:
     assert _debug_signer_sha256(_certificate_with_field_metadata("Signer #1")) == "a" * 64
 
 
+def test_verify_apk_accepts_successful_signature_report_on_stderr(tmp_path: Path) -> None:
+    apk = tmp_path / "app-debug.apk"
+    _write_apk(apk)
+
+    def runner(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        result = _runner(command, **kwargs)
+        if "verify" in command:
+            result.stderr = result.stdout
+            result.stdout = ""
+        return result
+
+    evidence = verify_apk(
+        apk,
+        expected_application_id="br.com.zenit.zenit_mobile",
+        expected_version_name="1.0.0",
+        expected_version_code="1",
+        expected_min_sdk="24",
+        expected_target_sdk="36",
+        configured_api_base_url="https://api.example.invalid",
+        apkanalyzer_path=_tool(tmp_path / "apkanalyzer"),
+        apksigner_path=_tool(tmp_path / "apksigner"),
+        runner=runner,
+    )
+
+    assert evidence.signature_verified is True
+
+
 def test_verify_apk_rejects_incomplete_flutter_archive(tmp_path: Path) -> None:
     apk = tmp_path / "app-debug.apk"
     _write_apk(apk, omit="assets/flutter_assets/AssetManifest.bin")

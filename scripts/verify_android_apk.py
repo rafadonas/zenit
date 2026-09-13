@@ -120,7 +120,7 @@ def _run_tool(
     if result.returncode != 0:
         detail = result.stderr.strip() or result.stdout.strip() or "no diagnostic output"
         raise ApkVerificationError(f"{name} failed: {detail}")
-    return result.stdout.strip()
+    return "\n".join(part for stream in (result.stdout, result.stderr) if (part := stream.strip()))
 
 
 def _validate_demo_api_base_url(value: str) -> None:
