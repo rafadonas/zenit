@@ -210,7 +210,7 @@ def _debug_signer_sha256(output: str) -> str:
 
     if not certificates:
         structural_lines = [
-            line.strip().partition(":")[0]
+            line.strip().rpartition(":")[0]
             for line in output.splitlines()
             if "signer" in line.casefold() or "certificate" in line.casefold()
         ]
