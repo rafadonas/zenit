@@ -26,8 +26,8 @@ REQUIRED_ENTRIES = (
 )
 RunCommand = Callable[..., subprocess.CompletedProcess[str]]
 SIGNER_CERTIFICATE_FIELD = re.compile(
-    r"(?:V\d+(?:\.\d+)? Signer:\s*)?"
-    r"(?P<signer>Signer [^\r\n]+?|V\d+(?:\.\d+)? Signer) certificate "
+    r"(?:(?P<scheme_signer>V\d+(?:\.\d+)? Signer):\s*)?"
+    r"(?:(?P<signer>Signer [^\r\n]+?|V\d+(?:\.\d+)? Signer)\s+)?certificate "
     r"(?P<field>DN|SHA-256 digest)(?: [^:\r\n]+)?: (?P<value>.+)"
 )
 NUMBERED_SIGNER = re.compile(r"Signer #(?P<number>\d+)(?:\s.*)?")
@@ -193,7 +193,7 @@ def _debug_signer_sha256(output: str) -> str:
         match = SIGNER_CERTIFICATE_FIELD.fullmatch(line.strip())
         if match is None:
             continue
-        signer = match.group("signer")
+        signer = match.group("signer") or match.group("scheme_signer")
         field, value = match.group("field", "value")
         numbered_signer = NUMBERED_SIGNER.fullmatch(signer)
         if numbered_signer is not None:

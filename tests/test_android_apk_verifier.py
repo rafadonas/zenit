@@ -20,7 +20,7 @@ DEV_RELEASE_SIGNERS = (
     "Signer (minSdkVersion=33, maxSdkVersion=2147483647, devRelease=true)",
     "Signer #1 (minSdkVersion=24, maxSdkVersion=2147483647)",
 )
-SCHEME_SIGNERS = ("V2 Signer: Signer #1", "V2 Signer")
+SCHEME_SIGNERS = ("V2 Signer: Signer #1", "V2 Signer", "V2 Signer:")
 
 
 def _certificate(signer: str, *, dn: str = DEBUG_DN, digest: str = "a" * 64) -> str:
