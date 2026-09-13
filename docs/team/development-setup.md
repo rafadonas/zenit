@@ -4,6 +4,10 @@ Este guia cobre ambiente limpo, stack inteira, execução por componente, dados
 locais e diagnóstico. Use credenciais exclusivamente locais. Não copie segredos
 reais para comandos, commits, screenshots ou conversas de IA.
 
+Para o inventário completo de chaves, serviços externos, formatos e requisitos
+por ambiente, leia
+[`external-services-and-secrets.md`](external-services-and-secrets.md).
+
 ## 1. Versões suportadas
 
 | Ferramenta | Versão/base |
@@ -39,6 +43,10 @@ git switch -c codex/<ticket>-<slug>
 
 Se o grupo usar worktrees, crie um diretório irmão com uma branch exclusiva. Não
 compartilhe a mesma working tree entre duas IAs.
+
+Depois desse ponto, não trabalhe nem envie commits diretamente em `main`. Siga o
+fluxo completo de validação, push da branch e pull request em
+[`git-collaboration-workflow.md`](git-collaboration-workflow.md).
 
 ## 3. Configuração de ambiente
 

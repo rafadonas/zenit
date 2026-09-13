@@ -27,7 +27,8 @@ Antes de editar, inspecione o estado real e escreva um plano pequeno. Não inven
 dados oficiais, não use demo/simulado para treino/relatório, não autorize roçada,
 não modifique data/raw, não adicione dependência nem altere arquitetura sem pedir.
 Preserve alterações alheias. Ao terminar, revise diff, execute testes, atualize a
-documentação necessária e faça commit coeso em inglês. Não dê push sem pedido.
+documentação necessária, faça commit coeso em inglês e dê push somente na branch
+do ticket. Nunca dê push direto na main e nunca use force-push.
 ```
 
 ## Protocolo obrigatório da IA
@@ -78,12 +79,21 @@ operação destrutiva, rede não prevista, dados sensíveis ou expansão materia
 - para migração: forward/down e volume/banco de teste apropriado;
 - para mobile: restart/offline/retry além de testes unitários.
 
+A confirmação final deve comparar um a um os critérios de aceite do ticket com
+uma evidência: teste automatizado, inspeção de código, screenshot segura ou
+validação manual reproduzível. “Está correto” sem evidência não conclui o ticket.
+
 ### 5. Entregar
 
 - atualizar ADR/contrato/guia quando o comportamento mudar;
 - commit coeso com mensagem imperativa em inglês;
+- sincronizar com `origin/main`, resolver conflitos conscientemente e repetir os
+  gates afetados;
+- executar `git push -u origin <branch-do-ticket>`;
+- abrir pull request com objetivo, aceite, testes, screenshots quando úteis,
+  riscos, limitações e rollback;
 - reportar commit, arquivos, comportamento, testes, limitações e próximo ticket;
-- não fazer push, merge, deploy ou promoção sem pedido explícito.
+- não fazer push direto em `main`, force-push, merge, deploy ou promoção.
 
 ## Convenção de branch e commit
 
@@ -93,6 +103,9 @@ operação destrutiva, rede não prevista, dados sensíveis ou expansão materia
 - commit: `Add dashboard data status primitives`, `Refactor mobile order flow`;
 - não usar “misc”, “changes” ou commit misturando frontend, modelo e infra sem
   necessidade contratual demonstrada.
+
+O fluxo Git completo e os comandos seguros estão em
+[`git-collaboration-workflow.md`](git-collaboration-workflow.md).
 
 ## Coordenação entre IAs
 
@@ -120,6 +133,8 @@ Regras:
 - ID:
 - Resultado observável:
 - Commit:
+- Branch remota:
+- Pull request:
 
 ## Arquivos alterados
 - caminho: motivo
@@ -130,6 +145,9 @@ Regras:
 
 ## Testes executados
 - comando — resultado/contagem
+
+## Critérios de aceite confirmados
+- critério — evidência objetiva
 
 ## Validação manual
 - cenário, perfil, viewport/device e resultado

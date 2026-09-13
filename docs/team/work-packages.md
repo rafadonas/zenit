@@ -12,9 +12,10 @@ arquivo como substituto de uma ferramenta de gestão concorrente.
 Ticket:
 Responsável:
 Branch/worktree:
+Branch remota/PR:
 Arquivos reservados:
 Dependências confirmadas:
-Testes planejados:
+Testes planejados e evidências de aceite:
 Decisões/assunções:
 ```
 

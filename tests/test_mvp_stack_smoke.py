@@ -45,7 +45,7 @@ def _success_opener(request: object, *, timeout: float) -> FakeResponse:
     if url == "http://dashboard.test/":
         return FakeResponse(
             200,
-            b'<html><main data-zenit-smoke-page="overview"></main></html>',
+            b'<html><main data-zenit-smoke-page="corridor"></main></html>',
         )
     raise HTTPError(url, 401, "Unauthorized", {}, io.BytesIO(b'{"detail":"unauthorized"}'))
 

@@ -26,9 +26,11 @@ REQUIRED_ENTRIES = (
 )
 RunCommand = Callable[..., subprocess.CompletedProcess[str]]
 SIGNER_CERTIFICATE_FIELD = re.compile(
-    r"(?P<signer>Signer #\d+|Signer \(minSdkVersion=\d+(?: \(dev release=true\))?, "
-    r"maxSdkVersion=\d+\)) certificate (?P<field>DN|SHA-256 digest): (?P<value>.+)"
+    r"(?:(?P<scheme_signer>V\d+(?:\.\d+)? Signer):\s*)?"
+    r"(?:(?P<signer>Signer [^\r\n]+?|V\d+(?:\.\d+)? Signer)\s+)?certificate "
+    r"(?P<field>DN|SHA-256 digest)(?: [^:\r\n]+)?: (?P<value>.+)"
 )
+NUMBERED_SIGNER = re.compile(r"Signer #(?P<number>\d+)(?:\s.*)?")
 
 
 class ApkVerificationError(RuntimeError):
@@ -119,7 +121,7 @@ def _run_tool(
     if result.returncode != 0:
         detail = result.stderr.strip() or result.stdout.strip() or "no diagnostic output"
         raise ApkVerificationError(f"{name} failed: {detail}")
-    return result.stdout.strip()
+    return "\n".join(part for stream in (result.stdout, result.stderr) if (part := stream.strip()))
 
 
 def _validate_demo_api_base_url(value: str) -> None:
@@ -191,17 +193,33 @@ def _debug_signer_sha256(output: str) -> str:
         match = SIGNER_CERTIFICATE_FIELD.fullmatch(line.strip())
         if match is None:
             continue
-        signer, field, value = match.group("signer", "field", "value")
-        if signer.startswith("Signer #") and signer != "Signer #1":
-            raise ApkVerificationError("APK must have exactly one debug signer")
+        signer = match.group("signer") or match.group("scheme_signer")
+        field, value = match.group("field", "value")
+        numbered_signer = NUMBERED_SIGNER.fullmatch(signer)
+        if numbered_signer is not None:
+            if numbered_signer.group("number") != "1":
+                raise ApkVerificationError("APK must have exactly one debug signer")
+        elif signer.startswith("V") and signer.endswith(" Signer"):
+            pass
+        elif "minSdkVersion=" not in signer or "maxSdkVersion=" not in signer:
+            continue
         certificate = certificates.setdefault(signer, {})
         if field in certificate:
             raise ApkVerificationError(f"APK signature output repeats {signer} certificate {field}")
         certificate[field] = value.strip()
 
     if not certificates:
-        raise ApkVerificationError("APK signature output is missing signer certificate details")
-    if "Signer #1" in certificates and len(certificates) != 1:
+        structural_lines = [
+            line.strip().rpartition(":")[0]
+            for line in output.splitlines()
+            if "signer" in line.casefold() or "certificate" in line.casefold()
+        ]
+        diagnostic = "; ".join(structural_lines[:12]) or "no signer or certificate lines"
+        raise ApkVerificationError(
+            "APK signature output is missing signer certificate details "
+            f"(structural lines: {diagnostic})"
+        )
+    if any(NUMBERED_SIGNER.fullmatch(signer) for signer in certificates) and len(certificates) != 1:
         raise ApkVerificationError("APK signature output mixes numbered and SDK-targeted signers")
 
     digests = set()
