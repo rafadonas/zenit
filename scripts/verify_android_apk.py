@@ -27,7 +27,8 @@ REQUIRED_ENTRIES = (
 RunCommand = Callable[..., subprocess.CompletedProcess[str]]
 SIGNER_CERTIFICATE_FIELD = re.compile(
     r"(?P<signer>Signer #\d+|Signer \(minSdkVersion=\d+(?: \(dev release=true\))?, "
-    r"maxSdkVersion=\d+\)) certificate (?P<field>DN|SHA-256 digest): (?P<value>.+)"
+    r"maxSdkVersion=\d+(?: \(dev release=true\))?\)(?: \(dev release=true\))?) "
+    r"certificate (?P<field>DN|SHA-256 digest): (?P<value>.+)"
 )
 
 
