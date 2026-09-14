@@ -707,6 +707,7 @@ h2, .card-heading h2, .side-heading h2, .recommendation-title h2, .prepared-summ
   margin-bottom: 28px;
 }
 .overview-hero > div:first-child { max-width: 700px; }
+.overview-hero > .ui-alert { width: min(360px, 100%); }
 .overview-hero h1 { margin: 8px 0 12px; font-size: clamp(2.5rem, 5vw, 4.35rem); }
 .overview-hero .subtitle { max-width: 660px; margin: 0; font-size: 1rem; }
 .demo-state {
@@ -734,6 +735,8 @@ h2, .card-heading h2, .side-heading h2, .recommendation-title h2, .prepared-summ
 .overview-metrics article:last-child { border-right: 0; }
 .overview-metrics strong { font-size: 2rem; line-height: 1; letter-spacing: -.05em; }
 .overview-metrics span { color: var(--color-text-muted); font-size: .72rem; }
+.overview-metrics small { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; color: var(--color-text-muted); font-size: .65rem; }
+.overview-state { margin-bottom: 18px; }
 .workflow-panel, .focus-card, .boundary-card {
   border: 1px solid var(--color-border);
   border-radius: 18px;
@@ -795,6 +798,8 @@ h2, .card-heading h2, .side-heading h2, .recommendation-title h2, .prepared-summ
 .boundary-card ul { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
 .boundary-card li { display: grid; gap: 4px; padding: 14px 0; border-top: 1px solid var(--color-border); }
 .boundary-card li strong { font-size: .72rem; }
+.boundary-card li a { color: var(--color-brand); text-decoration: none; }
+.boundary-card li a:hover, .boundary-card li a:focus-visible { text-decoration: underline; }
 .boundary-card li span { color: var(--color-text-muted); font-size: .68rem; line-height: 1.45; }
 
 @media (min-width: 981px) {

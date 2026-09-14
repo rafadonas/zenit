@@ -1,10 +1,14 @@
 import Link from "next/link";
 
 import { DashboardHeader } from "../../components/dashboard-header";
+import { Alert, DataStatus, EmptyState, ErrorState } from "../../components/ui";
 import { loadDashboardSession } from "../../lib/dashboard-session";
 import {
   buildOverviewMetrics,
+  latestOverviewReference,
+  nextDecisionItem,
   recommendationLabel,
+  shortcutsForRole,
   zoneLabel,
 } from "../../lib/overview";
 import {
@@ -21,6 +25,13 @@ const FULL_CORRIDOR_BBOX = {
   max_lon: -46.72,
   max_lat: -23.4,
 };
+
+function displayDataStatus(status: string): "real" | "estimated" | "simulated" | "prepared" | "inconclusive" {
+  if (status === "real" || status === "estimated" || status === "simulated" || status === "prepared") {
+    return status;
+  }
+  return "inconclusive";
+}
 
 async function loadRecommendations(): Promise<RecommendationQueue> {
   const baseUrl = process.env.INTERNAL_API_URL ?? "http://localhost:8000";
@@ -52,13 +63,26 @@ async function loadSegments(): Promise<SegmentCollection> {
 }
 
 export default async function OverviewPage() {
-  const [segments, queue, session] = await Promise.all([
-    loadSegments(),
-    loadRecommendations(),
+  const [segmentsResult, queueResult, session] = await Promise.all([
+    loadSegments().then(
+      (value) => ({ ok: true as const, value }),
+      (error: unknown) => ({ error, ok: false as const }),
+    ),
+    loadRecommendations().then(
+      (value) => ({ ok: true as const, value }),
+      (error: unknown) => ({ error, ok: false as const }),
+    ),
     loadDashboardSession(),
   ]);
-  const metrics = buildOverviewMetrics(segments.features.length, queue.items);
-  const focus = queue.items.find((item) => item.review_state === "awaiting_review") ?? queue.items[0];
+  const segments = segmentsResult.ok ? segmentsResult.value : null;
+  const queue = queueResult.ok ? queueResult.value : null;
+  const items = queue?.items ?? [];
+  const metrics = buildOverviewMetrics(segments?.features.length ?? 0, items);
+  const reference = latestOverviewReference(items);
+  const focus = nextDecisionItem(items);
+  const primaryRole = session?.road_roles[0]?.role ?? null;
+  const shortcuts = shortcutsForRole(primaryRole);
+  const hasPartialError = !segmentsResult.ok || !queueResult.ok;
 
   return (
     <main className="overview-shell" data-zenit-smoke-page="overview" id="main-content" tabIndex={-1}>
@@ -79,24 +103,51 @@ export default async function OverviewPage() {
       <div className="overview-content">
         <section className="overview-hero">
           <div>
-            <p className="eyebrow">Demonstração do produto</p>
-            <h1>Da imagem à decisão em campo</h1>
+            <p className="eyebrow">Situação</p>
+            <h1>
+              {metrics.awaitingReview > 0
+                ? `${metrics.awaitingReview} decisão(ões) aguardam revisão humana`
+                : "Nenhuma decisão pendente nesta fila"}
+            </h1>
             <p className="subtitle">
-              Uma visão simples do que foi detectado, do que precisa de decisão humana e do
-              que ainda depende de validação.
+              Primeiro veja o estado da rodovia, depois os pontos de atenção e por fim a
+              próxima ação permitida para o seu papel.
             </p>
           </div>
-          <div className="demo-state" role="status">
-            <span>Ambiente preparado</span>
-            <strong>Nenhuma ação libera trabalho de campo</strong>
-          </div>
+          <Alert tone={reference.isStale ? "near" : "normal"} title={reference.isStale ? "Referência temporal antiga" : "Referência temporal visível"}>
+            Fonte: API interna do dashboard. Última aquisição: {reference.label}. Nenhuma ação libera trabalho de campo.
+          </Alert>
         </section>
 
-        <section className="overview-metrics" aria-label="Resumo da demonstração">
-          <article><strong>{metrics.segmentCount}</strong><span>trechos de 100 m</span></article>
-          <article><strong>{queue.metadata.total_count}</strong><span>análises apresentadas</span></article>
-          <article><strong>{metrics.awaitingReview}</strong><span>decisões pendentes</span></article>
-          <article><strong>{metrics.preparedInspectionOrders}</strong><span>ordens preparadas</span></article>
+        {hasPartialError ? (
+          <ErrorState
+            className="overview-state"
+            description="Parte dos dados da visão geral não carregou. Nenhum KPI foi presumido."
+            title="Dados parcialmente indisponíveis"
+          />
+        ) : null}
+
+        <section className="overview-metrics" aria-label="Indicadores com fonte e referência temporal">
+          <article>
+            <strong>{metrics.segmentCount}</strong>
+            <span>trechos de 100 m</span>
+            <small><DataStatus status="prepared" /> Fonte: segmentos SP021</small>
+          </article>
+          <article>
+            <strong>{queue?.metadata.total_count ?? 0}</strong>
+            <span>análises apresentadas</span>
+            <small><DataStatus status={reference.latestAcquiredAt ? "estimated" : "inconclusive"} /> Ref.: {reference.label}</small>
+          </article>
+          <article>
+            <strong>{metrics.awaitingReview}</strong>
+            <span>decisões pendentes</span>
+            <small><DataStatus status="prepared" /> Fila humana</small>
+          </article>
+          <article>
+            <strong>{metrics.preparedInspectionOrders}</strong>
+            <span>ordens preparadas</span>
+            <small><DataStatus status="prepared" /> Não autorizam campo</small>
+          </article>
         </section>
 
         <section className="workflow-panel" aria-labelledby="workflow-title">
@@ -130,10 +181,10 @@ export default async function OverviewPage() {
           <article className="focus-card">
             <div className="section-heading">
               <div>
-                <p className="eyebrow">Próxima decisão</p>
+                <p className="eyebrow">Atenção e próxima ação</p>
                 <h2>{focus ? `Trecho #${focus.segment_index}` : "Fila concluída"}</h2>
               </div>
-              {focus ? <span className="status-pill review">Confiança baixa</span> : null}
+              {focus ? <DataStatus status={displayDataStatus(focus.zone_data_status)} /> : null}
             </div>
             {focus ? (
               <>
@@ -154,17 +205,24 @@ export default async function OverviewPage() {
                 </div>
               </>
             ) : (
-              <p>Nenhuma recomendação está disponível neste ambiente.</p>
+              <EmptyState
+                description="Nenhuma recomendação exige ação nesta resposta da API."
+                title="Sem item para decisão"
+              />
             )}
           </article>
 
           <aside className="boundary-card" aria-labelledby="boundary-title">
-            <p className="eyebrow">Limites atuais</p>
-            <h2 id="boundary-title">O que esta demo comprova</h2>
+            <p className="eyebrow">Atalhos por papel</p>
+            <h2 id="boundary-title">{primaryRole === "manager" ? "Gestor" : primaryRole === "supervisor" ? "Supervisor" : "Acesso público"}</h2>
             <ul>
-              <li><strong>Comprova</strong><span>Fluxo, rastreabilidade e decisão humana.</span></li>
-              <li><strong>Não comprova</strong><span>Altura por satélite ou eixo rodoviário oficial.</span></li>
-              <li><strong>Bloqueado</strong><span>Execução real, relatório oficial e treino de modelo.</span></li>
+              {shortcuts.map((shortcut) => (
+                <li key={shortcut.href}>
+                  <strong><Link href={shortcut.href}>{shortcut.label}</Link></strong>
+                  <span>{shortcut.role === "public" ? "Disponível sem alterar dados." : "Ação limitada ao papel autenticado."}</span>
+                </li>
+              ))}
+              <li><strong>Limite</strong><span>Sem KPI fictício, sem relatório oficial e sem autorização automática.</span></li>
             </ul>
           </aside>
         </section>
