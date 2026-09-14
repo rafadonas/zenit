@@ -133,7 +133,7 @@ gateway, encrypted vault, domain models, navigation outcomes, or API payloads:
 
 - `lib/main.dart` only builds production dependencies and starts the app;
 - `lib/app/` owns the application shell and navigation boundary;
-- `lib/core/` contains shared workflow errors and presentation helpers;
+- `lib/core/` contains shared workflow errors, design tokens, theme, and field presentation primitives;
 - `lib/features/auth/` and `lib/features/work_orders/` own entry and inbox UI;
 - `lib/features/inspection/` owns prepared-inspection UI and orchestration;
 - `lib/features/mowing_rehearsal/` owns the explicitly simulated mowing flow;
