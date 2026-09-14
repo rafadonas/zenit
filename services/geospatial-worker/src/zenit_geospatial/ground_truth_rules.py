@@ -118,3 +118,79 @@ def summarize_eligibility(
         "included_observation_ids": [result.observation_id for result in included],
         "exclusion_confirmation": EXCLUSION_CONFIRMATION,
     }
+
+
+class AdjudicationTrigger(StrEnum):
+    CLASS_MISMATCH = "cover_class_mismatch"
+    COVER_BAND_NOT_ADJACENT = "cover_band_not_adjacent"
+    QUALITY_REJECTED = "quality_rejected"
+    PHOTO_HEIGHT_READABILITY_MISMATCH = "photo_height_readability_mismatch"
+    PHOTO_HEIGHT_DIFFERENCE = "photo_height_difference"
+    PHOTO_HEIGHT_THRESHOLD_CROSSING = "photo_height_threshold_crossing"
+    FIELD_PHOTO_DIFFERENCE = "field_photo_height_difference"
+    FIELD_PHOTO_THRESHOLD_CROSSING = "field_photo_threshold_crossing"
+
+
+@dataclass(frozen=True, slots=True)
+class AdjudicationPolicy:
+    # Academic assumptions from protocol section 7.3; cover bands await the annotation guide.
+    height_tolerance_cm: float = 5.0
+    thresholds_cm: tuple[float, ...] = (10.0, 30.0)
+    cover_bands: tuple[str, ...] = ("0-25", "25-50", "50-75", "75-100")
+
+
+def _crosses(first: float, second: float, thresholds: tuple[float, ...]) -> bool:
+    return any((first > threshold) != (second > threshold) for threshold in thresholds)
+
+
+def _height(annotation: Mapping[str, object]) -> float | None:
+    value = annotation.get("photo_height_cm")
+    if value is None or isinstance(value, bool):
+        return None
+    if not isinstance(value, int | float) or value < 0:
+        raise ValueError("photo_height_cm must be a non-negative number or null (not readable)")
+    return float(value)
+
+
+def adjudication_triggers(
+    annotations: tuple[Mapping[str, object], Mapping[str, object]],
+    field_height_cm: float | None,
+    policy: AdjudicationPolicy | None = None,
+) -> tuple[AdjudicationTrigger, ...]:
+    """Section 7.3 triggers for one double-annotated observation, in a stable order."""
+    active = policy or AdjudicationPolicy()
+    first, second = annotations
+    triggers: list[AdjudicationTrigger] = []
+
+    if first.get("cover_class") != second.get("cover_class"):
+        triggers.append(AdjudicationTrigger.CLASS_MISMATCH)
+
+    bands = [annotation.get("cover_band") for annotation in annotations]
+    if any(band is not None for band in bands):
+        unknown = [band for band in bands if band not in active.cover_bands]
+        if unknown:
+            raise ValueError(f"cover_band outside the configured bands: {unknown}")
+        ranks = [active.cover_bands.index(str(band)) for band in bands]
+        if abs(ranks[0] - ranks[1]) > 1:
+            triggers.append(AdjudicationTrigger.COVER_BAND_NOT_ADJACENT)
+
+    if "rejected" in (first.get("quality"), second.get("quality")):
+        triggers.append(AdjudicationTrigger.QUALITY_REJECTED)
+
+    heights = [_height(first), _height(second)]
+    readable = [height for height in heights if height is not None]
+    if len(readable) == 1:
+        triggers.append(AdjudicationTrigger.PHOTO_HEIGHT_READABILITY_MISMATCH)
+    if len(readable) == 2:
+        if abs(readable[0] - readable[1]) > active.height_tolerance_cm:
+            triggers.append(AdjudicationTrigger.PHOTO_HEIGHT_DIFFERENCE)
+        if _crosses(readable[0], readable[1], active.thresholds_cm):
+            triggers.append(AdjudicationTrigger.PHOTO_HEIGHT_THRESHOLD_CROSSING)
+
+    if field_height_cm is not None:
+        if any(abs(height - field_height_cm) > active.height_tolerance_cm for height in readable):
+            triggers.append(AdjudicationTrigger.FIELD_PHOTO_DIFFERENCE)
+        if any(_crosses(height, field_height_cm, active.thresholds_cm) for height in readable):
+            triggers.append(AdjudicationTrigger.FIELD_PHOTO_THRESHOLD_CROSSING)
+
+    return tuple(triggers)

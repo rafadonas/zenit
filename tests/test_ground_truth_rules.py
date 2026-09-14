@@ -2,9 +2,12 @@ import pytest
 
 from zenit_geospatial.ground_truth_rules import (
     EXCLUSION_CONFIRMATION,
+    AdjudicationPolicy,
+    AdjudicationTrigger,
     EligibilityPolicy,
     ExclusionReason,
     HeightExclusionReason,
+    adjudication_triggers,
     evaluate_eligibility,
     summarize_eligibility,
 )
@@ -113,3 +116,83 @@ def test_summary_counts_exclusions_and_keeps_confirmation() -> None:
     assert summary["data_statuses_seen"] == {"prepared": 1, "real": 2, "simulated": 1}
     assert summary["included_observation_ids"] == ["obs-1", "obs-2"]
     assert summary["exclusion_confirmation"] == EXCLUSION_CONFIRMATION
+
+
+def annotation(**overrides: object) -> dict[str, object]:
+    value: dict[str, object] = {
+        "cover_class": "grass_herbaceous",
+        "cover_band": "50-75",
+        "quality": "ok",
+        "photo_height_cm": 20,
+    }
+    value.update(overrides)
+    return value
+
+
+def test_matching_annotations_within_tolerance_need_no_adjudication() -> None:
+    assert adjudication_triggers((annotation(), annotation(photo_height_cm=24)), 22) == ()
+
+
+@pytest.mark.parametrize(
+    ("second", "field", "expected"),
+    [
+        ({"cover_class": "shrub"}, None, (AdjudicationTrigger.CLASS_MISMATCH,)),
+        ({"cover_band": "0-25"}, None, (AdjudicationTrigger.COVER_BAND_NOT_ADJACENT,)),
+        ({"quality": "rejected"}, None, (AdjudicationTrigger.QUALITY_REJECTED,)),
+        (
+            {"photo_height_cm": None},
+            None,
+            (AdjudicationTrigger.PHOTO_HEIGHT_READABILITY_MISMATCH,),
+        ),
+        ({"photo_height_cm": 26}, None, (AdjudicationTrigger.PHOTO_HEIGHT_DIFFERENCE,)),
+    ],
+)
+def test_each_protocol_condition_triggers_adjudication(second, field, expected) -> None:
+    assert adjudication_triggers((annotation(), annotation(**second)), field) == expected
+
+
+def test_adjacent_cover_bands_do_not_trigger() -> None:
+    assert adjudication_triggers((annotation(), annotation(cover_band="75-100")), None) == ()
+
+
+def test_small_difference_across_threshold_still_triggers() -> None:
+    triggers = adjudication_triggers(
+        (annotation(photo_height_cm=29), annotation(photo_height_cm=31)), None
+    )
+
+    assert triggers == (AdjudicationTrigger.PHOTO_HEIGHT_THRESHOLD_CROSSING,)
+
+
+def test_threshold_is_strict_exceedance() -> None:
+    pair = (annotation(photo_height_cm=10), annotation(photo_height_cm=9))
+
+    assert adjudication_triggers(pair, None) == ()
+
+
+def test_photo_reading_diverging_from_field_height_triggers() -> None:
+    pair = (annotation(photo_height_cm=20), annotation(photo_height_cm=21))
+
+    assert adjudication_triggers(pair, 27) == (AdjudicationTrigger.FIELD_PHOTO_DIFFERENCE,)
+    assert adjudication_triggers(pair, 32) == (
+        AdjudicationTrigger.FIELD_PHOTO_DIFFERENCE,
+        AdjudicationTrigger.FIELD_PHOTO_THRESHOLD_CROSSING,
+    )
+
+
+def test_policy_overrides_tolerance_and_bands() -> None:
+    policy = AdjudicationPolicy(height_tolerance_cm=1, cover_bands=("low", "high"))
+    pair = (
+        annotation(cover_band="low", photo_height_cm=20),
+        annotation(cover_band="high", photo_height_cm=22),
+    )
+
+    assert adjudication_triggers(pair, None, policy) == (
+        AdjudicationTrigger.PHOTO_HEIGHT_DIFFERENCE,
+    )
+
+
+def test_invalid_annotation_values_are_rejected() -> None:
+    with pytest.raises(ValueError, match="cover_band"):
+        adjudication_triggers((annotation(cover_band="90%"), annotation()), None)
+    with pytest.raises(ValueError, match="photo_height_cm"):
+        adjudication_triggers((annotation(photo_height_cm=-3), annotation()), None)
