@@ -171,6 +171,9 @@ anotação, adjudicação e privacidade.
 **Aceite:** piloto de anotação mede concordância; licença/consentimento e retenção
 documentados; dados demo excluídos.
 
+**Proposta:** [`../data-quality/ground-truth-protocol.md`](../data-quality/ground-truth-protocol.md)
+(`proposed`; aprovações e piloto pendentes).
+
 ### GEO-003 — contrato de cobertura vegetal (`BLOCKED`, P1)
 
 **Predecessor:** aprovação de GEO-001 e ADR.

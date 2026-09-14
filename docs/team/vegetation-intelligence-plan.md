@@ -55,34 +55,15 @@ dado a revisar, não algo a esconder por média.
 
 ## Protocolo de aquisição e anotação
 
-### Amostragem
+O protocolo completo está em
+[`../data-quality/ground-truth-protocol.md`](../data-quality/ground-truth-protocol.md)
+(`GEO-002`, status `proposed`). Ele define amostragem estratificada por rodovia,
+zona, classe histórica e estação; instrumentos e definição única de altura;
+metadados obrigatórios de foto, escala, altura e GPS; dupla anotação,
+adjudicação e medição de concordância; aprovações de licença, consentimento,
+privacidade e retenção; e exclusão de dados demo/simulados.
 
-- estratificar por rodovia, zona, classe histórica, estação/clima, iluminação e
-  tipo de entorno;
-- evitar que frames vizinhos do mesmo local caiam em treino e teste;
-- reservar rodovias/trechos e períodos inteiros para holdout;
-- incluir casos difíceis e `unknown`, não apenas exemplos limpos;
-- registrar ausência de classe e motivo de descarte.
-
-### Foto de campo candidata
-
-- ponto planejado e identificador imutável;
-- data/hora e origem confiável;
-- GPS + precisão, quando autorizado;
-- direção/side/zone e enquadramento padronizados;
-- escala/régua visível sem cobrir a vegetação;
-- vista de contexto e vista de medição quando o protocolo exigir;
-- blur, exposição, oclusão e integridade avaliados antes de aceitar;
-- rostos, placas e dados pessoais tratados conforme política aprovada.
-
-### Anotação
-
-- manual ilustrado com exemplos aceitos/rejeitados;
-- dois anotadores independentes em amostra de calibração;
-- adjudicação por especialista em conflito;
-- classe, máscara/bbox conforme objetivo, cobertura, qualidade e razão de unknown;
-- versão de taxonomia e ferramenta;
-- concordância interanotador publicada com a versão do dataset.
+Nenhuma coleta real começa antes dos gates desse protocolo.
 
 ## Pipeline por maturidade
 
