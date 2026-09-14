@@ -209,6 +209,9 @@ h1 { margin-bottom: 8px; font: 600 clamp(2.1rem, 4vw, 3.2rem)/1 Georgia, serif; 
 .queue-summary strong { font: 600 1.6rem Georgia, serif; }
 .queue-summary span, .queue-summary small { color: var(--muted); font-size: .72rem; }
 .queue-summary small { margin-left: auto; color: #7b561f; }
+.filter-bar { display: flex; flex-wrap: wrap; gap: 8px; width: min(1120px, 92vw); margin: 0 auto 18px; }
+.filter-bar a { min-height: 44px; display: inline-flex; align-items: center; padding: 10px 13px; border: 1px solid var(--color-border); border-radius: 8px; color: var(--color-text-muted); background: var(--color-surface); font-size: .72rem; font-weight: 700; text-decoration: none; }
+.filter-bar a:hover, .filter-bar a:focus-visible, .filter-bar a[aria-current="page"] { color: var(--color-brand); border-color: var(--color-brand); background: var(--color-brand-soft); }
 .recommendation-list { display: grid; gap: 14px; margin-top: 16px; }
 .recommendation-card, .queue-empty { padding: 22px; border: 1px solid var(--line); border-radius: 14px; background: var(--card); box-shadow: var(--shadow); }
 .recommendation-title { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
@@ -224,6 +227,12 @@ h1 { margin-bottom: 8px; font: 600 clamp(2.1rem, 4vw, 3.2rem)/1 Georgia, serif; 
 .recommendation-reasons { color: #52655c; font-size: .72rem; line-height: 1.5; }
 .recommendation-reasons ul { margin: 7px 0 0; padding-left: 19px; }
 .recommendation-reasons p { margin: 7px 0 0; }
+.evidence-panel { display: grid; gap: 10px; margin: 16px 0; padding: 14px; border: 1px solid var(--color-border); border-radius: 12px; background: #fafafe; }
+.evidence-panel dl { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.evidence-panel div { min-width: 0; }
+.evidence-panel dt { color: var(--color-text-muted); font-size: .58rem; text-transform: uppercase; }
+.evidence-panel dd { margin: 4px 0 0; overflow-wrap: anywhere; font-size: .68rem; font-weight: 700; }
+.evidence-panel p { margin: 0; color: var(--color-text-muted); font-size: .68rem; line-height: 1.45; }
 .recorded-decision { display: grid; gap: 3px; margin-top: 18px; padding: 14px 16px; border-left: 3px solid var(--green); border-radius: 8px; background: #f0f6f2; }
 .recorded-decision span, .recorded-decision small { color: var(--muted); font-size: .65rem; }
 .recorded-decision strong { font-size: .78rem; }
@@ -259,6 +268,8 @@ h1 { margin-bottom: 8px; font: 600 clamp(2.1rem, 4vw, 3.2rem)/1 Georgia, serif; 
 .decision-form select, .decision-form textarea { width: 100%; padding: 9px; border: 1px solid #bdccc1; border-radius: 7px; color: var(--ink); background: white; }
 .decision-form textarea { resize: vertical; }
 .decision-rationale, .decision-form small { grid-column: 1 / -1; }
+.decision-confirmation { grid-column: 1 / -1; display: flex; align-items: flex-start; gap: 9px; color: var(--color-text); line-height: 1.45; }
+.decision-confirmation input { width: 18px; height: 18px; margin-top: 1px; accent-color: var(--color-brand); }
 .decision-form button { justify-self: start; }
 .decision-form small { color: #73552a; font-size: .63rem; }
 .inspection-order-form { display: grid; gap: 10px; margin-top: 12px; padding: 16px; border: 1px solid #d7c79d; border-radius: 10px; background: #faf6e9; }
@@ -377,6 +388,7 @@ h1 { margin-bottom: 8px; font: 600 clamp(2.1rem, 4vw, 3.2rem)/1 Georgia, serif; 
   .reviewer-session { align-items: stretch; flex-direction: column; }
   .role-list { justify-items: start; }
   .decision-form { grid-template-columns: 1fr; }
+  .evidence-panel dl { grid-template-columns: 1fr 1fr; }
   .photo-review-card { grid-template-columns: 1fr; }
   .summary-export-form { grid-template-columns: 1fr; }
   .decision-rationale, .decision-form small { grid-column: auto; }

@@ -1,14 +1,17 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  type RecommendationQueueItem,
+  effectiveRecommendation,
   explanationReasonLabel,
   explanationReasons,
+  filterRecommendationQueue,
   isRecommendationQueue,
   recommendationLabel,
   zoneLabel,
 } from "./recommendations";
 
-const item = {
+const item: RecommendationQueueItem = {
   vegetation_analysis_id: "analysis-1",
   analysis_run_id: "run-1",
   segment_id: "segment-1",
@@ -109,5 +112,26 @@ describe("recommendation queue contract", () => {
     expect(explanationReasonLabel("Reason from a future processor")).toBe(
       "Reason from a future processor",
     );
+  });
+
+  it("filters the unified queue without changing review state", () => {
+    const reviewedItem: RecommendationQueueItem = {
+      ...item,
+      confidence_band: "medium",
+      review_count: 1,
+      latest_review_id: "review-1",
+      latest_review_decision: "adjusted",
+      latest_review_adjusted_recommendation: "monitor",
+      latest_reviewed_at: "2026-08-08T12:00:00Z",
+      latest_review_policy_version: "recommendation-review-mvp-v1",
+      latest_review_policy_data_status: "prepared",
+      review_state: "review_recorded_no_work_authorization",
+    };
+
+    expect(filterRecommendationQueue([item, reviewedItem], { review: "awaiting" })).toEqual([item]);
+    expect(filterRecommendationQueue([item, reviewedItem], { confidence: "medium" })).toEqual([
+      reviewedItem,
+    ]);
+    expect(effectiveRecommendation(reviewedItem)).toBe("monitor");
   });
 });
