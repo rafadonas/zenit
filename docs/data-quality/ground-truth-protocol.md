@@ -369,10 +369,40 @@ Cada manifesto de campanha e de dataset registra:
 - prazos de retenção, legal hold e responsáveis de privacidade, dados e segurança;
 - procedimento de segurança de campo da concessão.
 
-## 12. Fora de escopo
+## 12. Ferramentas
+
+O comando `zenit-ground-truth` implementa as partes calculáveis deste protocolo sem
+alterar schema, API ou aplicativo. Entradas são JSON (arquivo ou `-` para stdin) e
+saídas são JSON:
+
+| Comando | Seção | Resultado |
+| --- | --- | --- |
+| `plan` | 4 | plano de pontos com semente a partir de polígonos de zona em EPSG:31983 |
+| `eligibility` | 9 | contagem de incluídos/excluídos por motivo e confirmação de exclusão |
+| `report` | 7 | κ, α, ICC(2,1), Bland–Altman, acordo por limiar, IC por bootstrap e gatilhos de adjudicação |
+
+Os exemplos em `tests/fixtures/ground_truth/` são `simulated`/`prepared` e servem
+apenas para exercitar as ferramentas: `eligibility` exclui todos, e `report`
+marca `non_real_input: true` e nunca aprova o gate provisório com eles.
+
+```bash
+docker compose exec -T api zenit-ground-truth plan --zones - --seed 20260914 \
+  --campaign-id sim-rehearsal --edge-setback-m 1 \
+  < tests/fixtures/ground_truth/zones_simulated.geojson
+docker compose exec -T api zenit-ground-truth eligibility --observations - \
+  --approved-campaign <campanha> --approved-protocol gt-protocol-0.1 \
+  --registered-device <dispositivo> \
+  < tests/fixtures/ground_truth/observations_simulated.json
+docker compose exec -T api zenit-ground-truth report --annotations - \
+  < tests/fixtures/ground_truth/observations_simulated.json
+```
+
+Um resultado das ferramentas não aprova gates, não substitui revisão humana e não
+autoriza coleta ou roçada.
+
+## 13. Fora de escopo
 
 - schema, migração, API e autorização dos campos novos (`GEO-003`);
 - manifesto e dataset versionado (`GEO-004`);
 - captura guiada no aplicativo (`MOB-005`);
-- cálculo automatizado de concordância, que depende de dados reais;
 - qualquer modelo, treinamento ou uso operacional.
