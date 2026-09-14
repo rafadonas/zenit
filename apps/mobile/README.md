@@ -137,6 +137,8 @@ gateway, encrypted vault, domain models, navigation outcomes, or API payloads:
 - `lib/features/auth/` and `lib/features/work_orders/` own entry and inbox UI;
 - `lib/features/inspection/` owns prepared-inspection UI and orchestration;
 - `lib/features/mowing_rehearsal/` owns the explicitly simulated mowing flow;
+- `lib/features/sync_center/` presents the encrypted local queue, persisted
+  attempt history, manifest-before-bytes dependencies, and idempotent retry;
 - `lib/data/` retains gateway and secure persistence implementations; and
 - `lib/domain/` retains immutable workflow models and validation rules.
 

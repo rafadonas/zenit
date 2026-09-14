@@ -12,6 +12,7 @@ import '../domain/mowing_post_service_photo_draft.dart';
 import '../domain/prepared_mowing_plan.dart';
 import '../domain/prepared_photo_draft.dart';
 import '../domain/prepared_work_order.dart';
+import '../domain/sync_center.dart';
 
 abstract interface class OfflineVault {
   Future<void> initialize();
@@ -56,6 +57,8 @@ abstract interface class OfflineVault {
   Future<bool> hasUnacknowledgedEvents();
   Future<PendingSyncBatch?> readPendingSyncBatch();
   Future<int> readSyncCursor();
+  Future<Map<String, SyncAttemptRecord>> readSyncAttempts();
+  Future<SyncAttemptRecord> recordSyncAttempt(String itemKey, DateTime at);
   Future<void> savePendingSyncBatch(
     PendingSyncBatch batch,
     List<MeasurementDraft> drafts,
@@ -96,6 +99,7 @@ class HiveOfflineVault implements OfflineVault {
   static const _ownerUserIdKey = 'owner_user_id';
   static const _pendingBatchKey = 'pending_sync_batch';
   static const _syncCursorKey = 'sync_cursor';
+  static const _syncAttemptsKey = 'sync_attempts';
 
   final FlutterSecureStorage _secureStorage;
   Box<String>? _box;
@@ -492,6 +496,40 @@ class HiveOfflineVault implements OfflineVault {
   Future<int> readSyncCursor() async {
     final encoded = _openBox.get(_syncCursorKey);
     return encoded == null ? 0 : int.parse(encoded);
+  }
+
+  @override
+  Future<Map<String, SyncAttemptRecord>> readSyncAttempts() async {
+    final encoded = _openBox.get(_syncAttemptsKey);
+    if (encoded == null) return const {};
+    final values = (jsonDecode(encoded) as Map).cast<String, Object?>();
+    return {
+      for (final entry in values.entries)
+        entry.key: SyncAttemptRecord.fromJson(
+          (entry.value! as Map).cast<String, Object?>(),
+        ),
+    };
+  }
+
+  @override
+  Future<SyncAttemptRecord> recordSyncAttempt(
+    String itemKey,
+    DateTime at,
+  ) async {
+    final attempts = await readSyncAttempts();
+    final record = SyncAttemptRecord(
+      itemKey: itemKey,
+      attemptCount: (attempts[itemKey]?.attemptCount ?? 0) + 1,
+      lastAttemptAt: at.toUtc(),
+    );
+    await _openBox.put(
+      _syncAttemptsKey,
+      jsonEncode({
+        ...attempts.map((key, value) => MapEntry(key, value.toJson())),
+        itemKey: record.toJson(),
+      }),
+    );
+    return record;
   }
 
   @override

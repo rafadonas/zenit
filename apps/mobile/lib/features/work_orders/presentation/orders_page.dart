@@ -14,6 +14,12 @@ class OrdersPage extends StatelessWidget {
       title: const Text('Ordens preparadas'),
       actions: [
         IconButton(
+          onPressed: () =>
+              AppNavigator.openSyncCenter(context, controller: controller),
+          tooltip: 'Abrir central de sincronização',
+          icon: const Icon(Icons.cloud_sync),
+        ),
+        IconButton(
           onPressed: controller.busy ? null : controller.refreshOrders,
           tooltip: 'Atualizar',
           icon: const Icon(Icons.sync),

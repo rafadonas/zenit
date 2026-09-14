@@ -16,6 +16,7 @@ import 'package:zenit_mobile/domain/mowing_post_service_photo_draft.dart';
 import 'package:zenit_mobile/domain/prepared_mowing_plan.dart';
 import 'package:zenit_mobile/domain/prepared_photo_draft.dart';
 import 'package:zenit_mobile/domain/prepared_work_order.dart';
+import 'package:zenit_mobile/domain/sync_center.dart';
 
 Map<String, Object?> preparedOrderJson() => {
   'work_order_id': '11111111-1111-4111-8111-111111111111',
@@ -275,6 +276,7 @@ class MemoryVault implements OfflineVault {
   String? ownerUserId;
   PendingSyncBatch? pendingBatch;
   int syncCursor = 0;
+  final Map<String, SyncAttemptRecord> syncAttempts = {};
 
   @override
   Future<void> initialize() async {}
@@ -292,6 +294,7 @@ class MemoryVault implements OfflineVault {
     ownerUserId = null;
     pendingBatch = null;
     syncCursor = 0;
+    syncAttempts.clear();
   }
 
   @override
@@ -448,6 +451,24 @@ class MemoryVault implements OfflineVault {
 
   @override
   Future<int> readSyncCursor() async => syncCursor;
+
+  @override
+  Future<Map<String, SyncAttemptRecord>> readSyncAttempts() async =>
+      Map.unmodifiable(syncAttempts);
+
+  @override
+  Future<SyncAttemptRecord> recordSyncAttempt(
+    String itemKey,
+    DateTime at,
+  ) async {
+    final record = SyncAttemptRecord(
+      itemKey: itemKey,
+      attemptCount: (syncAttempts[itemKey]?.attemptCount ?? 0) + 1,
+      lastAttemptAt: at.toUtc(),
+    );
+    syncAttempts[itemKey] = record;
+    return record;
+  }
 
   @override
   Future<void> savePendingSyncBatch(
