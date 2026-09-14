@@ -130,7 +130,7 @@ extension MowingRehearsalWorkflowController on ZenitAppController {
           (height) => !height.isFinite || height < 0 || height > 1000,
         )) {
       errorMessage = 'Informe três alturas válidas entre 0 e 1000 cm.';
-      notifyListeners();
+      _notifyWorkflowListeners();
       return false;
     }
     return _run(() async {

@@ -192,4 +192,6 @@ class ZenitAppController extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  void _notifyWorkflowListeners() => notifyListeners();
 }

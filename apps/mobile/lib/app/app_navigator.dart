@@ -11,20 +11,24 @@ abstract final class AppNavigator {
     BuildContext context, {
     required ZenitAppController controller,
     required PreparedWorkOrder order,
-  }) => Navigator.of(context).push(
-    MaterialPageRoute(
-      builder: (_) => OrderDraftPage(controller: controller, order: order),
-    ),
-  );
+  }) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => OrderDraftPage(controller: controller, order: order),
+      ),
+    );
+  }
 
   static Future<void> openMowingPlan(
     BuildContext context, {
     required ZenitAppController controller,
     required PreparedMowingPlan plan,
-  }) => Navigator.of(context).push(
-    MaterialPageRoute(
-      builder: (_) =>
-          PreparedMowingPlanPage(controller: controller, plan: plan),
-    ),
-  );
+  }) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            PreparedMowingPlanPage(controller: controller, plan: plan),
+      ),
+    );
+  }
 }
