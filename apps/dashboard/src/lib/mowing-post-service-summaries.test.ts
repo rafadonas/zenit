@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { isMowingPostServiceSummaryCollection } from "./mowing-post-service-summaries";
+import {
+  buildMowingPostServiceResultHistory,
+  isMowingPostServiceSummaryCollection,
+  type MowingPostServiceSummary,
+} from "./mowing-post-service-summaries";
 
-const item = {
+const item: MowingPostServiceSummary = {
   summary_id: "98000000-0000-4000-8000-000000000002",
   mowing_order_id: "98000000-0000-4000-8000-000000000001",
   summary_policy_version: "prepared-mowing-post-service-summary-v1",
@@ -46,5 +50,18 @@ describe("mowing post-service summary contract", () => {
       truncated: false,
       warning: "Resumo pós-serviço simulado; não comprova roçada, eficácia, conclusão ou operação oficial.",
     })).toBe(false);
+  });
+
+  it("blocks before-after comparison when the before source is absent", () => {
+    const history = buildMowingPostServiceResultHistory(item);
+
+    expect(history.before).toEqual({
+      date: "not_collected",
+      maximumHeightCm: null,
+      source: "not_available_in_contract",
+    });
+    expect(history.after.maximumHeightCm).toBe(8);
+    expect(history.comparison.label).toBe("Comparação bloqueada");
+    expect(history.officialReportingStatus).toBe("blocked");
   });
 });

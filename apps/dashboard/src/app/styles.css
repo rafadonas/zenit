@@ -308,6 +308,11 @@ h1 { margin-bottom: 8px; font: 600 clamp(2.1rem, 4vw, 3.2rem)/1 Georgia, serif; 
 .summary-classes { display: flex; gap: 7px; margin-top: 10px; }
 .summary-classes span { padding: 5px 8px; border-radius: 6px; color: #436257; background: #e9f0ea; font-size: .66rem; font-weight: 750; }
 .summary-rationale { margin: 12px 0 5px; color: #52635c; font-size: .7rem; }
+.result-history { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 14px 0; }
+.result-history div { display: grid; gap: 4px; padding: 12px; border: 1px solid var(--color-border); border-radius: 10px; background: #fff; }
+.result-history span { color: var(--color-text-muted); font-size: .6rem; font-weight: 700; text-transform: uppercase; }
+.result-history strong { font-size: .82rem; }
+.result-history small { color: var(--color-text-muted); font-size: .62rem; line-height: 1.35; }
 .prepared-summary-card > small, .prepared-summary-form small { color: #73552a; font-size: .62rem; }
 .prepared-summary-form { display: grid; gap: 7px; margin-top: 15px; }
 .prepared-summary-form label { color: #66512f; font-size: .65rem; font-weight: 750; }
