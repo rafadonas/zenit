@@ -42,6 +42,12 @@ export interface ProjectedPosition {
   y: number;
 }
 
+export type CorridorSearchQuery =
+  | { type: "empty" }
+  | { type: "road"; roadCode: string }
+  | { type: "segment"; segmentIndex: number; roadCode?: string }
+  | { type: "distance"; distanceM: number; roadCode?: string };
+
 export type MapProjection = (position: Position) => ProjectedPosition;
 
 const MAP_WIDTH = 1000;
@@ -136,8 +142,44 @@ export function findSegmentIdByIndex(
   );
 }
 
+export function findSegmentIdByDistance(
+  features: SegmentFeature[],
+  distanceM: number,
+): string | null {
+  if (!Number.isFinite(distanceM) || distanceM < 0) return null;
+  return features.find((feature) => (
+    distanceM >= feature.properties.start_distance_m &&
+    distanceM <= feature.properties.end_distance_m
+  ))?.properties.segment_id ?? null;
+}
+
 export function parseSegmentIndex(value: string): number | null {
   if (value.trim() === "") return null;
   const segmentIndex = Number(value);
   return Number.isInteger(segmentIndex) && segmentIndex >= 0 ? segmentIndex : null;
+}
+
+export function parseCorridorSearchQuery(value: string): CorridorSearchQuery {
+  const query = value.trim();
+  if (query === "") return { type: "empty" };
+
+  const normalized = query
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toUpperCase()
+    .replace(",", ".");
+  const roadCode = normalized.match(/\b[A-Z]{2}\s*-?\s*(\d{3})\b/)?.[0].replace(/\s|-+/g, "");
+  const segment = normalized.match(/\b(?:TRECHO|SEGMENTO|SEG)\s*#?\s*(\d+)\b/);
+  if (segment) return { type: "segment", segmentIndex: Number(segment[1]), roadCode };
+
+  const km = normalized.match(/\bKM\s*(\d+(?:\.\d+)?)\b/);
+  if (km) return { type: "distance", distanceM: Number(km[1]) * 1000, roadCode };
+
+  const plainNumber = Number(normalized);
+  if (Number.isInteger(plainNumber) && plainNumber >= 0) {
+    return { type: "segment", segmentIndex: plainNumber, roadCode };
+  }
+
+  if (roadCode) return { type: "road", roadCode };
+  return { type: "empty" };
 }

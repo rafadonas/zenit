@@ -72,12 +72,14 @@ h1 { margin-bottom: 8px; font: 600 clamp(2.1rem, 4vw, 3.2rem)/1 Georgia, serif; 
 .side-heading h2:focus { outline: 0; border-radius: 5px; box-shadow: 0 0 0 3px var(--color-brand-soft); }
 .map-tools { display: flex; align-items: end; gap: 14px; }
 .segment-search { display: grid; gap: 4px; }
-.segment-search label { color: var(--muted); font-size: .61rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
+.segment-search label, .map-filter span { color: var(--muted); font-size: .61rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
 .segment-search > div { display: flex; }
-.segment-search input { width: 74px; padding: 7px 8px; border: 1px solid #cbd5cd; border-radius: 7px 0 0 7px; color: var(--ink); background: white; }
+.segment-search input { width: 156px; padding: 7px 8px; border: 1px solid #cbd5cd; border-radius: 7px 0 0 7px; color: var(--ink); background: white; }
 .segment-search button { padding: 7px 10px; border: 0; border-radius: 0 7px 7px 0; color: white; background: var(--green); cursor: pointer; font-size: .68rem; font-weight: 750; }
 .segment-search button:hover, .segment-search button:focus-visible { background: var(--green-dark); }
 .segment-search > span { max-width: 230px; color: #8a3f32; font-size: .61rem; }
+.map-filter { display: grid; gap: 4px; }
+.map-filter select { min-height: 34px; padding: 7px 9px; border: 1px solid var(--color-border); border-radius: 8px; color: var(--color-text); background: #fff; font-size: .68rem; }
 .map-meta { display: flex; gap: 8px; }
 .map-meta span { padding: 6px 9px; border-radius: 6px; background: #eef2eb; color: var(--muted); font-size: .65rem; }
 .map-frame { position: relative; height: min(61vh, 680px); min-height: 480px; margin: 0 14px; border: 1px solid #cfd8d0; border-radius: 10px; overflow: hidden; background: #e9eee8; }
@@ -106,6 +108,14 @@ h1 { margin-bottom: 8px; font: 600 clamp(2.1rem, 4vw, 3.2rem)/1 Georgia, serif; 
 .map-load-state small { max-width: 310px; color: var(--color-text-muted); font-size: .67rem; line-height: 1.45; }
 .map-load-state.error > span { border: 0; animation: none; }
 .map-load-state.error > span::before { content: "!"; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; color: #fff; background: var(--status-near); font-weight: 800; }
+.segment-equivalent-list { display: grid; gap: 12px; margin: 14px; padding: 14px; border: 1px solid var(--color-border); border-radius: 12px; background: #fff; }
+.segment-equivalent-list > div { display: flex; align-items: end; justify-content: space-between; gap: 12px; }
+.segment-equivalent-list h3 { margin: 0; font-size: .92rem; }
+.segment-equivalent-list > div > span { color: var(--color-text-muted); font-size: .65rem; }
+.segment-equivalent-list ol { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; max-height: 280px; margin: 0; padding: 0; overflow: auto; list-style: none; }
+.segment-equivalent-list button { width: 100%; min-height: 76px; display: grid; gap: 3px; padding: 10px; border: 1px solid var(--color-border); border-radius: 10px; color: var(--color-text); background: var(--color-surface); text-align: left; cursor: pointer; }
+.segment-equivalent-list button:hover, .segment-equivalent-list button:focus-visible, .segment-equivalent-list button[aria-current="true"] { border-color: var(--color-brand); box-shadow: 0 0 0 2px var(--color-brand-soft); }
+.segment-equivalent-list button span, .segment-equivalent-list button small { color: var(--color-text-muted); font-size: .62rem; line-height: 1.35; }
 @keyframes map-loading-spin { to { transform: rotate(360deg); } }
 .grid-line { fill: none; stroke: #d5ddd6; stroke-width: 1; }
 .route-shadow path { fill: none; stroke: #f8faf7; stroke-width: 12; stroke-linecap: round; stroke-linejoin: round; }
@@ -517,6 +527,7 @@ h2, .card-heading h2, .side-heading h2, .recommendation-title h2, .prepared-summ
   color: var(--color-status-normal-text);
   background: var(--color-status-normal-surface);
 }
+.map-filter select { border-color: var(--color-border); }
 .decision-form { border-color: var(--color-border); border-radius: 12px; background: #fafafe; }
 .decision-form label, .inspection-order-form label, .prepared-summary-form label, .summary-export-form label { color: var(--color-text-muted); }
 .decision-form small, .inspection-order-form small, .prepared-summary-card > small, .prepared-summary-form small, .summary-export-form small { color: var(--color-text-muted); }

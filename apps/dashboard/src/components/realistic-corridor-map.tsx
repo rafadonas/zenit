@@ -286,13 +286,13 @@ export function RealisticCorridorMap({
     <div className="realistic-map-shell">
       <div className="realistic-map" ref={containerRef} />
       {mapStatus !== "ready" ? (
-        <div className={`map-load-state ${mapStatus}`} role="status">
+        <div className={`map-load-state ${mapStatus}`} role={mapStatus === "error" ? "alert" : "status"}>
           <span aria-hidden="true" />
           <strong>{mapStatus === "loading" ? "Carregando mapa" : "Mapa-base indisponível"}</strong>
           <small>
             {mapStatus === "loading"
               ? "Preparando ruas, segmentos e áreas históricas de vegetação."
-              : "Verifique a conexão para carregar as ruas de referência."}
+              : "A lista equivalente, filtros e detalhes continuam disponíveis sem os tiles."}
           </small>
         </div>
       ) : null}
