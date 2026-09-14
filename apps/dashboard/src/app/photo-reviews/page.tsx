@@ -1,9 +1,9 @@
 import { randomUUID } from "node:crypto";
 
 import { cookies } from "next/headers";
-import Image from "next/image";
 import Link from "next/link";
 import { DashboardHeader } from "../../components/dashboard-header";
+import { FieldPhotoEvidence, FieldQueueNavigation } from "../../components/field-photo-queue";
 
 import { loadDashboardSession } from "../../lib/dashboard-session";
 import {
@@ -309,6 +309,7 @@ export default async function PhotoReviewsPage({ searchParams }: PageProps) {
       <div><p className="eyebrow">Revisão humana</p><h1>Fotos preparadas</h1><p className="subtitle">Qualidade visual e presença de régua, sem inferência automática de altura.</p></div>
       <div className="warning-banner" role="status"><span className="warning-icon" aria-hidden="true">!</span><div><strong>Nenhuma revisão autoriza campo</strong><span>Mesmo aceita, a foto não entra em treino ou relatório oficial.</span></div></div>
     </section>
+    <FieldQueueNavigation active="inspection" />
     {operationMessage ? <p className="operation-message" role="status">{operationMessage}</p> : null}
     {!session || !queue ? <section className="reviewer-session"><div><strong>Sessão necessária</strong><span>Entre para acessar fotos da sua rodovia.</span></div><Link className="primary-button" href="/login">Entrar</Link></section> : <>
       <section className="reviewer-session"><div><strong>{session.user.display_name}</strong><span>{session.user.email}</span></div><div className="role-list">{session.road_roles.map((role) => <span key={`${role.road_code}-${role.role}`}>{role.road_code} · {role.role}</span>)}</div></section>
@@ -455,10 +456,9 @@ export default async function PhotoReviewsPage({ searchParams }: PageProps) {
       </section> : null}
       <section className="photo-review-grid" aria-label="Fotos para revisão">
         {queue.items.length === 0 ? <div className="queue-empty"><h2>Fila vazia</h2><p>Nenhuma foto preparada está disponível para seu papel.</p></div> : queue.items.map((item) => <article className="photo-review-card" key={item.photo_id}>
-          <div className="photo-frame"><Image alt={`Foto preparada do ponto ${item.planned_point_sequence}`} fill sizes="(max-width: 720px) 92vw, 42vw" src={`/api/media/${item.photo_id}`} unoptimized /></div>
+          <FieldPhotoEvidence alt={`Foto preparada do ponto ${item.planned_point_sequence}`} byteSize={item.byte_size} dataStatus={item.data_status} imageSrc={`/api/media/${item.photo_id}`} mediaType={item.media_type} photoId={item.photo_id} />
           <div className="photo-review-body">
             <div className="recommendation-title"><div><p className="eyebrow">{item.road_code} · trecho #{item.segment_index} · {item.zone_type}</p><h2>Ponto {item.planned_point_sequence}</h2></div><span className="status-pill review">{item.review_state === "awaiting_review" ? "Aguardando revisão" : "Revisão registrada"}</span></div>
-            <p className="photo-meta">{item.media_type} · {item.byte_size} bytes · conteúdo preparado e não oficial</p>
             {item.latest_review_id ? <div className="latest-photo-review"><strong>Última revisão: {item.latest_decision}</strong><span>Qualidade {item.latest_quality_status} · régua {item.latest_ruler_status}</span>{item.latest_rationale ? <p>{item.latest_rationale}</p> : null}</div> : null}
             <form action={`/api/media/${item.photo_id}/reviews`} className="decision-form" method="post">
               <input name="csrf_token" type="hidden" value={session.csrfToken} /><input name="idempotency_key" type="hidden" value={randomUUID()} />{item.latest_review_id ? <input name="supersedes_review_id" type="hidden" value={item.latest_review_id} /> : null}
