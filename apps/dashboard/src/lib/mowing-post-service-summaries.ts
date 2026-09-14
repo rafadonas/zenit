@@ -1,3 +1,5 @@
+import type { MowingPostServiceException } from "./mowing-post-service-exceptions";
+
 export interface MowingPostServiceSummary {
   summary_id: string;
   mowing_order_id: string;
@@ -22,6 +24,25 @@ export interface MowingPostServiceSummary {
   eligible_for_official_reporting: false;
   authorizes_field_work: false;
   generated_at: string;
+}
+
+export interface MowingPostServiceResultHistory {
+  after: {
+    date: string;
+    maximumHeightCm: number;
+    source: "simulated_post_service_summary";
+  };
+  before: {
+    date: "not_collected";
+    maximumHeightCm: null;
+    source: "not_available_in_contract";
+  };
+  comparison: {
+    label: "Comparação bloqueada";
+    reason: string;
+  };
+  officialReportingStatus: "blocked";
+  reviewStatus: "pending" | "recorded" | "not_required";
 }
 
 export interface MowingPostServiceSummaryCollection {
@@ -82,4 +103,30 @@ export function isMowingPostServiceSummaryCollection(
     Number.isInteger(value.limit) &&
     typeof value.truncated === "boolean" &&
     value.items.every(isSummary);
+}
+
+export function buildMowingPostServiceResultHistory(
+  summary: MowingPostServiceSummary,
+  exception?: MowingPostServiceException,
+): MowingPostServiceResultHistory {
+  return {
+    after: {
+      date: summary.generated_at,
+      maximumHeightCm: Number(summary.maximum_height_cm),
+      source: "simulated_post_service_summary",
+    },
+    before: {
+      date: "not_collected",
+      maximumHeightCm: null,
+      source: "not_available_in_contract",
+    },
+    comparison: {
+      label: "Comparação bloqueada",
+      reason: "O contrato atual não traz medição anterior com fonte e data compatíveis.",
+    },
+    officialReportingStatus: "blocked",
+    reviewStatus: exception
+      ? exception.review_state === "awaiting_review" ? "pending" : "recorded"
+      : "not_required",
+  };
 }

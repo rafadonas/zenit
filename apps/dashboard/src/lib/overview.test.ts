@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import type { RecommendationQueueItem } from "./recommendations";
-import { buildOverviewMetrics, recommendationLabel, zoneLabel } from "./overview";
+import {
+  buildOverviewMetrics,
+  latestOverviewReference,
+  nextDecisionItem,
+  recommendationLabel,
+  shortcutsForRole,
+  zoneLabel,
+} from "./overview";
 
 function item(
   reviewState: RecommendationQueueItem["review_state"],
@@ -57,5 +64,38 @@ describe("overview presentation", () => {
     expect(zoneLabel("special")).toBe("área especial");
     expect(recommendationLabel("inspect")).toBe("Inspecionar");
     expect(recommendationLabel("mowing_review")).toBe("Avaliar roçada");
+  });
+
+  it("selects the next human decision before reviewed items", () => {
+    const reviewed = item("review_recorded_no_work_authorization", "order");
+    const awaiting = item("awaiting_review");
+
+    expect(nextDecisionItem([reviewed, awaiting])).toBe(awaiting);
+    expect(nextDecisionItem([])).toBeNull();
+  });
+
+  it("labels stale and missing temporal references", () => {
+    expect(latestOverviewReference([], new Date("2026-09-14T00:00:00Z"))).toEqual({
+      isStale: true,
+      label: "Sem referência temporal",
+      latestAcquiredAt: null,
+    });
+
+    const reference = latestOverviewReference([
+      item("awaiting_review"),
+    ], new Date("2026-09-14T00:00:00Z"));
+    expect(reference.label).toBe("28/07/2026");
+    expect(reference.isStale).toBe(true);
+  });
+
+  it("keeps role shortcuts scoped to manager and supervisor journeys", () => {
+    expect(shortcutsForRole("manager").map((shortcut) => shortcut.href)).toEqual([
+      "/recommendations",
+      "/mowing-post-service-summaries",
+    ]);
+    expect(shortcutsForRole("supervisor").map((shortcut) => shortcut.href)).toEqual([
+      "/photo-reviews",
+      "/corridor",
+    ]);
   });
 });

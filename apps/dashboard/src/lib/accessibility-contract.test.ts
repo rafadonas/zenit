@@ -6,7 +6,14 @@ import { describe, expect, it } from "vitest";
 
 const dashboardRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const sourceRoot = join(dashboardRoot, "src");
-const styles = readFileSync(join(sourceRoot, "app/styles.css"), "utf8");
+const styles = [
+  "styles/tokens.css",
+  "styles/base.css",
+  "app/styles.css",
+].map((path) => readFileSync(join(sourceRoot, path), "utf8")).join("\n");
+const cssVariables = new Map(
+  [...styles.matchAll(/--([\w-]+):\s*([^;]+);/g)].map(([, name, value]) => [name, value.trim()]),
+);
 
 function sourceFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -16,10 +23,20 @@ function sourceFiles(directory: string): string[] {
   });
 }
 
-function cssVariable(name: string): string {
-  const match = styles.match(new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{6})`));
-  if (!match) throw new Error(`Missing CSS variable --${name}`);
-  return match[1];
+function cssVariable(name: string, seen = new Set<string>()): string {
+  if (seen.has(name)) throw new Error(`Circular CSS variable reference --${name}`);
+  seen.add(name);
+
+  const value = cssVariables.get(name);
+  if (!value) throw new Error(`Missing CSS variable --${name}`);
+
+  const hex = value.match(/^#[0-9a-fA-F]{6}$/);
+  if (hex) return value;
+
+  const alias = value.match(/^var\(--([\w-]+)\)$/);
+  if (alias) return cssVariable(alias[1], seen);
+
+  throw new Error(`CSS variable --${name} does not resolve to a hex color`);
 }
 
 function relativeLuminance(hex: string): number {
@@ -51,6 +68,7 @@ describe("dashboard accessibility baseline", () => {
     for (const { path, source } of mainShells) {
       expect(source, path).toContain('id="main-content"');
       expect(source.match(/id="main-content"/g), path).toHaveLength(1);
+      expect(source, path).toContain("tabIndex={-1}");
     }
   });
 
@@ -59,6 +77,17 @@ describe("dashboard accessibility baseline", () => {
     expect(styles).toContain('[role="button"]):focus-visible');
     expect(styles).toContain("@media (prefers-reduced-motion: reduce)");
     expect(styles).toContain(".loading-mark { animation: none; }");
+  });
+
+  it("publishes canonical design tokens with compatibility aliases", () => {
+    expect(cssVariable("color-brand-600").toLowerCase()).toBe("#5a26ff");
+    expect(cssVariable("color-brand-800").toLowerCase()).toBe("#35129a");
+    expect(cssVariable("color-brand-100").toLowerCase()).toBe("#eee9ff");
+    expect(cssVariable("color-canvas").toLowerCase()).toBe("#f7f7fa");
+    expect(cssVariable("color-status-normal").toLowerCase()).toBe("#148a45");
+    expect(cssVariable("status-critical").toLowerCase()).toBe("#d82c55");
+    expect(cssVariable("color-height-n3").toLowerCase()).toBe("#e45745");
+    expect(cssVariable("green").toLowerCase()).toBe("#5a26ff");
   });
 
   it("keeps normal muted text at WCAG AA contrast on primary surfaces", () => {
