@@ -2,6 +2,24 @@
 
 Android-first, offline-first field application scaffold for the ZENIT MVP.
 
+## Code organization
+
+`lib/main.dart` is limited to runtime configuration and bootstrap. The app shell
+and screens are split by responsibility under `lib/app/` and `lib/features/`:
+
+- `auth/` owns the initial online login screen;
+- `work_orders/` owns the prepared-order inbox;
+- `inspection/` owns prepared inspection collection and its controller logic;
+- `mowing_rehearsal/` owns the simulated, non-operational mowing flow and its
+  controller logic; and
+- `sync_center/` contains shared presentation for persisted sync states.
+
+`ZenitAppController` retains session/bootstrap coordination. Inspection and mowing
+operations remain part of the same Dart library through feature-specific extensions
+so they can share the existing fail-closed transaction boundary without adding a
+state-management or routing dependency. Gateway, encrypted vault, payloads, UUIDs,
+and domain models are unchanged by this decomposition.
+
 Current P0 slice:
 
 - initial online OAuth password login against the ZENIT API;

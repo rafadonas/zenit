@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:zenit_mobile/app/zenit_app.dart';
 import 'package:zenit_mobile/app_controller.dart';
 import 'package:zenit_mobile/domain/mowing_demo_lifecycle.dart';
-import 'package:zenit_mobile/main.dart';
 
 import 'support/fakes.dart';
 
