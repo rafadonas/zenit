@@ -33,6 +33,10 @@ were checked with `pdfinfo` and `pdftotext`.
 All four PDFs are unencrypted and text-extractable. The DOCX contains 58
 non-empty paragraphs and opens as a valid Office Open XML container.
 
+Searchable, source-labeled companions for these PDFs and the two root project PDFs
+are indexed in [`docs/reference/README.md`](../reference/README.md). They preserve
+the checksums above and do not replace or modify the raw files.
+
 ## Satellite API integration guide
 
 The guide received on 2026-08-07 is a technical reference rather than imagery

@@ -37,3 +37,7 @@ original supplied names unchanged.
 - The satellite API guide is a dated technical reference, not a credential file,
   satellite scene, or current observation. Provider details require production
   revalidation, and its ~1 km AOI suggestion does not override 100 m analysis.
+
+Searchable, versioned summaries of the PDF sources live in
+[`docs/reference/`](../docs/reference/README.md). They are derived documentation,
+not replacements for these immutable raw files.
