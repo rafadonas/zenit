@@ -9,6 +9,7 @@ import 'package:zenit_mobile/domain/mowing_post_service_photo_draft.dart';
 import 'package:zenit_mobile/domain/prepared_mowing_plan.dart';
 import 'package:zenit_mobile/domain/prepared_photo_draft.dart';
 import 'package:zenit_mobile/domain/prepared_work_order.dart';
+import 'package:zenit_mobile/domain/sync_center.dart';
 
 import 'support/fakes.dart';
 
@@ -689,6 +690,8 @@ void main() {
 
     expect(await controller.syncPreparedDrafts(order), isFalse);
     final firstBatch = vault.pendingBatch!;
+    final itemKey = syncWorkItemKey(SyncWorkKind.inspectionBatch, order.id);
+    expect(vault.syncAttempts[itemKey]?.attemptCount, 1);
     expect(firstBatch.eventIds, hasLength(9));
     expect(
       (await vault.readDrafts(
@@ -699,6 +702,25 @@ void main() {
 
     gateway.syncFailure = null;
     expect(await controller.syncPreparedDrafts(order), isTrue);
+    expect(vault.syncAttempts[itemKey]?.attemptCount, 2);
+
+    final syncItem = (await controller.readSyncCenterItems()).singleWhere(
+      (item) => item.key == itemKey,
+    );
+    expect(syncItem.status, SyncCenterStatus.accepted);
+    expect(syncItem.attemptCount, 2);
+
+    final restoredController = ZenitAppController(
+      gateway: FakeGateway(orders: [order]),
+      sessionStore: MemorySessionStore()..value = validSession(),
+      vault: vault,
+      deviceIdentityStore: MemoryDeviceIdentityStore(),
+      appVersion: 'test',
+    );
+    await restoredController.initialize();
+    final restoredItem = (await restoredController.readSyncCenterItems())
+        .singleWhere((item) => item.key == itemKey);
+    expect(restoredItem.attemptCount, 2);
 
     expect(gateway.lastBatch!.batchId, firstBatch.batchId);
     expect(gateway.lastBatch!.eventIds, firstBatch.eventIds);
@@ -905,6 +927,11 @@ void main() {
         DraftSyncState.rejected,
         DraftSyncState.conflict,
       ]);
+      final syncItem = (await controller.readSyncCenterItems()).singleWhere(
+        (item) => item.kind == SyncWorkKind.inspectionBatch,
+      );
+      expect(syncItem.status, SyncCenterStatus.conflict);
+      expect(syncItem.canRetry, isFalse);
       expect(vault.pendingBatch, isNull);
     },
   );

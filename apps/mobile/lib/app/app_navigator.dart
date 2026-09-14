@@ -5,8 +5,20 @@ import '../domain/prepared_mowing_plan.dart';
 import '../domain/prepared_work_order.dart';
 import '../features/inspection/presentation/order_draft_page.dart';
 import '../features/mowing_rehearsal/presentation/prepared_mowing_plan_page.dart';
+import '../features/sync_center/presentation/sync_center_page.dart';
 
 abstract final class AppNavigator {
+  static Future<void> openSyncCenter(
+    BuildContext context, {
+    required ZenitAppController controller,
+  }) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => SyncCenterPage(controller: controller),
+      ),
+    );
+  }
+
   static Future<void> openInspectionDraft(
     BuildContext context, {
     required ZenitAppController controller,
