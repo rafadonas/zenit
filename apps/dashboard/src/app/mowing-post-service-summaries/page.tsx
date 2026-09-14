@@ -99,12 +99,17 @@ export default async function MowingPostServiceSummariesPage({ searchParams }: P
   );
 
   return (
-    <main className="recommendations-shell" id="main-content">
+    <main className="recommendations-shell" id="main-content" tabIndex={-1}>
       <DashboardHeader
         active="results"
         session={session ? {
           csrfToken: session.csrfToken,
           displayName: session.user.display_name,
+          roadRoles: session.road_roles.map((role) => ({
+            dataStatus: role.data_status,
+            roadCode: role.road_code,
+            role: role.role,
+          })),
         } : null}
       />
 

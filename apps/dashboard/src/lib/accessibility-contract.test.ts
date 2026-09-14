@@ -68,6 +68,7 @@ describe("dashboard accessibility baseline", () => {
     for (const { path, source } of mainShells) {
       expect(source, path).toContain('id="main-content"');
       expect(source.match(/id="main-content"/g), path).toHaveLength(1);
+      expect(source, path).toContain("tabIndex={-1}");
     }
   });
 

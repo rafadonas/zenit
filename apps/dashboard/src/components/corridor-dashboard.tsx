@@ -267,6 +267,7 @@ export function CorridorDashboard({
       className="dashboard-shell"
       data-zenit-smoke-page="corridor"
       id="main-content"
+      tabIndex={-1}
     >
       <DashboardHeader
         active="corridor"

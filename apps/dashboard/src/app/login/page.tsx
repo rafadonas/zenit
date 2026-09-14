@@ -35,6 +35,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       className="login-shell"
       data-zenit-smoke-page="login"
       id="main-content"
+      tabIndex={-1}
     >
       <section className="login-card" aria-labelledby="login-title">
         <div className="login-brand-panel">

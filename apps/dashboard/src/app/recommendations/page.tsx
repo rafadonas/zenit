@@ -132,13 +132,18 @@ export default async function RecommendationsPage({ searchParams }: Recommendati
   ]);
   const message = operationMessage(query.auth, query.decision, query.order);
   return (
-    <main className="recommendations-shell" id="main-content">
+    <main className="recommendations-shell" id="main-content" tabIndex={-1}>
       <DashboardHeader
         active="decisions"
         context={{ label: "Fluxo", value: "somente leitura" }}
         session={session ? {
           csrfToken: session.csrfToken,
           displayName: session.user.display_name,
+          roadRoles: session.road_roles.map((role) => ({
+            dataStatus: role.data_status,
+            roadCode: role.road_code,
+            role: role.role,
+          })),
         } : null}
       />
 

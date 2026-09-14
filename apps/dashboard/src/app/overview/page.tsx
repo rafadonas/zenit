@@ -61,12 +61,18 @@ export default async function OverviewPage() {
   const focus = queue.items.find((item) => item.review_state === "awaiting_review") ?? queue.items[0];
 
   return (
-    <main className="overview-shell" data-zenit-smoke-page="overview" id="main-content">
+    <main className="overview-shell" data-zenit-smoke-page="overview" id="main-content" tabIndex={-1}>
       <DashboardHeader
         active="overview"
+        context={{ label: "Rodovia", value: "SP021" }}
         session={session ? {
           csrfToken: session.csrfToken,
           displayName: session.user.display_name,
+          roadRoles: session.road_roles.map((role) => ({
+            dataStatus: role.data_status,
+            roadCode: role.road_code,
+            role: role.role,
+          })),
         } : null}
       />
 
