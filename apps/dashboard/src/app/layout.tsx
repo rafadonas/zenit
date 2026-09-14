@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "../styles/tokens.css";
 import "../styles/base.css";
+import "../styles/primitives.css";
 import "./styles.css";
 
 export const metadata: Metadata = {
