@@ -37,7 +37,10 @@ void main() {
       'lib/features/mowing_rehearsal/application/mowing_rehearsal_workflow.dart',
     ).readAsStringSync();
 
-    expect(inspectionSource, contains('extension InspectionWorkflowController'));
+    expect(
+      inspectionSource,
+      contains('extension InspectionWorkflowController'),
+    );
     expect(inspectionSource, contains('syncPreparedDrafts'));
     expect(inspectionSource, isNot(contains('confirmMowingDemo')));
 

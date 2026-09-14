@@ -23,10 +23,8 @@ abstract final class AppNavigator {
     required PreparedMowingPlan plan,
   }) => Navigator.of(context).push(
     MaterialPageRoute(
-      builder: (_) => PreparedMowingPlanPage(
-        controller: controller,
-        plan: plan,
-      ),
+      builder: (_) =>
+          PreparedMowingPlanPage(controller: controller, plan: plan),
     ),
   );
 }
