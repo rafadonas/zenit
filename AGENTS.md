@@ -4,9 +4,13 @@
 
 Before significant work, read:
 
-1. `ZENIT_Manual_Mestre_para_Codex.pdf`
+1. `docs/manual/README.md` and the chapters it routes for the task
 2. `README.md`
 3. Relevant files in `docs/decisions/` and `docs/data-quality/`
+
+`ZENIT_Manual_Mestre_para_Codex.pdf` is the immutable version 1.0 source. Use the
+maintained Markdown manual for current behavior and the PDF only for historical
+verification.
 
 For team-distributed work, also read `docs/team/README.md` and the complete work
 package assigned in `docs/team/work-packages.md` before editing code.

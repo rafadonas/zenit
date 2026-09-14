@@ -10,8 +10,9 @@ real.
 Antes de editar código, leia nesta ordem:
 
 1. [`../../AGENTS.md`](../../AGENTS.md) — regras permanentes do projeto;
-2. [`../../ZENIT_Manual_Mestre_para_Codex.pdf`](../../ZENIT_Manual_Mestre_para_Codex.pdf)
-   — objetivo, domínio e limites do produto;
+2. [`../manual/README.md`](../manual/README.md) e os capítulos pertinentes —
+   objetivo, domínio, arquitetura e limites atualizados do produto; o PDF v1.0 é
+   preservado apenas como fonte histórica;
 3. [`../../README.md`](../../README.md) — arquitetura e comandos já existentes;
 4. [`current-state-and-gaps.md`](current-state-and-gaps.md) — o que existe e o
    que ainda falta;

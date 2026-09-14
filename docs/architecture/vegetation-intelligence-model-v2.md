@@ -655,7 +655,8 @@ criar um modelo treinado sobre dados inadequados.
 
 ## Referências internas
 
-- [Manual mestre](../../ZENIT_Manual_Mestre_para_Codex.pdf)
+- [Manual mestre atualizado](../manual/README.md)
+- [Companheiros das fontes PDF](../reference/README.md)
 - [Estado atual e lacunas](../team/current-state-and-gaps.md)
 - [Plano de inteligência vegetal](../team/vegetation-intelligence-plan.md)
 - [Serviços externos e segredos](../team/external-services-and-secrets.md)
