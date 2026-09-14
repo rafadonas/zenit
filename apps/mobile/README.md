@@ -125,3 +125,23 @@ No release signing configuration is tracked. The Android Gradle Plugin leaves
 the `release` variant unsigned instead of reusing the debug key. Production
 signing, key custody, and distribution require a separate approved operational
 release process.
+
+## Mobile source structure
+
+The application is organized by responsibility without changing the existing
+gateway, encrypted vault, domain models, navigation outcomes, or API payloads:
+
+- `lib/main.dart` only builds production dependencies and starts the app;
+- `lib/app/` owns the application shell and navigation boundary;
+- `lib/core/` contains shared workflow errors and presentation helpers;
+- `lib/features/auth/` and `lib/features/work_orders/` own entry and inbox UI;
+- `lib/features/inspection/` owns prepared-inspection UI and orchestration;
+- `lib/features/mowing_rehearsal/` owns the explicitly simulated mowing flow;
+- `lib/data/` retains gateway and secure persistence implementations; and
+- `lib/domain/` retains immutable workflow models and validation rules.
+
+`ZenitAppController` remains the shared session/snapshot state boundary. Feature
+operations are defined beside their feature as controller extensions, which keeps
+the existing call surface stable while preventing the central controller from
+accumulating inspection and mowing rules again. The architecture test enforces the
+size and feature-boundary constraints on the central files.
