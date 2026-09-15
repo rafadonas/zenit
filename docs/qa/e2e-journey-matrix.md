@@ -259,6 +259,14 @@ Manual evidence must contain no secrets or personal data. Store large or
 temporary screenshots outside Git; if a small image is approved for tracking,
 redact it and record its purpose and source revision.
 
+### Targeted login/session regression
+
+The Rafael validation card for the historical login failure is covered by the
+targeted route/API suite and bounded local fixed-session/logout check recorded
+in [`login-session-regression-2026-09-15.md`](login-session-regression-2026-09-15.md).
+The browser/device accessibility gap remains intentionally separate from this
+route-level regression result.
+
 ## Exit criteria and known gaps
 
 QA-001 is complete when this matrix is reproducible, each required dimension is
