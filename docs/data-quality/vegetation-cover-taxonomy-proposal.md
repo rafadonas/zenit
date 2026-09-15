@@ -1,10 +1,25 @@
 # Proposta de taxonomia de cobertura vegetal
 
-- Status: proposta para revisão
-- Versão: `0.1-draft`
+- Status: proposta revisada; decisão do data owner registrada, sem validação
+  especializada
+- Versão: `zenit-cover-taxonomy-v0.1-draft`
 - Data: 2026-09-14
-- Dono da proposta: trilha geoespacial e inteligência vegetal
-- Aprovação necessária: especialista em vegetação e data owner
+- Dono da proposta: Rafael (data owner do projeto) com a trilha geoespacial e
+  inteligência vegetal
+- Revisão especializada: ainda não disponível; permanece como limitação
+
+## Decisão de escopo registrada
+
+O data owner decidiu manter as seis classes como núcleo extensível, usar motivos
+específicos para `unknown`, avaliar cada zona separadamente, permitir análise de
+copa sobre a faixa caso a caso e preparar a taxonomia para classificação
+assistida por IA. A ausência de especialista foi aceita como limitação explícita
+do trabalho; isso não transforma a proposta em validação científica ou schema
+operacional.
+
+O identificador de versão adotado é `zenit-cover-taxonomy-v0.1-draft`. A criação
+de uma nova classe exige nova versão e justificativa, sem reinterpretação
+silenciosa dos valores existentes.
 
 ## Objetivo e limite
 
@@ -20,7 +35,10 @@ O rótulo de cobertura é independente de:
 - índice espectral, especialmente NDVI;
 - estimativa de altura em centímetros.
 
-Quando a evidência não sustenta uma classe, o rótulo correto é `unknown`.
+Quando a evidência não sustenta uma classe, o rótulo correto é `unknown` e um
+`unknown_reason` específico deve explicar o motivo. Novas classes podem ser
+acrescentadas em versões futuras, mas não podem mudar silenciosamente o
+significado das seis classes desta versão.
 
 ## Vocabulário candidato
 
@@ -35,6 +53,28 @@ Quando a evidência não sustenta uma classe, o rótulo correto é `unknown`.
 
 O valor persistido deve ser exatamente um dos identificadores acima. Rótulos de
 interface podem ser traduzidos, mas não devem alterar o identificador.
+
+### Motivos controlados para `unknown`
+
+O motivo é uma dimensão separada da classe. A lista inicial é extensível por
+versão:
+
+| `unknown_reason` | Uso |
+| --- | --- |
+| `insufficient_resolution` | A resolução não permite distinguir o objeto. |
+| `shadow` | Sombra impede a leitura da estrutura. |
+| `cloud_or_haze` | Nuvem, névoa ou condição atmosférica encobre a evidência. |
+| `blur_or_exposure` | Desfoque, saturação ou exposição impede a leitura. |
+| `canopy_occlusion` | Copa ou dossel esconde a camada inferior. |
+| `vehicle_or_structure_occlusion` | Veículo, barreira ou estrutura bloqueia a visão. |
+| `mixed_without_dominance` | Há mistura relevante, mas nenhum tipo domina. |
+| `source_conflict` | Fontes comparáveis apresentam classes divergentes. |
+| `out_of_zone` | Não há evidência suficiente de relação com a zona avaliada. |
+| `privacy_redaction` | A evidência foi mascarada por política de privacidade. |
+| `other` | Motivo documentado que ainda não possui valor próprio. |
+
+`unknown_reason` é obrigatório para `unknown`, recomendado para `mixed` e não
+deve ser usado para disfarçar uma decisão de `non_vegetation`.
 
 ## Atributos que acompanham o rótulo
 
@@ -51,6 +91,8 @@ observação deve manter, no mínimo:
 | `spatial_relation` | `inside_zone`, `overhang`, `adjacent`, `uncertain` | Se a copa está sobre a faixa mas o tronco está fora, preservar `overhang`. |
 | `quality_status` | `accepted`, `limited`, `rejected` | `rejected` não alimenta análise nem treinamento. |
 | `rationale` | texto curto e controlado | Obrigatório em `unknown`, `mixed` ou conflito. |
+| `gps_status` | `simulated`, `real`, `unavailable` | O protótipo atual usa `simulated`; uma captura real exige permissão e consentimento. |
+| `gps_accuracy_m` | número não negativo, quando disponível | Preservar a precisão informada pelo dispositivo; não inventar precisão. |
 
 Percentual, quando vier a existir, deve guardar método, resolução e referência
 espacial. Não é permitido inventar percentual a partir de uma cor de mapa.
@@ -78,15 +120,38 @@ espacial. Não é permitido inventar percentual a partir de uma cor de mapa.
 7. **Zonas:** avaliar esquerda, direita, canteiro central e áreas especiais
    separadamente. Um rótulo não pode atravessar zonas sem evidência própria.
 
+## Classificação assistida por IA
+
+A taxonomia será usada como espaço de rótulos para um modelo de IA, mas a saída
+do modelo não é uma decisão operacional. Uma observação futura deve separar:
+
+- `cover_type_method`: `model_estimated` ou `human_reviewed`;
+- faixa de confiança e qualidade da fonte;
+- versão do modelo e da taxonomia;
+- revisão humana `pending`, `accepted`, `corrected` ou `rejected`.
+
+O modelo pode sugerir a classe e o motivo de incerteza; baixa confiança,
+conflito ou oclusão deve manter `unknown`/`mixed` e encaminhar a revisão. Não
+derivar altura, N1/N2/N3, urgência ou autorização de roçada da previsão.
+
+O treinamento será feito em ticket próprio, depois do dataset versionado e do
+protocolo de anotação. Somente dados reais, licenciados/consentidos e aprovados
+podem entrar no treinamento; dados `prepared` e `simulated` continuam excluídos.
+
 ## Fluxo de revisão proposto
 
 1. Anotador registra classe, atributos, fonte, data, zona e limitação.
 2. Segundo anotador revisa uma amostra de calibração e todos os casos de
    `unknown`, `mixed` ou conflito material.
-3. Especialista adjudica divergências e aprova exemplos do manual ilustrado.
-4. Data owner aprova versão, licença/consentimento, retenção e uso permitido.
-5. Só depois do aceite formal uma versão pode ser referenciada por um contrato
-   ou dataset; esta proposta não faz essa promoção.
+3. Quando houver especialista disponível, ele adjudica divergências e aprova
+   exemplos do manual ilustrado. Enquanto isso, a ausência fica registrada como
+   limitação do projeto.
+4. O data owner do projeto aprova a versão provisória, licença/consentimento,
+   retenção e uso permitido dentro do escopo acadêmico.
+5. A decisão do data owner permite referenciar esta versão em artefatos de
+   demonstração e em um experimento de treinamento posterior, desde que os
+   dados sejam reais, licenciados/consentidos e versionados. Ela ainda não se
+   torna schema operacional sem revisão especializada ou novo gate formal.
 
 Concordância deve ser publicada por classe, zona e condição de qualidade. Não
 fixar meta numérica antes da revisão especializada.
@@ -96,6 +161,7 @@ fixar meta numérica antes da revisão especializada.
 - derivar `N1`/`N2`/`N3` do tipo de cobertura;
 - converter NDVI, cor, confiança ou tipo em altura em centímetros;
 - treinar modelo com dados `prepared` ou `simulated`;
+- tratar uma previsão de IA como rótulo humano ou certeza de altura;
 - usar `tree`, `grass_herbaceous` ou qualquer classe para autorizar roçada;
 - apagar uma observação conflitante ou perder sua proveniência;
 - chamar a taxonomia de “oficial”, “validada” ou “operacional” antes das duas
@@ -103,8 +169,8 @@ fixar meta numérica antes da revisão especializada.
 
 ## Critérios para sair de proposta
 
-O status só pode mudar quando houver registro revisável de especialista e data
-owner, exemplos aceitos/rejeitados, política de privacidade/licença, versão do
-manual de anotação e decisão explícita sobre o contrato. Até lá, consumidores
-devem tratar o vocabulário como candidato e manter `unknown` quando houver
-dúvida.
+O status só pode mudar quando houver registro revisável de especialista (ou uma
+decisão formal de escopo sobre a sua ausência), data owner, exemplos
+aceitos/rejeitados, política de privacidade/licença, versão do manual de
+anotação e decisão explícita sobre o contrato. Até lá, consumidores devem
+tratar o vocabulário como candidato e manter `unknown` quando houver dúvida.
