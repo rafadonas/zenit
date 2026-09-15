@@ -54,6 +54,24 @@ never placed in a browser-facing tile URL.
 - Orders API, scene downloads, basemap discovery, tile proxy/cache, quota ledger,
   raster checksums, and processing provenance remain future reviewed increments.
 
+`PLANET-002` adds an opt-in `assets:download` permission filter to the bounded
+catalog request and exposes it through `zenit-planet-capabilities`. This checks
+scene-level catalog permission only; it still does not select a product bundle,
+create an Order, download bytes, or consume scene-download quota.
+
+`PLANET-003` adds the reversible `0041` migration and
+`zenit-planet-persist`. It stores only normalized, checksummed catalog metadata
+with `cache_status=discovered` and idempotent provider/scene identity. The
+command requires `--persist`, never stores asset bytes, and remains
+non-operational. A bounded validation on 2026-09-15 persisted 13 scenes on the
+first run and 13 existing scenes on an immediate repeat; all 13 remain
+`cached_at=NULL`.
+
+`PLANET-004` remains blocked until the owner records the exact scene IDs,
+product bundle/assets, clipped AOI, area/byte or cost budget, academic license,
+retention/destination, and explicit approval to create an external Order. A
+catalog key and `assets:download` result do not satisfy those gates.
+
 ### PLANET-001 validation
 
 On 2026-09-15 the backend-only catalog flow successfully authenticated against

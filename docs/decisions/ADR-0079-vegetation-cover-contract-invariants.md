@@ -1,4 +1,4 @@
-# ADR-0077: Vegetation-cover draft contract invariants
+# ADR-0079: Vegetation-cover draft contract invariants
 
 - Status: accepted for the academic draft API; real GPS remains blocked
 - Date: 2026-09-15
@@ -22,7 +22,7 @@ current-chain selection, count, and row mapping outside direct coverage.
 
 ## Decision
 
-Apply migration `0041` without modifying the already integrated migration
+Apply migration `0042` without modifying the already integrated migration
 `0040`. Require a non-empty `model_version` for every `model_estimated`
 observation. Require `unknown_reason` for `unknown`, permit it for `mixed`, and
 reject it for the remaining cover types.

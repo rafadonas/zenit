@@ -1,4 +1,4 @@
-"""Discover PlanetScope scenes without ordering assets or consuming download quota."""
+"""Persist bounded Planet catalog metadata without ordering or downloading assets."""
 
 from __future__ import annotations
 
@@ -6,33 +6,37 @@ import argparse
 from datetime import UTC, date, datetime, timedelta
 
 from zenit_api.config import Settings
+from zenit_geospatial.satellite_catalog import PostgresSatelliteCatalog
 from zenit_geospatial.satellite_http import PlanetCatalogClient, UrllibJsonTransport
 from zenit_geospatial.satellite_providers import BoundingBox, PlanetDataProvider, SearchWindow
 
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Discover Planet PSScene metadata for a prepared, non-operational AOI"
+        description="Persist bounded Planet PSScene metadata with download permission"
     )
-    parser.add_argument(
-        "--bbox",
-        nargs=4,
-        type=float,
-        required=True,
-        metavar=("MIN_LON", "MIN_LAT", "MAX_LON", "MAX_LAT"),
-    )
+    parser.add_argument("--bbox", nargs=4, type=float, required=True,
+                        metavar=("MIN_LON", "MIN_LAT", "MAX_LON", "MAX_LAT"))
     parser.add_argument("--from-date", type=date.fromisoformat, required=True)
     parser.add_argument("--to-date", type=date.fromisoformat, required=True)
     parser.add_argument("--limit", type=int, default=25)
     parser.add_argument(
-        "--require-download-permission",
+        "--persist",
         action="store_true",
-        help="include only scenes with the assets:download permission",
+        help="confirm writing normalized metadata to the configured local database",
     )
     return parser
 
 
+def _local_database_url(database_url: str) -> str:
+    return database_url.replace("@postgres:", "@localhost:").replace(
+        "postgresql+psycopg://", "postgresql://"
+    )
+
+
 def run(arguments: argparse.Namespace, settings: Settings | None = None) -> dict[str, object]:
+    if not arguments.persist:
+        raise RuntimeError("metadata persistence requires the --persist confirmation")
     active = settings or Settings()
     if active.planet_api_key is None:
         raise RuntimeError("Planet API key is not configured")
@@ -41,27 +45,48 @@ def run(arguments: argparse.Namespace, settings: Settings | None = None) -> dict
     if start >= end:
         raise ValueError("from-date must not be after to-date")
 
-    require_download_permission = bool(
-        getattr(arguments, "require_download_permission", False)
-    )
     provider = PlanetDataProvider()
     payload = provider.build_search_request(
         BoundingBox(*arguments.bbox),
         SearchWindow(start, end),
         limit=arguments.limit,
-        require_download_permission=require_download_permission,
+        require_download_permission=True,
     )
     page = PlanetCatalogClient(
         UrllibJsonTransport(timeout_seconds=30),
         active.planet_api_key.get_secret_value(),
         provider,
     ).search(payload)
+    if not page.acquisitions:
+        return {
+            "catalog_acquisitions": 0,
+            "scenes_created": 0,
+            "scenes_existing": 0,
+            "has_next_page": page.next_url is not None,
+            "order_requested": False,
+            "download_requested": False,
+            "operationally_eligible": False,
+        }
+
+    database_url = _local_database_url(active.database_url)
+    catalog = PostgresSatelliteCatalog(database_url)
+    discovered_at = datetime.now(UTC)
+    created = 0
+    existing = 0
+    for acquisition in page.acquisitions:
+        result = catalog.register(acquisition, discovered_at)
+        if result.created:
+            created += 1
+        else:
+            existing += 1
     return {
         "catalog_acquisitions": len(page.acquisitions),
+        "scenes_created": created,
+        "scenes_existing": existing,
         "has_next_page": page.next_url is not None,
+        "order_requested": False,
         "download_requested": False,
         "operationally_eligible": False,
-        "download_permission_filter": require_download_permission,
     }
 
 

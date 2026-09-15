@@ -89,11 +89,14 @@ AUTHENTICATION_SESSION_MIGRATION = Path(
 VEGETATION_COVER_CONTRACT_MIGRATION = Path(
     "infra/migrations/0040_vegetation_cover_contract.sql"
 )
+PLANET_SCENE_PERSISTENCE_MIGRATION = Path(
+    "infra/migrations/0041_planet_scene_persistence.sql"
+)
 VEGETATION_COVER_INVARIANTS_MIGRATION = Path(
-    "infra/migrations/0041_vegetation_cover_contract_invariants.sql"
+    "infra/migrations/0042_vegetation_cover_contract_invariants.sql"
 )
 VEGETATION_COVER_INVARIANTS_DOWN_MIGRATION = Path(
-    "infra/migrations/0041_vegetation_cover_contract_invariants.down.sql"
+    "infra/migrations/0042_vegetation_cover_contract_invariants.down.sql"
 )
 
 
@@ -197,7 +200,7 @@ class MigrationContractTests(unittest.TestCase):
         mounts = [
             line.strip() for line in compose.splitlines() if "/docker-entrypoint-initdb.d/" in line
         ]
-        self.assertEqual(len(mounts), 41)
+        self.assertEqual(len(mounts), 42)
         for version, mount in enumerate(mounts, start=1):
             prefix = f"{version:04d}"
             self.assertIn(f"infra/migrations/{prefix}_", mount)
@@ -279,6 +282,13 @@ class MigrationContractTests(unittest.TestCase):
             "ADD CONSTRAINT vegetation_cover_observation_unknown_reason_original",
             down_sql,
         )
+
+    def test_planet_scene_persistence_keeps_sensor_series_separate(self) -> None:
+        sql = PLANET_SCENE_PERSISTENCE_MIGRATION.read_text(encoding="utf-8")
+
+        self.assertIn("DROP CONSTRAINT IF EXISTS satellite_scene_sensor_check", sql)
+        self.assertIn("'planet-scope'", sql)
+        self.assertIn("PlanetScope remains a separate product series", sql)
 
     def test_mowing_post_service_measurement_is_separate_simulated_evidence(self) -> None:
         sql = PREPARED_MOWING_POST_SERVICE_MEASUREMENT_MIGRATION.read_text(

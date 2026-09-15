@@ -404,6 +404,31 @@ cd apps/mobile
   não cria pedido, não baixa cena e sempre informa
   `operationally_eligible=false`.
 
+- **Validação de permissão Planet sem pedido (`zenit-planet-capabilities`)**:
+  ```bash
+  zenit-planet-capabilities \
+    --bbox -46.80 -23.55 -46.76 -23.50 \
+    --from-date 2026-08-01 \
+    --to-date 2026-08-07
+  ```
+
+  Usa o filtro `assets:download` no catálogo para verificar acesso de cena no
+  recorte escolhido. Não cria Order, não baixa bytes e não habilita operação;
+  produto, licença, cota e checksum ainda exigem tickets próprios.
+
+- **Persistência de metadados Planet (`zenit-planet-persist`)**:
+  ```bash
+  zenit-planet-persist \
+    --bbox -46.80 -23.55 -46.76 -23.50 \
+    --from-date 2026-08-01 \
+    --to-date 2026-08-07 \
+    --persist
+  ```
+
+  O `--persist` é uma confirmação explícita para registrar somente metadados
+  normalizados e checksummed no banco local. O comando não cria pedido, não
+  baixa bytes e mantém `operationally_eligible=false`.
+
 - **Renderizar prévia NDVI estática**:
   ```bash
   python scripts/render_cached_ndvi_preview.py
@@ -453,7 +478,7 @@ e a proveniência. Consulte o ADR-0067 e o guia de serviços externos.
 
 ## Banco de dados e migrações
 
-O banco atual exige as migrações `0001` a `0041`, sempre em ordem numérica. Um
+O banco atual exige as migrações `0001` a `0042`, sempre em ordem numérica. Um
 volume novo do Compose executa todas automaticamente por
 `/docker-entrypoint-initdb.d`. Volumes existentes não são atualizados por esse
 mecanismo.
@@ -482,8 +507,10 @@ As migrações preservam uma evolução append-only:
   exportação, exceção pós-serviço e decisão humana da exceção.
 - `0038`: limitação persistente e auditada de tentativas de login local.
 - `0039`: sessões de autenticação persistentes e revogáveis.
-- `0040`–`0041`: contrato de cobertura vegetal e invariantes acadêmicos que
-  mantêm GPS real bloqueado.
+- `0040`: contrato acadêmico de cobertura vegetal.
+- `0041`: persistência preparada e não operacional do catálogo Planet.
+- `0042`: invariantes do contrato de cobertura vegetal que mantêm GPS real
+  bloqueado.
 
 Decisões detalhadas e invariantes de cada etapa estão em
 [`docs/decisions`](docs/decisions).

@@ -51,7 +51,8 @@ services:
       - ./infra/migrations/0038_persistent_login_throttle.sql:/docker-entrypoint-initdb.d/0038.sql:ro
       - ./infra/migrations/0039_persistent_authentication_sessions.sql:/docker-entrypoint-initdb.d/0039.sql:ro
       - ./infra/migrations/0040_vegetation_cover_contract.sql:/docker-entrypoint-initdb.d/0040.sql:ro
-      - ./infra/migrations/0041_vegetation_cover_contract_invariants.sql:/docker-entrypoint-initdb.d/0041.sql:ro
+      - ./infra/migrations/0041_planet_scene_persistence.sql:/docker-entrypoint-initdb.d/0041.sql:ro
+      - ./infra/migrations/0042_vegetation_cover_contract_invariants.sql:/docker-entrypoint-initdb.d/0042.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s

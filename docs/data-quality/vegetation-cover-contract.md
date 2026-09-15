@@ -1,7 +1,7 @@
 # Contrato de observação de cobertura vegetal
 
 Migrations `0040_vegetation_cover_contract.sql` and
-`0041_vegetation_cover_contract_invariants.sql`, together with the authenticated endpoint
+`0042_vegetation_cover_contract_invariants.sql`, together with the authenticated endpoint
 `GET /v1/segments/{segment_id}/vegetation-cover` expose the draft taxonomy
 without presenting it as an operational decision.
 
