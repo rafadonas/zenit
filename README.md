@@ -404,6 +404,18 @@ cd apps/mobile
   não cria pedido, não baixa cena e sempre informa
   `operationally_eligible=false`.
 
+- **Validação de permissão Planet sem pedido (`zenit-planet-capabilities`)**:
+  ```bash
+  zenit-planet-capabilities \
+    --bbox -46.80 -23.55 -46.76 -23.50 \
+    --from-date 2026-08-01 \
+    --to-date 2026-08-07
+  ```
+
+  Usa o filtro `assets:download` no catálogo para verificar acesso de cena no
+  recorte escolhido. Não cria Order, não baixa bytes e não habilita operação;
+  produto, licença, cota e checksum ainda exigem tickets próprios.
+
 - **Renderizar prévia NDVI estática**:
   ```bash
   python scripts/render_cached_ndvi_preview.py

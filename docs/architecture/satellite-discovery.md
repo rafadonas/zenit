@@ -54,6 +54,11 @@ never placed in a browser-facing tile URL.
 - Orders API, scene downloads, basemap discovery, tile proxy/cache, quota ledger,
   raster checksums, and processing provenance remain future reviewed increments.
 
+`PLANET-002` adds an opt-in `assets:download` permission filter to the bounded
+catalog request and exposes it through `zenit-planet-capabilities`. This checks
+scene-level catalog permission only; it still does not select a product bundle,
+create an Order, download bytes, or consume scene-download quota.
+
 ### PLANET-001 validation
 
 On 2026-09-15 the backend-only catalog flow successfully authenticated against

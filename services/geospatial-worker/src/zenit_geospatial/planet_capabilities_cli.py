@@ -1,4 +1,4 @@
-"""Discover PlanetScope scenes without ordering assets or consuming download quota."""
+"""Validate Planet asset-download filtering without creating an Order."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from zenit_geospatial.satellite_providers import BoundingBox, PlanetDataProvider
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Discover Planet PSScene metadata for a prepared, non-operational AOI"
+        description="Check Planet catalog results filtered by assets:download permission"
     )
     parser.add_argument(
         "--bbox",
@@ -24,11 +24,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--from-date", type=date.fromisoformat, required=True)
     parser.add_argument("--to-date", type=date.fromisoformat, required=True)
     parser.add_argument("--limit", type=int, default=25)
-    parser.add_argument(
-        "--require-download-permission",
-        action="store_true",
-        help="include only scenes with the assets:download permission",
-    )
     return parser
 
 
@@ -40,16 +35,12 @@ def run(arguments: argparse.Namespace, settings: Settings | None = None) -> dict
     end = datetime.combine(arguments.to_date + timedelta(days=1), datetime.min.time(), tzinfo=UTC)
     if start >= end:
         raise ValueError("from-date must not be after to-date")
-
-    require_download_permission = bool(
-        getattr(arguments, "require_download_permission", False)
-    )
     provider = PlanetDataProvider()
     payload = provider.build_search_request(
         BoundingBox(*arguments.bbox),
         SearchWindow(start, end),
         limit=arguments.limit,
-        require_download_permission=require_download_permission,
+        require_download_permission=True,
     )
     page = PlanetCatalogClient(
         UrllibJsonTransport(timeout_seconds=30),
@@ -57,11 +48,11 @@ def run(arguments: argparse.Namespace, settings: Settings | None = None) -> dict
         provider,
     ).search(payload)
     return {
-        "catalog_acquisitions": len(page.acquisitions),
+        "catalog_acquisitions_with_download_permission": len(page.acquisitions),
         "has_next_page": page.next_url is not None,
+        "order_requested": False,
         "download_requested": False,
         "operationally_eligible": False,
-        "download_permission_filter": require_download_permission,
     }
 
 
