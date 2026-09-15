@@ -46,3 +46,30 @@ export function safeReturnPath(value: string | null): string {
   }
   return value;
 }
+
+export function safeDashboardReturnPath(
+  value: string | null | undefined,
+  fallback = "/recommendations?auth=signed-in",
+): string {
+  const candidate = safeReturnPath(value ?? null);
+  if (candidate.includes("#") || /[\u0000-\u001f\u007f]/.test(candidate)) {
+    return fallback;
+  }
+
+  let pathname: string;
+  try {
+    pathname = decodeURIComponent(new URL(candidate, "http://zenit.local").pathname);
+  } catch {
+    return fallback;
+  }
+  const allowedPaths = new Set([
+    "/corridor",
+    "/mowing-photo-reviews",
+    "/mowing-post-service-summaries",
+    "/overview",
+    "/photo-reviews",
+    "/recommendations",
+  ]);
+  if (!allowedPaths.has(pathname)) return fallback;
+  return candidate;
+}

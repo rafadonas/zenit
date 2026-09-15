@@ -529,7 +529,10 @@ de login:
 Abra diretamente uma dessas portas. A rota `/login` identifica o perfil
 configurado naquela instância e permite refazer o acesso demonstrativo sem
 pedir senha. Se o formulário de e-mail e senha aparecer, a sessão fixa não está
-configurada e a instância está no modo de login local comum.
+configurada e a instância está no modo de login local comum. Esse formulário
+identifica o ambiente antes da entrada, anuncia o carregamento do perfil e só
+retorna a uma página interna explicitamente permitida; respostas de falha não
+confirmam se uma conta existe.
 
 Os e-mails podem ser trocados por `DASHBOARD_MANAGER_EMAIL` e
 `DASHBOARD_SUPERVISOR_EMAIL`. Os nomes de cookie são diferentes entre as
