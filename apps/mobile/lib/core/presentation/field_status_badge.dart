@@ -149,11 +149,12 @@ class FieldStatusBadge extends StatelessWidget {
           borderRadius: BorderRadius.circular(FieldTokens.radiusPill),
           border: Border.all(color: border, width: 1.2),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
+        child: Wrap(
+          spacing: dense ? 4 : 6,
+          runSpacing: FieldTokens.space1,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             Icon(icon, size: dense ? 14 : 16, color: textCol),
-            SizedBox(width: dense ? 4 : 6),
             Text(
               label,
               style: TextStyle(
