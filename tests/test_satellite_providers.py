@@ -100,6 +100,20 @@ class SatelliteProviderTests(unittest.TestCase):
             {"gte": "2026-08-01T00:00:00Z", "lte": "2026-08-07T00:00:00Z"},
         )
 
+    def test_planet_request_can_require_scene_download_permission(self) -> None:
+        request = PlanetDataProvider().build_search_request(
+            self.bbox,
+            self.window,
+            limit=25,
+            require_download_permission=True,
+        )
+
+        permission_filter = request["filter"]["config"][2]
+        self.assertEqual(permission_filter, {
+            "type": "PermissionFilter",
+            "config": ["assets:download"],
+        })
+
     def test_planet_page_normalizes_fractional_cloud_cover_without_asset_urls(self) -> None:
         page = PlanetDataProvider().parse_search_page(
             {
