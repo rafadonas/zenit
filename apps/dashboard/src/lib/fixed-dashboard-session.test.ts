@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { getFixedDashboardSessionConfig, safeReturnPath } from "./fixed-dashboard-session";
+import {
+  getFixedDashboardSessionConfig,
+  safeDashboardReturnPath,
+  safeReturnPath,
+} from "./fixed-dashboard-session";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -43,5 +47,29 @@ describe("fixed dashboard session configuration", () => {
     expect(safeReturnPath("//attacker.test/path")).toBe("/");
     expect(safeReturnPath("/\\attacker.test/path")).toBe("/");
     expect(safeReturnPath("https://attacker.test/path")).toBe("/");
+  });
+
+  it("allows only non-API dashboard destinations after login", () => {
+    expect(safeDashboardReturnPath("/photo-reviews?status=pending")).toBe(
+      "/photo-reviews?status=pending",
+    );
+    expect(safeDashboardReturnPath("//attacker.test/path")).toBe(
+      "/recommendations?auth=signed-in",
+    );
+    expect(safeDashboardReturnPath("/api/auth/logout")).toBe(
+      "/recommendations?auth=signed-in",
+    );
+    expect(safeDashboardReturnPath("/login?error=session")).toBe(
+      "/recommendations?auth=signed-in",
+    );
+    expect(safeDashboardReturnPath("/api?route=logout")).toBe(
+      "/recommendations?auth=signed-in",
+    );
+    expect(safeDashboardReturnPath("/%61pi/auth/logout")).toBe(
+      "/recommendations?auth=signed-in",
+    );
+    expect(safeDashboardReturnPath("/unknown-page")).toBe(
+      "/recommendations?auth=signed-in",
+    );
   });
 });

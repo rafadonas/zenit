@@ -612,10 +612,16 @@ h2, .card-heading h2, .side-heading h2, .recommendation-title h2, .prepared-summ
 .login-form-panel { display: flex; flex-direction: column; justify-content: center; padding: 56px 52px; }
 .login-form-panel h1 { margin-bottom: 10px; font-size: 2rem; }
 .login-form-panel .subtitle { max-width: 360px; font-size: .82rem; }
+.login-context { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
+.login-context div { display: grid; gap: 2px; min-width: 148px; padding: 9px 12px; border: 1px solid var(--color-border); border-radius: 10px; background: var(--color-canvas); }
+.login-context span { color: var(--color-text-muted); font-size: .65rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.login-context strong { font-size: .76rem; }
 .login-form { gap: 8px; margin: 28px 0 18px; }
 .login-form label { color: var(--color-text); font-size: .72rem; font-weight: 700; }
 .login-form input { min-height: 46px; padding: 12px; }
 .login-form button { width: 100%; margin-top: 12px; }
+.login-form button:disabled, .login-form input:disabled { cursor: wait; opacity: .7; }
+.login-submit-status { min-height: 20px; color: var(--color-text-muted); font-size: .7rem; text-align: center; }
 .demo-access-card {
   display: grid;
   gap: 8px;
@@ -629,7 +635,10 @@ h2, .card-heading h2, .side-heading h2, .recommendation-title h2, .prepared-summ
 .demo-access-card strong { overflow-wrap: anywhere; font-size: 1rem; }
 .demo-access-card small { margin-bottom: 8px; color: var(--color-text-muted); line-height: 1.5; }
 .demo-access-card .primary-button { color: #fff; text-align: center; text-decoration: none; }
-.form-message { border: 1px solid var(--color-status-near-border); color: var(--color-status-near-text); background: var(--color-status-near-surface); }
+.form-message { display: grid; gap: 3px; margin-top: 18px; border: 1px solid var(--color-status-near-border); color: var(--color-status-near-text); background: var(--color-status-near-surface); line-height: 1.45; }
+.form-message.error { border-color: var(--color-status-critical-border); color: var(--color-status-critical-text); background: var(--color-status-critical-surface); }
+.form-message.info { border-color: #cfc6ff; color: var(--color-brand-800); background: var(--color-brand-100); }
+.form-message.success { border-color: var(--color-status-normal-border); color: var(--color-status-normal-text); background: var(--color-status-normal-surface); }
 .login-safety-note { border: 1px solid #e1dafe; color: var(--color-text-muted); background: #faf9ff; }
 .login-card > .login-form-panel > a { color: var(--color-brand); font-size: .72rem; font-weight: 700; }
 
