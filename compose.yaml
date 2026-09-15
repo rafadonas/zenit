@@ -52,6 +52,7 @@ services:
       - ./infra/migrations/0039_persistent_authentication_sessions.sql:/docker-entrypoint-initdb.d/0039.sql:ro
       - ./infra/migrations/0040_vegetation_cover_contract.sql:/docker-entrypoint-initdb.d/0040.sql:ro
       - ./infra/migrations/0041_planet_scene_persistence.sql:/docker-entrypoint-initdb.d/0041.sql:ro
+      - ./infra/migrations/0042_planet_order_download.sql:/docker-entrypoint-initdb.d/0042.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
@@ -113,6 +114,7 @@ services:
       OBJECT_STORAGE_ACCESS_KEY: ${OBJECT_STORAGE_ACCESS_KEY:-zenit}
       OBJECT_STORAGE_SECRET_KEY: ${OBJECT_STORAGE_SECRET_KEY:-change_me}
       OBJECT_STORAGE_BUCKET_MEDIA: ${OBJECT_STORAGE_BUCKET_MEDIA:-zenit-media}
+      OBJECT_STORAGE_BUCKET_RAW: ${OBJECT_STORAGE_BUCKET_RAW:-zenit-raw}
       OBJECT_STORAGE_MEDIA_ENCRYPTION_KEY: ${OBJECT_STORAGE_MEDIA_ENCRYPTION_KEY:-ZGV2ZWxvcG1lbnQtb25seS0zMi1ieXRlLWtleSEhISE=}
     ports:
       - "8000:8000"
