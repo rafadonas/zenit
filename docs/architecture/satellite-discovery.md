@@ -54,6 +54,17 @@ never placed in a browser-facing tile URL.
 - Orders API, scene downloads, basemap discovery, tile proxy/cache, quota ledger,
   raster checksums, and processing provenance remain future reviewed increments.
 
+### PLANET-001 validation
+
+On 2026-09-15 the backend-only catalog flow successfully authenticated against
+the configured account for the documented development corridor AOI
+`[-46.80, -23.55, -46.76, -23.50]` and UTC window `2026-08-01` through
+`2026-08-07`. The `PSScene` search returned 13 acquisitions and no next page.
+This confirms catalog access only; it did not request an Order, download bytes,
+consume scene-download quota, or authorize an operational result. See
+[`ADR-0075`](../decisions/ADR-0075-planet-account-catalog-validation.md) and the
+[validation record](../data-quality/planet-account-catalog-validation-2026-09-15.md).
+
 ## HTTP safety
 
 The standard-library transport applies timeouts and bounded retry to HTTP 429,
