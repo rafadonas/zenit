@@ -1,6 +1,7 @@
 # Contrato de observação de cobertura vegetal
 
-Migration `0040_vegetation_cover_contract.sql` and the authenticated endpoint
+Migrations `0040_vegetation_cover_contract.sql` and
+`0042_vegetation_cover_contract_invariants.sql`, together with the authenticated endpoint
 `GET /v1/segments/{segment_id}/vegetation-cover` expose the draft taxonomy
 without presenting it as an operational decision.
 
@@ -8,16 +9,23 @@ without presenting it as an operational decision.
 
 Each effective observation includes:
 
-- `cover_type` and a required `unknown_reason` when the value is `unknown`;
+- `cover_type`, with a required `unknown_reason` for `unknown` and an optional
+  controlled reason for `mixed`;
 - `cover_type_method`, source reference/checksum, and acquisition time;
 - `validity_status`, `confidence_band`, and `quality_status`;
 - `review_state`, taxonomy/model versions, rationale, and provenance;
-- zone/segment identifiers and GPS status/accuracy when available; and
+- zone/segment identifiers and a GPS status restricted to `simulated` or
+  `unavailable` in the current draft; and
 - `data_status` plus `eligible_for_official_reporting=false`.
 
 The API is read-only in this increment. Manager and supervisor assignments are
 checked against the road and simulated assignments are denied. Invalid or
 inaccessible segments do not reveal observations.
+
+Every `model_estimated` observation requires a non-empty `model_version`. Real
+GPS and device accuracy remain rejected until coordinates, timestamp, SRID,
+consent reference, pseudonymized device reference, retention, and privacy rules
+are approved and introduced through a later versioned migration.
 
 ## History and uncertainty
 

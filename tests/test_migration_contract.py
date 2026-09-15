@@ -92,6 +92,12 @@ VEGETATION_COVER_CONTRACT_MIGRATION = Path(
 PLANET_SCENE_PERSISTENCE_MIGRATION = Path(
     "infra/migrations/0041_planet_scene_persistence.sql"
 )
+VEGETATION_COVER_INVARIANTS_MIGRATION = Path(
+    "infra/migrations/0042_vegetation_cover_contract_invariants.sql"
+)
+VEGETATION_COVER_INVARIANTS_DOWN_MIGRATION = Path(
+    "infra/migrations/0042_vegetation_cover_contract_invariants.down.sql"
+)
 
 
 class MigrationContractTests(unittest.TestCase):
@@ -194,7 +200,7 @@ class MigrationContractTests(unittest.TestCase):
         mounts = [
             line.strip() for line in compose.splitlines() if "/docker-entrypoint-initdb.d/" in line
         ]
-        self.assertEqual(len(mounts), 41)
+        self.assertEqual(len(mounts), 42)
         for version, mount in enumerate(mounts, start=1):
             prefix = f"{version:04d}"
             self.assertIn(f"infra/migrations/{prefix}_", mount)
@@ -247,6 +253,35 @@ class MigrationContractTests(unittest.TestCase):
         self.assertIn("review_state IN ('pending', 'accepted', 'corrected', 'rejected')", sql)
         self.assertIn("CREATE TRIGGER vegetation_cover_observation_immutable", sql)
         self.assertIn("CHECK (NOT eligible_for_official_reporting)", sql)
+
+    def test_vegetation_cover_followup_enforces_draft_contract_invariants(self) -> None:
+        sql = VEGETATION_COVER_INVARIANTS_MIGRATION.read_text(encoding="utf-8")
+        down_sql = VEGETATION_COVER_INVARIANTS_DOWN_MIGRATION.read_text(encoding="utf-8")
+
+        self.assertIn(
+            "vegetation_cover_observation_unknown_reason_consistency",
+            sql,
+        )
+        self.assertIn("OR (cover_type = 'mixed')", sql)
+        self.assertIn(
+            "vegetation_cover_observation_model_version_required",
+            sql,
+        )
+        self.assertIn("cover_type_method <> 'model_estimated'", sql)
+        self.assertIn(
+            "vegetation_cover_observation_gps_draft_scope",
+            sql,
+        )
+        self.assertIn("gps_status IN ('simulated', 'unavailable')", sql)
+        self.assertIn("gps_accuracy_m IS NULL", sql)
+        self.assertIn(
+            "DROP CONSTRAINT IF EXISTS vegetation_cover_observation_gps_draft_scope",
+            down_sql,
+        )
+        self.assertIn(
+            "ADD CONSTRAINT vegetation_cover_observation_unknown_reason_original",
+            down_sql,
+        )
 
     def test_planet_scene_persistence_keeps_sensor_series_separate(self) -> None:
         sql = PLANET_SCENE_PERSISTENCE_MIGRATION.read_text(encoding="utf-8")
