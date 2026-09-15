@@ -86,6 +86,9 @@ LOGIN_THROTTLE_MIGRATION = Path(
 AUTHENTICATION_SESSION_MIGRATION = Path(
     "infra/migrations/0039_persistent_authentication_sessions.sql"
 )
+VEGETATION_COVER_CONTRACT_MIGRATION = Path(
+    "infra/migrations/0040_vegetation_cover_contract.sql"
+)
 
 
 class MigrationContractTests(unittest.TestCase):
@@ -188,7 +191,7 @@ class MigrationContractTests(unittest.TestCase):
         mounts = [
             line.strip() for line in compose.splitlines() if "/docker-entrypoint-initdb.d/" in line
         ]
-        self.assertEqual(len(mounts), 39)
+        self.assertEqual(len(mounts), 40)
         for version, mount in enumerate(mounts, start=1):
             prefix = f"{version:04d}"
             self.assertIn(f"infra/migrations/{prefix}_", mount)
@@ -222,6 +225,25 @@ class MigrationContractTests(unittest.TestCase):
         self.assertIn("authentication_session_immutable", sql)
         self.assertIn("authentication_session_revocation_immutable", sql)
         self.assertNotIn("access_token", sql)
+
+    def test_vegetation_cover_contract_is_versioned_reviewable_and_non_operational(self) -> None:
+        sql = VEGETATION_COVER_CONTRACT_MIGRATION.read_text(encoding="utf-8")
+
+        self.assertIn("CREATE TABLE vegetation_cover_observation", sql)
+        self.assertIn("'grass_herbaceous'", sql)
+        self.assertIn("(cover_type = 'unknown') = (unknown_reason IS NOT NULL)", sql)
+        self.assertIn("cover_type_method IN ('model_estimated', 'human_reviewed')", sql)
+        self.assertIn(
+            "source_type IN ("
+            "'satellite', 'field_photo', 'manual_annotation', 'model_output', 'other'"
+            ")",
+            sql,
+        )
+        self.assertIn("validity_status IN ('valid', 'limited', 'invalid')", sql)
+        self.assertIn("quality_status IN ('accepted', 'limited', 'rejected')", sql)
+        self.assertIn("review_state IN ('pending', 'accepted', 'corrected', 'rejected')", sql)
+        self.assertIn("CREATE TRIGGER vegetation_cover_observation_immutable", sql)
+        self.assertIn("CHECK (NOT eligible_for_official_reporting)", sql)
 
     def test_mowing_post_service_measurement_is_separate_simulated_evidence(self) -> None:
         sql = PREPARED_MOWING_POST_SERVICE_MEASUREMENT_MIGRATION.read_text(
