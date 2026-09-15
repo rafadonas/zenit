@@ -9,6 +9,9 @@
 - Record filename, byte size, SHA-256, import time, parser version, reference
   date, CRS, and validation status before promoting derived data.
 - Write normalized outputs only to `data/processed/` or object storage.
+- The current academic owner review is recorded in
+  [`manifests/source-homologation-2026-09-15.json`](manifests/source-homologation-2026-09-15.json)
+  and does not authorize operational promotion.
 
 ## Expected initial inputs
 
