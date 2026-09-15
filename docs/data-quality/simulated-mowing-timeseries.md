@@ -4,7 +4,7 @@
 
 Este dataset demonstra como o ZENIT pode organizar uma série temporal de
 vegetação para ingestão, gráficos e ensaio do pipeline. Ele cobre o trecho
-preparado `SP021/195` durante 30 dias, sempre separando `left`, `right`, `median`
+preparado `SP021/195` durante 180 dias, sempre separando `left`, `right`, `median`
 e `special`.
 
 Todos os valores são **mockados**. Altura, crescimento, chuva e eventos de corte
@@ -13,7 +13,7 @@ condição atual ou serviço executado.
 
 ## Conteúdo
 
-- `data/simulated/sp021-195/mowing-timeseries.csv`: 120 registros, um por
+- `data/simulated/sp021-195/mowing-timeseries.csv`: 720 registros, um por
   dia e zona;
 - `data/simulated/sp021-195/mowing-timeseries.manifest.json`: parâmetros,
   checksum do CSV, finalidade, elegibilidade e limitações;
@@ -35,7 +35,7 @@ Para outro ensaio local:
 ```bash
 python scripts/generate_simulated_mowing_timeseries.py \
   --start-date 2026-08-01 \
-  --days 30 \
+  --days 180 \
   --road-code SP021 \
   --segment-index 195 \
   --seed 20260915 \

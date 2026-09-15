@@ -1,6 +1,6 @@
 {
   "checksums": {
-    "csv_sha256": "1cf99e16f615e19917c2c2ca641c3b9af1be0b39d92bbd2585d91717a7ddd56b"
+    "csv_sha256": "8fa4ce5b6de213ad03db6a22032cf3caf4da9a03768b043b598671489c92a1ed"
   },
   "data_status": "simulated",
   "dataset_id": "zenit-simulated-mowing-timeseries",
@@ -18,9 +18,9 @@
   ],
   "purpose": "pipeline_rehearsal_and_presentation",
   "scenario": {
-    "days": 30,
-    "end_date": "2026-08-30",
-    "record_count": 120,
+    "days": 180,
+    "end_date": "2027-01-27",
+    "record_count": 720,
     "road_code": "SP021",
     "seed": 20260915,
     "segment_index": 195,

@@ -4,7 +4,7 @@ import csv
 import hashlib
 import io
 import json
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
@@ -19,15 +19,15 @@ from scripts.generate_simulated_mowing_timeseries import (
 )
 
 
-def test_builds_thirty_days_for_each_independent_zone() -> None:
+def test_builds_six_month_scenario_for_each_independent_zone() -> None:
     config = ScenarioConfig()
     records = build_records(config)
 
-    assert len(records) == 120
+    assert len(records) == 720
     assert {(record["zone_type"], record["scenario_date"]) for record in records} == {
-        (zone, date(2026, 8, day).isoformat())
+        (zone, (date(2026, 8, 1) + timedelta(days=day)).isoformat())
         for zone in ZONE_TYPES
-        for day in range(1, 31)
+        for day in range(180)
     }
     special_thresholds = {
         record["threshold_cm"] for record in records if record["zone_type"] == "special"
@@ -42,14 +42,16 @@ def test_scripted_mowing_events_reset_height_without_authorizing_work() -> None:
     records = build_records(ScenarioConfig())
     events = [record for record in records if record["simulated_mowing_event"]]
 
-    assert [(event["zone_type"], event["scenario_date"]) for event in events] == [
+    assert len(events) == 25
+    assert [(event["zone_type"], event["scenario_date"]) for event in events[:4]] == [
         ("left", "2026-08-13"),
-        ("right", "2026-08-17"),
-        ("median", "2026-08-21"),
-        ("special", "2026-08-09"),
-        ("special", "2026-08-19"),
-        ("special", "2026-08-29"),
+        ("left", "2026-09-24"),
+        ("left", "2026-11-05"),
+        ("left", "2026-12-17"),
     ]
+    assert [
+        event["scenario_date"] for event in events if event["zone_type"] == "special"
+    ][-1] == "2027-01-24"
     assert all(
         event["simulated_height_after_mowing_cm"]
         < event["simulated_height_before_mowing_cm"]
@@ -132,5 +134,5 @@ def test_committed_presentation_artifacts_are_reproducible() -> None:
     assert csv_path.read_text(encoding="utf-8") == expected_csv
     assert json.loads(manifest_path.read_text(encoding="utf-8")) == expected_manifest
     assert hashlib.sha256(csv_path.read_bytes()).hexdigest() == (
-        "1cf99e16f615e19917c2c2ca641c3b9af1be0b39d92bbd2585d91717a7ddd56b"
+        "8fa4ce5b6de213ad03db6a22032cf3caf4da9a03768b043b598671489c92a1ed"
     )

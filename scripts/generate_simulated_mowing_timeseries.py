@@ -48,7 +48,7 @@ _LIMITATIONS = (
 @dataclass(frozen=True, slots=True)
 class ScenarioConfig:
     start_date: date = date(2026, 8, 1)
-    days: int = 30
+    days: int = 180
     road_code: str = "SP021"
     segment_index: int = 195
     segment_length_m: int = 100
@@ -72,12 +72,13 @@ def _zone_seed(seed: int, zone_type: str) -> int:
 
 def _mowing_days(zone_type: str, days: int) -> frozenset[int]:
     schedule = {
-        "left": (12,),
-        "right": (16,),
-        "median": (20,),
-        "special": (8, 18, 28),
+        "left": (12, 42),
+        "right": (16, 45),
+        "median": (20, 50),
+        "special": (8, 14),
     }
-    return frozenset(day for day in schedule[zone_type] if day < days)
+    first_day, interval = schedule[zone_type]
+    return frozenset(range(first_day, days, interval))
 
 
 def build_records(config: ScenarioConfig | None = None) -> list[dict[str, Any]]:
@@ -258,7 +259,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--output-directory", type=Path, default=Path("data/simulated/sp021-195"))
     parser.add_argument("--start-date", type=date.fromisoformat, default=date(2026, 8, 1))
-    parser.add_argument("--days", type=int, default=30)
+    parser.add_argument("--days", type=int, default=180)
     parser.add_argument("--road-code", default="SP021")
     parser.add_argument("--segment-index", type=int, default=195)
     parser.add_argument("--seed", type=int, default=20260915)
