@@ -6,11 +6,13 @@
 This companion makes the visual source searchable while separating its conceptual
 mock data from current product behavior. The maintained implementation specification
 is [`docs/team/design-system.md`](../team/design-system.md). If they differ, the
-maintained specification, accessibility baseline, and implemented tokens/components
-take precedence.
+maintained specification, accessibility baseline, implemented tokens/components,
+and [ADR-0069](../decisions/ADR-0069-academic-brand-boundary.md) take precedence.
 
 The PDF says it is inspired by Motiva's visual universe but does not reproduce or
-authorize official Motiva brand assets. That limitation remains in force.
+authorize official Motiva brand assets. ADR-0069 records the current project
+boundary: ZENIT is an academic brand without Motiva affiliation, sponsorship, or
+brand license.
 
 ## Direction
 
@@ -32,6 +34,10 @@ the interface.
 ## Visual foundation
 
 ### Source palette
+
+These values are maintained as ZENIT academic placeholders. They are not Motiva
+brand colors, policy values, or evidence of permission to reproduce corporate
+identity.
 
 | Role | Source value | Maintained interpretation |
 | --- | --- | --- |
@@ -168,8 +174,10 @@ current ZENIT observations, accepted targets, or official report data.
 
 ## Updated governance
 
-The PDF's direction is retained, but brand permission is not assumed. New tokens and
-shared components require a cohesive ticket, consumer migration, accessibility
-checks, and review by the dashboard/design owner. Screenshots and telemetry require a
-separate privacy/tooling decision. Generated or illustrative imagery must be labeled
-and may not serve as field evidence or training data.
+The PDF's direction is retained, but brand permission is not assumed. Under
+ADR-0069, product surfaces use a ZENIT-only academic identity and may mention
+Motiva only as source or challenge context. New tokens and shared components
+require a cohesive ticket, consumer migration, accessibility checks, and review by
+the dashboard/design owner. Screenshots and telemetry require a separate
+privacy/tooling decision. Generated or illustrative imagery must be labeled and may
+not serve as field evidence or training data.

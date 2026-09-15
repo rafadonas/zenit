@@ -8,11 +8,16 @@ de campo e relatórios auditáveis.
 > fluxos marcados como `prepared`, `estimated` ou `simulated` não representam
 > operação real, não autorizam roçada e não podem alimentar treinamento de
 > modelos nem relatórios oficiais.
+>
+> **Marca:** ZENIT é um projeto acadêmico/estudantil sem relação direta,
+> patrocínio, autorização ou licença de marca da Motiva. Menções a Motiva são
+> contexto de desafio/fonte, não afiliação ou endosso.
 
 ## Sumário
 
-- [Objetivo e regras essenciais](#objetivo-e-regras-essenciais)
 - [Trabalho em equipe](#trabalho-em-equipe)
+- [Limite acadêmico e marca](#limite-acadêmico-e-marca)
+- [Objetivo e regras essenciais](#objetivo-e-regras-essenciais)
 - [Estado atual](#estado-atual)
 - [Arquitetura do repositório](#arquitetura-do-repositório)
 - [Início rápido](#início-rápido)
@@ -55,6 +60,19 @@ Antes de editar, cada integrante também deve consultar o
 [`pacote de trabalho completo`](docs/team/work-packages.md) e o
 [`fluxo Git`](docs/team/git-collaboration-workflow.md). Arquivos compartilhados,
 migrações, contratos e lockfiles precisam ser reservados no quadro do grupo.
+
+## Limite acadêmico e marca
+
+ZENIT usa identidade própria para demonstração acadêmica. O projeto não deve
+usar logotipo, paleta oficial, assets, slogans ou linguagem que sugira
+afiliação, patrocínio, aprovação ou operação pela Motiva. A decisão de marca
+atual está registrada em
+[`ADR-0069`](docs/decisions/ADR-0069-academic-brand-boundary.md).
+
+O nome Motiva pode aparecer apenas em contexto de desafio, referência de fonte
+ou nome de arquivo fornecido. Isso não autoriza atuação operacional, relatório
+oficial, marketing, publicação como produto da Motiva ou uso de identidade
+corporativa.
 
 ## Objetivo e regras essenciais
 

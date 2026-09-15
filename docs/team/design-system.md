@@ -1,8 +1,9 @@
 # ZENIT design system — especificação executável v2
 
 Este guia traduz a direção visual existente em regras aplicáveis ao dashboard e
-ao app. Ele não concede autorização para usar a marca Motiva e não transforma
-exemplos fictícios em dados oficiais.
+ao app. O ZENIT é tratado como marca acadêmica própria, sem afiliação,
+patrocínio ou autorização direta da Motiva. Ele não concede autorização para
+usar a marca Motiva e não transforma exemplos fictícios em dados oficiais.
 
 ## 1. Princípios
 
@@ -19,6 +20,10 @@ cores de dados/status. Não é uma fórmula rígida de pixels.
 ## 2. Tokens de base
 
 ### Cores neutras e de marca
+
+Os tokens de marca abaixo pertencem ao ZENIT acadêmico e são placeholders
+versionados do produto demonstrativo. Eles não são paleta oficial da Motiva nem
+autorização para reproduzir identidade visual corporativa.
 
 | Token | Valor inicial | Uso |
 | --- | --- | --- |
@@ -168,8 +173,10 @@ sem evidência e ato humano correspondentes.
 - ilustrações geradas por IA são rotuladas e não servem como evidência ou treino;
 - não criar fotografias sintéticas para preencher estados de dados;
 - miniaturas mantêm proporção; crop nunca remove régua/evidência relevante;
-- logotipo tem área de respiro e versão monocromática definidas somente após
-  aprovação de marca;
+- a marca exibida no produto é ZENIT; não usar logotipo, assets, slogans, cores
+  oficiais ou layouts que impliquem afiliação, patrocínio ou aprovação da Motiva;
+- logotipo final do ZENIT tem área de respiro e versão monocromática definidas
+  somente após aprovação interna de marca acadêmica;
 - exemplos conceituais de rodovia, KPI ou vegetação usam claramente “Exemplo” ou
   “Simulado”, nunca aparência de telemetria real.
 
@@ -191,6 +198,7 @@ Antes do merge:
 
 Tokens e componentes compartilhados têm dono de revisão. Uma alteração semântica
 exige changelog e migração dos consumidores. Novos padrões entram primeiro neste
-guia, depois no código e por fim nas telas. Ferramentas como Storybook, bibliotecas
-de componente, fonte externa ou serviço de mapa são decisões de dependência e
+guia, depois no código e por fim nas telas. Uso oficial de marca Motiva exige
+permissão escrita e nova decisão. Ferramentas como Storybook, bibliotecas de
+componente, fonte externa ou serviço de mapa são decisões de dependência e
 licença; não devem ser adicionadas automaticamente.

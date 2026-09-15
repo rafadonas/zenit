@@ -4,8 +4,9 @@
 - SHA-256: `7bbd8a74c63f89b1e42bec838f2d32fd206c9e39458ddfc35af916631c198958`
 
 This is a structured, searchable summary of the supplied challenge presentation. It
-does not reproduce the slide deck, grant brand permission, or certify that corporate
-figures remain current. Consult the original for its exact visual and legal context.
+does not reproduce the slide deck, grant brand permission, imply a direct
+relationship with Motiva, or certify that corporate figures remain current.
+Consult the original for its exact visual and legal context.
 
 ## Organization context
 
@@ -63,7 +64,9 @@ dated source evidence
 
 The academic prototype may demonstrate the chain and discuss potential benefits. It
 must not claim measured savings, safety improvement, continuous monitoring, or
-operational optimization without a defined baseline and evaluated pilot.
+operational optimization without a defined baseline and evaluated pilot. ADR-0069
+also requires ZENIT to present itself as an academic project brand, not as an
+official Motiva product or sponsored deployment.
 
 ## Requirements derived for the project
 

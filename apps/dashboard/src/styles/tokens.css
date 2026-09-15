@@ -1,6 +1,7 @@
 :root {
   color-scheme: light;
 
+  /* ZENIT academic placeholders, not official Motiva brand colors. */
   --color-brand-600: #5a26ff;
   --color-brand-800: #35129a;
   --color-brand-100: #eee9ff;

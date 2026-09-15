@@ -82,7 +82,8 @@ coerente, acessibilidade, responsividade e mapa operacionalmente legível.
 4. `WEB-003` — shell responsivo;
 5. `WEB-005` → `WEB-006` → `WEB-007` → `WEB-008` → `WEB-009`, um
    ticket e um PR por vez;
-6. `GOV-002` e `WEB-010` continuam bloqueados até as respectivas decisões.
+6. `GOV-002` pode registrar somente a fronteira acadêmica de marca; uso oficial
+   da Motiva e `WEB-010` continuam bloqueados até as respectivas decisões.
 
 **Arquivos/domínios preferenciais:** `apps/dashboard/`, estilos, componentes web,
 conteúdo de interface, testes web e documentação de design.

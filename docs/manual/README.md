@@ -75,6 +75,8 @@ Use the following order when sources conflict:
 For this academic project, Rafael may record product-scope decisions. That does
 not convert academic judgment into legal, contractual, privacy, operational, or
 professional certification. External source licenses and limitations still apply.
+ADR-0069 records the current brand boundary: ZENIT is an academic project brand
+with no Motiva affiliation, sponsorship, authorization, or brand license.
 
 ## Status vocabulary
 
