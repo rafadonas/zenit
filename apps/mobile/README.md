@@ -89,11 +89,15 @@ source code:
 ```bash
 ../../.tools/flutter/bin/flutter run \
   --dart-define=ZENIT_API_BASE_URL=https://api.example.test \
-  --dart-define=ZENIT_APP_VERSION=1.0.0+1
+  --dart-define=ZENIT_APP_VERSION=1.0.0+1 \
+  --dart-define=ZENIT_API_REQUEST_TIMEOUT_SECONDS=30
 ```
 
 Production builds must use HTTPS. The default HTTP address is intended only for
-an Android emulator connected to the local development API.
+an Android emulator connected to the local development API. Mobile API requests
+use a tracked 30-second demonstration timeout by default. Override it with
+`ZENIT_API_REQUEST_TIMEOUT_SECONDS`; an operational value still requires pilot
+validation and is not an official Motiva parameter.
 
 The demonstrative debug artifact is built and validated with a reserved,
 non-operational API URL:

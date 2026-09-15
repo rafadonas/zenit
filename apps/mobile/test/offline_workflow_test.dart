@@ -665,6 +665,25 @@ void main() {
     expect((await vault.readDrafts(order.id)).first.heightCm, 0);
   });
 
+  for (final failureCase in <({String label, ZenitApiException failure})>[
+    (
+      label: 'request timeout',
+      failure: const ZenitApiException(zenitApiRequestTimeoutMessage),
+    ),
+    (
+      label: 'HTTP 409',
+      failure: const ZenitApiException(
+        'batch_id was already persisted with different content',
+        statusCode: 409,
+      ),
+    ),
+  ]) {
+    test(
+      '${failureCase.label} retains the pending batch and retries exact IDs',
+      () => _verifyRetriableInspectionFailure(failureCase.failure),
+    );
+  }
+
   test('network retry reuses persisted batch and event identifiers', () async {
     final order = preparedOrder();
     final vault = MemoryVault();
@@ -988,6 +1007,55 @@ void main() {
     expect(controller.errorMessage, contains('não corresponde'));
     expect(vault.orders, isNotEmpty);
   });
+}
+
+Future<void> _verifyRetriableInspectionFailure(
+  ZenitApiException failure,
+) async {
+  final order = preparedOrder();
+  final vault = MemoryVault();
+  final gateway = FakeGateway(orders: [order], syncFailure: failure);
+  final controller = ZenitAppController(
+    gateway: gateway,
+    sessionStore: MemorySessionStore(),
+    vault: vault,
+    deviceIdentityStore: MemoryDeviceIdentityStore(),
+    appVersion: 'test',
+    photoCapture: FakePhotoCapture(),
+    uuidFactory: _uuidFactory(),
+  );
+  await controller.initialize();
+  await controller.login('field@example.test', 'secret');
+  await _startDemo(controller, order);
+  await controller.saveThreeDrafts(order, [8, 22, 35]);
+  await _capturePhotos(controller, order);
+  await controller.finishDemoOrder(order);
+
+  expect(await controller.syncPreparedDrafts(order), isFalse);
+  final firstBatch = vault.pendingBatch!;
+  final firstEventIds = List<String>.of(firstBatch.eventIds);
+  final itemKey = syncWorkItemKey(SyncWorkKind.inspectionBatch, order.id);
+  expect(controller.isAuthenticated, isTrue);
+  expect(controller.errorMessage, failure.message);
+  expect(vault.syncAttempts[itemKey]?.attemptCount, 1);
+  expect(
+    (await vault.readDrafts(
+      order.id,
+    )).every((draft) => draft.syncState == DraftSyncState.pending),
+    isTrue,
+  );
+  final pendingItem = (await controller.readSyncCenterItems()).singleWhere(
+    (item) => item.key == itemKey,
+  );
+  expect(pendingItem.status, SyncCenterStatus.pending);
+  expect(pendingItem.canRetry, isTrue);
+
+  gateway.syncFailure = null;
+  expect(await controller.retrySyncCenterItem(pendingItem), isTrue);
+  expect(gateway.lastBatch!.batchId, firstBatch.batchId);
+  expect(gateway.lastBatch!.eventIds, firstEventIds);
+  expect(vault.syncAttempts[itemKey]?.attemptCount, 2);
+  expect(vault.pendingBatch, isNull);
 }
 
 Future<void> _startDemo(
