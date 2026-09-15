@@ -27,6 +27,13 @@ remain unchanged. Enable byte upload only after all three matching manifests hav
 persistent acknowledgement. Rejected and conflicting evidence remains immutable;
 the center explains that it must be reviewed instead of offering overwrite.
 
+Bound every mobile API request with a configurable timeout. The tracked
+demonstration default is 30 seconds and is not an approved operational or Motiva
+value. A timeout becomes a stable retryable client error while the encrypted
+pending batch, session, evidence, and identifiers remain intact. An HTTP 409 also
+retains the pending batch and session, surfaces the server conflict message, and
+any retry continues to use the exact persisted identifiers.
+
 Do not add background synchronization, connectivity scheduling, a new dependency,
 an API field, or an operational eligibility transition.
 

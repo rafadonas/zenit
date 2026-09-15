@@ -21,11 +21,18 @@ const mobileAppVersion = String.fromEnvironment(
   'ZENIT_APP_VERSION',
   defaultValue: '1.0.0+1',
 );
+const apiRequestTimeoutSeconds = int.fromEnvironment(
+  'ZENIT_API_REQUEST_TIMEOUT_SECONDS',
+  defaultValue: defaultZenitApiRequestTimeoutSeconds,
+);
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   final controller = ZenitAppController(
-    gateway: HttpZenitGateway(baseUrl: apiBaseUrl),
+    gateway: HttpZenitGateway(
+      baseUrl: apiBaseUrl,
+      requestTimeout: const Duration(seconds: apiRequestTimeoutSeconds),
+    ),
     sessionStore: SecureSessionStore(),
     vault: HiveOfflineVault(),
     deviceIdentityStore: SecureDeviceIdentityStore(),

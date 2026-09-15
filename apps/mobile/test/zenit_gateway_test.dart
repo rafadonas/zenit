@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -14,6 +15,16 @@ import 'package:zenit_mobile/domain/prepared_photo_draft.dart';
 import 'support/fakes.dart';
 
 void main() {
+  test('rejects a non-positive API request timeout', () {
+    expect(
+      () => HttpZenitGateway(
+        baseUrl: 'https://api.example.test',
+        requestTimeout: Duration.zero,
+      ),
+      throwsArgumentError,
+    );
+  });
+
   test(
     'login uses OAuth form fields and creates an expiring session',
     () async {
@@ -219,6 +230,79 @@ void main() {
       expect(call, 2);
     },
   );
+
+  test('bounds sync requests and surfaces a stable timeout error', () async {
+    final gateway = HttpZenitGateway(
+      baseUrl: 'https://api.example.test',
+      requestTimeout: const Duration(milliseconds: 10),
+      client: MockClient((request) {
+        expect(request.url.path, '/v1/sync/batch');
+        return Completer<http.Response>().future;
+      }),
+    );
+    const batch = PendingSyncBatch(
+      batchId: '55555555-5555-4555-8555-555555555555',
+      deviceId: '44444444-4444-4444-8444-444444444444',
+      orderId: '11111111-1111-4111-8111-111111111111',
+      baseSyncCursor: 6,
+      eventIds: ['66666666-6666-4666-8666-666666666666'],
+    );
+
+    await expectLater(
+      gateway.syncBatch('signed-token', batch, const [
+        {'event_id': '66666666-6666-4666-8666-666666666666'},
+      ]),
+      throwsA(
+        isA<ZenitApiException>()
+            .having((error) => error.statusCode, 'statusCode', isNull)
+            .having(
+              (error) => error.message,
+              'message',
+              zenitApiRequestTimeoutMessage,
+            ),
+      ),
+    );
+  });
+
+  test('preserves the stable API conflict response for HTTP 409', () async {
+    final gateway = HttpZenitGateway(
+      baseUrl: 'https://api.example.test',
+      client: MockClient((request) async {
+        expect(request.url.path, '/v1/sync/batch');
+        return http.Response(
+          jsonEncode({
+            'code': 'conflict',
+            'message': 'batch_id was already persisted with different content',
+            'details': null,
+            'correlation_id': '20000000-0000-4000-8000-000000000009',
+          }),
+          409,
+        );
+      }),
+    );
+    const batch = PendingSyncBatch(
+      batchId: '55555555-5555-4555-8555-555555555555',
+      deviceId: '44444444-4444-4444-8444-444444444444',
+      orderId: '11111111-1111-4111-8111-111111111111',
+      baseSyncCursor: 6,
+      eventIds: ['66666666-6666-4666-8666-666666666666'],
+    );
+
+    await expectLater(
+      gateway.syncBatch('signed-token', batch, const [
+        {'event_id': '66666666-6666-4666-8666-666666666666'},
+      ]),
+      throwsA(
+        isA<ZenitApiException>()
+            .having((error) => error.statusCode, 'statusCode', 409)
+            .having(
+              (error) => error.message,
+              'message',
+              'batch_id was already persisted with different content',
+            ),
+      ),
+    );
+  });
 
   test('uploads exact prepared photo bytes and validates receipt', () async {
     final bytes = Uint8List.fromList([0xff, 0xd8, 0xff, 0xd9]);

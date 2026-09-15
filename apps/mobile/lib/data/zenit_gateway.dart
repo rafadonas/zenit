@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -9,6 +10,10 @@ import '../domain/mowing_post_service_photo_draft.dart';
 import '../domain/prepared_mowing_plan.dart';
 import '../domain/prepared_work_order.dart';
 import '../domain/prepared_photo_draft.dart';
+
+const defaultZenitApiRequestTimeoutSeconds = 30;
+const zenitApiRequestTimeoutMessage =
+    'A comunicação com a API excedeu o tempo limite. Tente novamente.';
 
 abstract interface class ZenitGateway {
   Future<AuthSession> login(String email, String password);
@@ -52,23 +57,38 @@ class HttpZenitGateway implements ZenitGateway {
     required String baseUrl,
     http.Client? client,
     DateTime Function()? clock,
+    Duration requestTimeout = const Duration(
+      seconds: defaultZenitApiRequestTimeoutSeconds,
+    ),
   }) : _baseUri = Uri.parse(baseUrl),
        _client = client ?? http.Client(),
-       _clock = clock ?? DateTime.now;
+       _clock = clock ?? DateTime.now,
+       _requestTimeout = requestTimeout {
+    if (requestTimeout <= Duration.zero) {
+      throw ArgumentError.value(
+        requestTimeout,
+        'requestTimeout',
+        'must be greater than zero',
+      );
+    }
+  }
 
   final Uri _baseUri;
   final http.Client _client;
   final DateTime Function() _clock;
+  final Duration _requestTimeout;
 
   Uri _uri(String path, [Map<String, String>? query]) =>
       _baseUri.resolve(path).replace(queryParameters: query);
 
   @override
   Future<AuthSession> login(String email, String password) async {
-    final response = await _client.post(
-      _uri('/v1/auth/token'),
-      headers: const {'Accept': 'application/json'},
-      body: {'username': email.trim(), 'password': password},
+    final response = await _withTimeout(
+      _client.post(
+        _uri('/v1/auth/token'),
+        headers: const {'Accept': 'application/json'},
+        body: {'username': email.trim(), 'password': password},
+      ),
     );
     final payload = _decodeObject(response);
     if (response.statusCode != 200) {
@@ -91,12 +111,14 @@ class HttpZenitGateway implements ZenitGateway {
 
   @override
   Future<void> logout(String accessToken) async {
-    final response = await _client.post(
-      _uri('/v1/auth/logout'),
-      headers: {
-        'Accept': 'application/json',
-        'Authorization': 'Bearer $accessToken',
-      },
+    final response = await _withTimeout(
+      _client.post(
+        _uri('/v1/auth/logout'),
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
+      ),
     );
     if (response.statusCode == 204 || response.statusCode == 401) return;
     final payload = _decodeObject(response);
@@ -108,12 +130,14 @@ class HttpZenitGateway implements ZenitGateway {
 
   @override
   Future<List<PreparedWorkOrder>> listPreparedOrders(String accessToken) async {
-    final response = await _client.get(
-      _uri('/v1/work-orders', const {'limit': '100'}),
-      headers: {
-        'Accept': 'application/json',
-        'Authorization': 'Bearer $accessToken',
-      },
+    final response = await _withTimeout(
+      _client.get(
+        _uri('/v1/work-orders', const {'limit': '100'}),
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
+      ),
     );
     final payload = _decodeObject(response);
     if (response.statusCode != 200) {
@@ -136,12 +160,14 @@ class HttpZenitGateway implements ZenitGateway {
   Future<List<PreparedMowingPlan>> listPreparedMowingPlans(
     String accessToken,
   ) async {
-    final response = await _client.get(
-      _uri('/v1/prepared-mowing-orders', const {'limit': '100'}),
-      headers: {
-        'Accept': 'application/json',
-        'Authorization': 'Bearer $accessToken',
-      },
+    final response = await _withTimeout(
+      _client.get(
+        _uri('/v1/prepared-mowing-orders', const {'limit': '100'}),
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $accessToken',
+        },
+      ),
     );
     final payload = _decodeObject(response);
     if (response.statusCode != 200) {
@@ -177,14 +203,16 @@ class HttpZenitGateway implements ZenitGateway {
     String deviceId,
     String appVersion,
   ) async {
-    final response = await _client.post(
-      _uri('/v1/mobile/devices'),
-      headers: _authorizedHeaders(accessToken),
-      body: jsonEncode({
-        'device_id': deviceId,
-        'platform': 'android',
-        'app_version': appVersion,
-      }),
+    final response = await _withTimeout(
+      _client.post(
+        _uri('/v1/mobile/devices'),
+        headers: _authorizedHeaders(accessToken),
+        body: jsonEncode({
+          'device_id': deviceId,
+          'platform': 'android',
+          'app_version': appVersion,
+        }),
+      ),
     );
     final payload = _decodeObject(response);
     if (response.statusCode != 200) {
@@ -209,10 +237,12 @@ class HttpZenitGateway implements ZenitGateway {
     PendingSyncBatch batch,
     List<Map<String, Object?>> events,
   ) async {
-    final response = await _client.post(
-      _uri('/v1/sync/batch'),
-      headers: _authorizedHeaders(accessToken),
-      body: jsonEncode(batch.toRequestJson(events)),
+    final response = await _withTimeout(
+      _client.post(
+        _uri('/v1/sync/batch'),
+        headers: _authorizedHeaders(accessToken),
+        body: jsonEncode(batch.toRequestJson(events)),
+      ),
     );
     final payload = _decodeObject(response);
     if (response.statusCode != 200) {
@@ -258,8 +288,10 @@ class HttpZenitGateway implements ZenitGateway {
         'Content-Type': 'multipart/form-data; boundary=$boundary',
       })
       ..bodyBytes = body.takeBytes();
-    final streamed = await _client.send(request);
-    final response = await http.Response.fromStream(streamed);
+    final response = await _withTimeout(() async {
+      final streamed = await _client.send(request);
+      return http.Response.fromStream(streamed);
+    }());
     final payload = _decodeObject(response);
     if (response.statusCode != 200) {
       throw ZenitApiException(
@@ -309,8 +341,10 @@ class HttpZenitGateway implements ZenitGateway {
             'Content-Type': 'multipart/form-data; boundary=$boundary',
           })
           ..bodyBytes = body.takeBytes();
-    final streamed = await _client.send(request);
-    final response = await http.Response.fromStream(streamed);
+    final response = await _withTimeout(() async {
+      final streamed = await _client.send(request);
+      return http.Response.fromStream(streamed);
+    }());
     final payload = _decodeObject(response);
     if (response.statusCode != 200) {
       throw ZenitApiException(
@@ -349,6 +383,14 @@ class HttpZenitGateway implements ZenitGateway {
     'Authorization': 'Bearer $accessToken',
     'Content-Type': 'application/json',
   };
+
+  Future<T> _withTimeout<T>(Future<T> request) async {
+    try {
+      return await request.timeout(_requestTimeout);
+    } on TimeoutException {
+      throw const ZenitApiException(zenitApiRequestTimeoutMessage);
+    }
+  }
 
   static Map<String, Object?> _decodeObject(http.Response response) {
     try {
