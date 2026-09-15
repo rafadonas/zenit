@@ -86,6 +86,21 @@ LOGIN_THROTTLE_MIGRATION = Path(
 AUTHENTICATION_SESSION_MIGRATION = Path(
     "infra/migrations/0039_persistent_authentication_sessions.sql"
 )
+VEGETATION_COVER_CONTRACT_MIGRATION = Path(
+    "infra/migrations/0040_vegetation_cover_contract.sql"
+)
+PLANET_SCENE_PERSISTENCE_MIGRATION = Path(
+    "infra/migrations/0041_planet_scene_persistence.sql"
+)
+PLANET_ORDER_DOWNLOAD_MIGRATION = Path(
+    "infra/migrations/0043_planet_order_download.sql"
+)
+VEGETATION_COVER_INVARIANTS_MIGRATION = Path(
+    "infra/migrations/0042_vegetation_cover_contract_invariants.sql"
+)
+VEGETATION_COVER_INVARIANTS_DOWN_MIGRATION = Path(
+    "infra/migrations/0042_vegetation_cover_contract_invariants.down.sql"
+)
 
 
 class MigrationContractTests(unittest.TestCase):
@@ -188,12 +203,24 @@ class MigrationContractTests(unittest.TestCase):
         mounts = [
             line.strip() for line in compose.splitlines() if "/docker-entrypoint-initdb.d/" in line
         ]
-        self.assertEqual(len(mounts), 39)
+        self.assertEqual(len(mounts), 43)
         for version, mount in enumerate(mounts, start=1):
             prefix = f"{version:04d}"
             self.assertIn(f"infra/migrations/{prefix}_", mount)
             self.assertIn(f"/docker-entrypoint-initdb.d/{prefix}.sql:ro", mount)
             self.assertNotIn(".down.sql", mount)
+
+    def test_planet_order_download_is_bounded_and_lineage_is_append_only(self) -> None:
+        sql = PLANET_ORDER_DOWNLOAD_MIGRATION.read_text(encoding="utf-8")
+
+        self.assertIn("CREATE TABLE planet_order", sql)
+        self.assertIn("CREATE TABLE planet_order_event", sql)
+        self.assertIn("product_bundle text NOT NULL CHECK (product_bundle = 'analytic_udm2')", sql)
+        self.assertIn("aoi_area_m2 <= 10000.00", sql)
+        self.assertIn("max_bytes <= 104857600", sql)
+        self.assertIn("license_scope = 'academic-only'", sql)
+        self.assertIn("ADD COLUMN source_order_id uuid REFERENCES planet_order(id)", sql)
+        self.assertIn("planet_order_event_immutable", sql)
 
     def test_mowing_demo_lifecycle_is_simulated_sequenced_and_non_operational(self) -> None:
         sql = PREPARED_MOWING_DEMO_LIFECYCLE_MIGRATION.read_text(encoding="utf-8")
@@ -222,6 +249,61 @@ class MigrationContractTests(unittest.TestCase):
         self.assertIn("authentication_session_immutable", sql)
         self.assertIn("authentication_session_revocation_immutable", sql)
         self.assertNotIn("access_token", sql)
+
+    def test_vegetation_cover_contract_is_versioned_reviewable_and_non_operational(self) -> None:
+        sql = VEGETATION_COVER_CONTRACT_MIGRATION.read_text(encoding="utf-8")
+
+        self.assertIn("CREATE TABLE vegetation_cover_observation", sql)
+        self.assertIn("'grass_herbaceous'", sql)
+        self.assertIn("(cover_type = 'unknown') = (unknown_reason IS NOT NULL)", sql)
+        self.assertIn("cover_type_method IN ('model_estimated', 'human_reviewed')", sql)
+        self.assertIn(
+            "source_type IN ("
+            "'satellite', 'field_photo', 'manual_annotation', 'model_output', 'other'"
+            ")",
+            sql,
+        )
+        self.assertIn("validity_status IN ('valid', 'limited', 'invalid')", sql)
+        self.assertIn("quality_status IN ('accepted', 'limited', 'rejected')", sql)
+        self.assertIn("review_state IN ('pending', 'accepted', 'corrected', 'rejected')", sql)
+        self.assertIn("CREATE TRIGGER vegetation_cover_observation_immutable", sql)
+        self.assertIn("CHECK (NOT eligible_for_official_reporting)", sql)
+
+    def test_vegetation_cover_followup_enforces_draft_contract_invariants(self) -> None:
+        sql = VEGETATION_COVER_INVARIANTS_MIGRATION.read_text(encoding="utf-8")
+        down_sql = VEGETATION_COVER_INVARIANTS_DOWN_MIGRATION.read_text(encoding="utf-8")
+
+        self.assertIn(
+            "vegetation_cover_observation_unknown_reason_consistency",
+            sql,
+        )
+        self.assertIn("OR (cover_type = 'mixed')", sql)
+        self.assertIn(
+            "vegetation_cover_observation_model_version_required",
+            sql,
+        )
+        self.assertIn("cover_type_method <> 'model_estimated'", sql)
+        self.assertIn(
+            "vegetation_cover_observation_gps_draft_scope",
+            sql,
+        )
+        self.assertIn("gps_status IN ('simulated', 'unavailable')", sql)
+        self.assertIn("gps_accuracy_m IS NULL", sql)
+        self.assertIn(
+            "DROP CONSTRAINT IF EXISTS vegetation_cover_observation_gps_draft_scope",
+            down_sql,
+        )
+        self.assertIn(
+            "ADD CONSTRAINT vegetation_cover_observation_unknown_reason_original",
+            down_sql,
+        )
+
+    def test_planet_scene_persistence_keeps_sensor_series_separate(self) -> None:
+        sql = PLANET_SCENE_PERSISTENCE_MIGRATION.read_text(encoding="utf-8")
+
+        self.assertIn("DROP CONSTRAINT IF EXISTS satellite_scene_sensor_check", sql)
+        self.assertIn("'planet-scope'", sql)
+        self.assertIn("PlanetScope remains a separate product series", sql)
 
     def test_mowing_post_service_measurement_is_separate_simulated_evidence(self) -> None:
         sql = PREPARED_MOWING_POST_SERVICE_MEASUREMENT_MIGRATION.read_text(

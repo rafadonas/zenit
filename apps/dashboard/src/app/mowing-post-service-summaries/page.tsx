@@ -20,6 +20,7 @@ import {
   mowingPostServiceSummaryExportMessage,
 } from "../../lib/mowing-post-service-operation-message";
 import {
+  buildMowingPostServiceResultHistory,
   isMowingPostServiceSummaryCollection,
   type MowingPostServiceSummaryCollection,
 } from "../../lib/mowing-post-service-summaries";
@@ -99,12 +100,17 @@ export default async function MowingPostServiceSummariesPage({ searchParams }: P
   );
 
   return (
-    <main className="recommendations-shell" id="main-content">
+    <main className="recommendations-shell" id="main-content" tabIndex={-1}>
       <DashboardHeader
         active="results"
         session={session ? {
           csrfToken: session.csrfToken,
           displayName: session.user.display_name,
+          roadRoles: session.road_roles.map((role) => ({
+            dataStatus: role.data_status,
+            roadCode: role.road_code,
+            role: role.role,
+          })),
         } : null}
       />
 
@@ -173,6 +179,7 @@ export default async function MowingPostServiceSummariesPage({ searchParams }: P
               </div>
             ) : summaries.items.map((item) => {
               const exception = exceptionBySummary.get(item.summary_id);
+              const history = buildMowingPostServiceResultHistory(item, exception);
               return (
                 <article className="prepared-summary-card" key={item.summary_id}>
                   <div className="prepared-summary-heading">
@@ -205,10 +212,27 @@ export default async function MowingPostServiceSummariesPage({ searchParams }: P
                   </div>
 
                   <p className="summary-rationale">{item.generation_rationale}</p>
+                  <section className="result-history" aria-label="Histórico e comparação">
+                    <div>
+                      <span>Antes</span>
+                      <strong>Não coletado</strong>
+                      <small>Fonte: contrato não disponível · data separada</small>
+                    </div>
+                    <div>
+                      <span>Depois</span>
+                      <strong>{cm(history.after.maximumHeightCm)}</strong>
+                      <small>Fonte: resumo pós-serviço simulado · {formatDate(history.after.date)}</small>
+                    </div>
+                    <div>
+                      <span>{history.comparison.label}</span>
+                      <strong>Sem delta</strong>
+                      <small>{history.comparison.reason}</small>
+                    </div>
+                  </section>
                   <small>
                     {item.summary_policy_version} · gerado {formatDate(item.generated_at)} ·{" "}
                     {item.measurement_count} medições · {item.accepted_photo_review_count} fotos
-                    aceitas
+                    aceitas · relatório oficial {history.officialReportingStatus === "blocked" ? "bloqueado" : "liberado"}
                   </small>
 
                   {exception ? (
@@ -357,8 +381,8 @@ export default async function MowingPostServiceSummariesPage({ searchParams }: P
                       Baixar CSV simulado
                     </button>
                     <small>
-                      O download gera auditoria e mantém bloqueio de relatório oficial, treino e
-                      autorização de campo.
+                      O download gera auditoria, inclui status/proveniência e mantém bloqueio de
+                      relatório oficial, treino e autorização de campo.
                     </small>
                   </form>
                 </article>

@@ -1,0 +1,128 @@
+{
+  "schema_version": 1,
+  "dataset_id": "zenit-vegetation-cover",
+  "dataset_version": "v0.1-draft",
+  "created_at": "2026-09-15",
+  "owner": "Rafael",
+  "purpose": "academic_model_development",
+  "taxonomy_version": "zenit-cover-taxonomy-v0.1-draft",
+  "status": "blocked",
+  "source_review_id": "zenit-source-review-2026-09-15",
+  "source_manifest": "data/manifests/source-homologation-2026-09-15.json",
+  "sources": [
+    {
+      "source_id": "sp021-km-markers",
+      "relative_path": "data/raw/01. Rodovia Motiva - Rodoanel/Marco km_rodoanel 2.kmz",
+      "sha256": "f457d3a9aca27ea5e2ee7527f2efb80c38cd87a1b280d675a3d1881b186b11e4",
+      "data_status": "prepared",
+      "provenance_status": "needs_validation",
+      "license_status": "pending",
+      "consent_status": "pending",
+      "included_in_training": false,
+      "exclusion_reason": "candidate axis and stationing are not officially homologated"
+    },
+    {
+      "source_id": "sp021-mowing-polygons",
+      "relative_path": "data/raw/01. Rodovia Motiva - Rodoanel/classificacao_rocada.kmz",
+      "sha256": "7cfb094262d3c6e8485eb5f466a222dd9cb96e7157a0f4c4004c30685ba24dac",
+      "data_status": "prepared",
+      "provenance_status": "needs_validation",
+      "license_status": "pending",
+      "consent_status": "pending",
+      "included_in_training": false,
+      "exclusion_reason": "equipment categories and shifted attributes are not cover labels"
+    },
+    {
+      "source_id": "ra-ret-roc-limp-2026-03-13",
+      "relative_path": "data/raw/02. Dados Gestão verde - Atual/Retigrafico/RA-RET-ROÇ-LIMP-2026-03-13.xlsx",
+      "sha256": "b88a8e394a291ac1cf885f4bb4a27e4e81bd7d467272608a519eaa5deaceb4aa",
+      "data_status": "prepared",
+      "provenance_status": "needs_validation",
+      "license_status": "pending",
+      "consent_status": "pending",
+      "included_in_training": false,
+      "exclusion_reason": "N1/N2/N3 are historical height classes, not vegetation-cover labels"
+    },
+    {
+      "source_id": "ra-ret-roc-limp-2026-03-20",
+      "relative_path": "data/raw/02. Dados Gestão verde - Atual/Retigrafico/RA-RET-ROÇ-LIMP-2026-03-20.xlsx",
+      "sha256": "516e64c1fc3574e33f956a6f24d7725626f01b6e9d1d83be05d469ea86a20466",
+      "data_status": "prepared",
+      "provenance_status": "needs_validation",
+      "license_status": "pending",
+      "consent_status": "pending",
+      "included_in_training": false,
+      "exclusion_reason": "document version is not an authoritative current survey"
+    }
+  ],
+  "labels": {
+    "status": "not_started",
+    "taxonomy_version": "zenit-cover-taxonomy-v0.1-draft",
+    "annotator_count": 0,
+    "independent_annotation": false,
+    "adjudication_status": "not_started",
+    "label_source_status": "missing",
+    "counts_by_class": {
+      "unknown": 0,
+      "grass_herbaceous": 0,
+      "shrub": 0,
+      "tree": 0,
+      "mixed": 0,
+      "non_vegetation": 0
+    },
+    "counts_by_zone": {
+      "left": 0,
+      "right": 0,
+      "median": 0,
+      "special": 0
+    }
+  },
+  "splits": {
+    "strategy": "spatial_and_temporal_holdout",
+    "spatial_holdout_status": "pending",
+    "temporal_holdout_status": "pending",
+    "leakage_check_status": "not_run",
+    "spatial_holdout": [],
+    "temporal_holdout": []
+  },
+  "exclusions": [
+    "demo_or_simulated_records",
+    "unlicensed_or_unconsented_sources",
+    "equipment_categories_without_cover_labels",
+    "historical_N1_N2_N3_without_cover_annotation",
+    "records_without_independent_double_annotation",
+    "records_with_unresolved_source_mapping_or_geometry_anomalies"
+  ],
+  "eligibility": {
+    "eligible_for_model_training": false,
+    "eligible_for_official_reporting": false,
+    "eligible_for_operations": false
+  },
+  "gates": [
+    {
+      "id": "source_lineage",
+      "status": "complete",
+      "evidence": "checksums and source review are recorded; bytes remain outside derived outputs"
+    },
+    {
+      "id": "license_and_consent",
+      "status": "pending",
+      "evidence": "academic-use scope and retention need confirmation for each source"
+    },
+    {
+      "id": "cover_labels",
+      "status": "pending",
+      "evidence": "no tree/grass/shrub/mixed cover labels exist in the reviewed sources"
+    },
+    {
+      "id": "independent_annotation_and_adjudication",
+      "status": "pending",
+      "evidence": "two independent annotators and conflict adjudication have not occurred"
+    },
+    {
+      "id": "spatial_temporal_splits",
+      "status": "pending",
+      "evidence": "holdout units and leakage checks will be recorded after labels exist"
+    }
+  ]
+}

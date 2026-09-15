@@ -127,6 +127,33 @@ class UrllibJsonTransport:
         response_body, content_type = self._post_raw(url, body, "application/json", headers)
         return BinaryResponse(body=response_body, content_type=content_type)
 
+    def get_json(
+        self,
+        url: str,
+        *,
+        headers: Mapping[str, str] | None = None,
+    ) -> Mapping[str, Any]:
+        """GET a provider JSON document without exposing response bodies on errors."""
+
+        response_body, _ = self._get_raw(url, headers=headers)
+        return _decode_json_object(response_body)
+
+    def get_bytes(
+        self,
+        url: str,
+        *,
+        headers: Mapping[str, str] | None = None,
+        maximum_bytes: int | None = None,
+    ) -> BinaryResponse:
+        """GET bounded binary content for a signed provider download URL."""
+
+        response_body, content_type = self._get_raw(
+            url,
+            headers=headers,
+            maximum_bytes=maximum_bytes,
+        )
+        return BinaryResponse(body=response_body, content_type=content_type)
+
     def _post(
         self,
         url: str,
@@ -152,6 +179,49 @@ class UrllibJsonTransport:
             try:
                 with urllib.request.urlopen(request, timeout=self._timeout_seconds) as response:
                     return response.read(), response.headers.get("Content-Type", "")
+            except urllib.error.HTTPError as error:
+                retryable = error.code == 429 or 500 <= error.code < 600
+                if not retryable or attempt + 1 >= self._retry_policy.max_attempts:
+                    raise SatelliteHttpError(error.code, retryable) from error
+                self._sleep(self._retry_delay(attempt, error.headers.get("Retry-After")))
+            except (TimeoutError, urllib.error.URLError) as error:
+                if attempt + 1 >= self._retry_policy.max_attempts:
+                    raise SatelliteHttpError(None, True) from error
+                self._sleep(self._retry_delay(attempt, None))
+        raise AssertionError("retry loop exited unexpectedly")
+
+    def _get_raw(
+        self,
+        url: str,
+        *,
+        headers: Mapping[str, str] | None,
+        maximum_bytes: int | None = None,
+    ) -> tuple[bytes, str]:
+        if maximum_bytes is not None and maximum_bytes < 1:
+            raise ValueError("maximum_bytes must be positive")
+        request_headers = dict(headers or {})
+        request = urllib.request.Request(url, headers=request_headers, method="GET")
+
+        for attempt in range(self._retry_policy.max_attempts):
+            try:
+                with urllib.request.urlopen(request, timeout=self._timeout_seconds) as response:
+                    length_header = response.headers.get("Content-Length")
+                    if maximum_bytes is not None and length_header:
+                        try:
+                            declared_length = int(length_header)
+                        except ValueError:
+                            declared_length = None
+                        if declared_length is not None and declared_length > maximum_bytes:
+                            raise SatelliteHttpError(413, False)
+                    body = bytearray()
+                    while True:
+                        chunk = response.read(1024 * 1024)
+                        if not chunk:
+                            break
+                        body.extend(chunk)
+                        if maximum_bytes is not None and len(body) > maximum_bytes:
+                            raise SatelliteHttpError(413, False)
+                    return bytes(body), response.headers.get("Content-Type", "")
             except urllib.error.HTTPError as error:
                 retryable = error.code == 429 or 500 <= error.code < 600
                 if not retryable or attempt + 1 >= self._retry_policy.max_attempts:

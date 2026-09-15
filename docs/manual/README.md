@@ -75,6 +75,8 @@ Use the following order when sources conflict:
 For this academic project, Rafael may record product-scope decisions. That does
 not convert academic judgment into legal, contractual, privacy, operational, or
 professional certification. External source licenses and limitations still apply.
+ADR-0069 records the current brand boundary: ZENIT is an academic project brand
+with no Motiva affiliation, sponsorship, authorization, or brand license.
 
 ## Status vocabulary
 
@@ -95,7 +97,7 @@ professional certification. External source licenses and limitations still apply
 - replaces the proposed monorepo description with the implemented FastAPI,
   PostGIS, Next.js, Flutter, MinIO, Docker Compose, contracts, and worker layout;
 - records the prepared/simulated workflow and its safety gates;
-- reflects provider-neutral Sentinel, CBERS, and discovery-only Planet support;
+- reflects provider-neutral Sentinel, CBERS, and bounded Planet Order support;
 - links the versioned OpenAPI contract and 67 accepted ADRs instead of listing a
   speculative endpoint set;
 - replaces the original sprint backlog with the current four-person work packages;

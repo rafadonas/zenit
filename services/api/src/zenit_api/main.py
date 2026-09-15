@@ -38,6 +38,7 @@ from zenit_api.recommendation_reviews import router as recommendation_reviews_ro
 from zenit_api.recommendations import router as recommendations_router
 from zenit_api.satellite_observations import router as satellite_observations_router
 from zenit_api.segments import router as segments_router
+from zenit_api.vegetation_cover import router as vegetation_cover_router
 from zenit_api.work_orders import router as work_orders_router
 
 
@@ -59,6 +60,7 @@ app.include_router(health_router)
 app.include_router(analysis_router)
 app.include_router(auth_router)
 app.include_router(segments_router)
+app.include_router(vegetation_cover_router)
 app.include_router(satellite_observations_router)
 app.include_router(recommendations_router)
 app.include_router(recommendation_reviews_router)

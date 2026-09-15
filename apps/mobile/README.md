@@ -7,6 +7,9 @@ Current P0 slice:
 - initial online OAuth password login against the ZENIT API;
 - access token stored in Android secure storage (the password is never stored);
 - prepared inspection orders downloaded from `GET /v1/work-orders`;
+- guided prepared-order journey with an explicit next action, three-point
+  progress, per-point local/sync status, and a local-versus-sent summary that
+  survives closing and reopening the screen;
 - prepared mowing-planning snapshots downloaded from
   `GET /v1/prepared-mowing-orders` for encrypted offline review;
 - order snapshot and three measurement drafts stored in an AES-256 encrypted
@@ -86,11 +89,15 @@ source code:
 ```bash
 ../../.tools/flutter/bin/flutter run \
   --dart-define=ZENIT_API_BASE_URL=https://api.example.test \
-  --dart-define=ZENIT_APP_VERSION=1.0.0+1
+  --dart-define=ZENIT_APP_VERSION=1.0.0+1 \
+  --dart-define=ZENIT_API_REQUEST_TIMEOUT_SECONDS=30
 ```
 
 Production builds must use HTTPS. The default HTTP address is intended only for
-an Android emulator connected to the local development API.
+an Android emulator connected to the local development API. Mobile API requests
+use a tracked 30-second demonstration timeout by default. Override it with
+`ZENIT_API_REQUEST_TIMEOUT_SECONDS`; an operational value still requires pilot
+validation and is not an official Motiva parameter.
 
 The demonstrative debug artifact is built and validated with a reserved,
 non-operational API URL:
@@ -133,10 +140,12 @@ gateway, encrypted vault, domain models, navigation outcomes, or API payloads:
 
 - `lib/main.dart` only builds production dependencies and starts the app;
 - `lib/app/` owns the application shell and navigation boundary;
-- `lib/core/` contains shared workflow errors and presentation helpers;
+- `lib/core/` contains shared workflow errors, design tokens, theme, and field presentation primitives;
 - `lib/features/auth/` and `lib/features/work_orders/` own entry and inbox UI;
 - `lib/features/inspection/` owns prepared-inspection UI and orchestration;
 - `lib/features/mowing_rehearsal/` owns the explicitly simulated mowing flow;
+- `lib/features/sync_center/` presents the encrypted local queue, persisted
+  attempt history, manifest-before-bytes dependencies, and idempotent retry;
 - `lib/data/` retains gateway and secure persistence implementations; and
 - `lib/domain/` retains immutable workflow models and validation rules.
 

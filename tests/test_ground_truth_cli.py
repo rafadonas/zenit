@@ -37,6 +37,8 @@ def test_plan_command_samples_every_simulated_cell_without_field_eligibility(cap
     assert plan["summary"]["primary_points"] == 24
     assert plan["summary"]["cells_not_eligible_for_field_use"] == 8
     assert plan["authorizes_field_work"] is False
+    assert plan["authorizes_mowing"] is False
+    assert plan["eligible_for_model_training"] is False
 
 
 def test_eligibility_command_excludes_all_simulated_and_prepared_fixtures(capsys) -> None:
@@ -48,7 +50,7 @@ def test_eligibility_command_excludes_all_simulated_and_prepared_fixtures(capsys
         "--approved-campaign",
         "sim-rehearsal",
         "--approved-protocol",
-        "gt-protocol-0.1",
+        "zenit-ground-truth-v0.1-draft",
         "--registered-device",
         "sim-device",
     )
@@ -68,6 +70,11 @@ def test_report_command_reads_stdin_and_never_passes_gate_on_non_real_input(
 
     assert report["observations"] == 24
     assert report["non_real_input"] is True
+    assert report["eligible_for_model_training"] is False
+    assert report["eligible_for_official_reporting"] is False
+    assert report["eligible_for_operations"] is False
+    assert report["authorizes_field_work"] is False
+    assert report["authorizes_mowing"] is False
     gate = report["cover_class"]["provisional_calibration_gate"]
     assert gate["passed"] is None
     assert gate["evaluated_on_real_input"] is False

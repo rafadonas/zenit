@@ -14,7 +14,7 @@ from zenit_geospatial.ground_truth_rules import (
 
 POLICY = EligibilityPolicy(
     approved_campaigns=frozenset({"pilot-2026-wet"}),
-    approved_protocols=frozenset({"gt-protocol-0.1"}),
+    approved_protocols=frozenset({"zenit-ground-truth-v0.1-draft"}),
     registered_devices=frozenset({"device-1"}),
 )
 
@@ -24,7 +24,7 @@ def real_observation(**overrides: object) -> dict[str, object]:
         "observation_id": "obs-1",
         "data_status": "real",
         "campaign_id": "pilot-2026-wet",
-        "protocol_version": "gt-protocol-0.1",
+        "protocol_version": "zenit-ground-truth-v0.1-draft",
         "consent_record_id": "consent-7",
         "license_record_id": "license-2",
         "device_id": "device-1",
@@ -73,7 +73,15 @@ def test_missing_fields_are_excluded_not_defaulted() -> None:
     result = evaluate_eligibility({"observation_id": "obs-empty"}, POLICY)
 
     assert not result.eligible
-    assert set(ExclusionReason) <= set(result.reasons)
+    expected = set(ExclusionReason) - {ExclusionReason.MISSING_OBSERVATION_ID}
+    assert expected <= set(result.reasons)
+
+
+def test_missing_observation_id_fails_closed() -> None:
+    result = evaluate_eligibility(real_observation(observation_id=" "), POLICY)
+
+    assert not result.eligible
+    assert result.reasons == (ExclusionReason.MISSING_OBSERVATION_ID,)
 
 
 @pytest.mark.parametrize(
@@ -116,6 +124,11 @@ def test_summary_counts_exclusions_and_keeps_confirmation() -> None:
     assert summary["data_statuses_seen"] == {"prepared": 1, "real": 2, "simulated": 1}
     assert summary["included_observation_ids"] == ["obs-1", "obs-2"]
     assert summary["exclusion_confirmation"] == EXCLUSION_CONFIRMATION
+    assert summary["eligible_for_model_training"] is False
+    assert summary["eligible_for_official_reporting"] is False
+    assert summary["eligible_for_operations"] is False
+    assert summary["authorizes_field_work"] is False
+    assert summary["authorizes_mowing"] is False
 
 
 def annotation(**overrides: object) -> dict[str, object]:

@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "review_id": "zenit-source-review-2026-09-15",
+  "ticket": "GOV-003",
+  "reviewed_at": "2026-09-15",
+  "data_owner": "Rafael",
+  "decision_status": "accepted_for_academic_prototype",
+  "operational_status": "needs_validation",
+  "eligible_for_operations": false,
+  "eligible_for_official_reporting": false,
+  "eligible_for_model_training": false,
+  "source_manifest": "data/manifests/initial-source-audit.json",
+  "raw_policy": "immutable; no rename, repair, overwrite, or in-place promotion",
+  "spatial_reference": {
+    "source_crs": "EPSG:4326",
+    "metric_processing_crs": "EPSG:31983",
+    "metric_crs_status": "approved_for_derived_processing_only"
+  },
+  "analysis_unit": {
+    "segment_length_m": 100,
+    "zones": ["left", "right", "median", "special"],
+    "zone_geometry_status": "official_boundaries_missing"
+  },
+  "sources": [
+    {
+      "path": "01. Rodovia Motiva - Rodoanel/Marco km_rodoanel 2.kmz",
+      "bytes": 3104,
+      "sha256": "f457d3a9aca27ea5e2ee7527f2efb80c38cd87a1b280d675a3d1881b186b11e4",
+      "content_type": "kmz",
+      "feature_summary": "30 SP021 kilometer marker points, km 0 through km 29",
+      "status": "estimated_needs_validation",
+      "exceptions": ["non_sequential_source_order", "km_2_km_3_order", "missing_km_29_plus_300"]
+    },
+    {
+      "path": "01. Rodovia Motiva - Rodoanel/classificacao_rocada.kmz",
+      "bytes": 1893845,
+      "sha256": "7cfb094262d3c6e8485eb5f466a222dd9cb96e7157a0f4c4004c30685ba24dac",
+      "content_type": "kml_despite_kmz_extension",
+      "feature_summary": "642 source polygons with equipment-like names",
+      "status": "prepared_needs_validation",
+      "inference_status": "needs_validation",
+      "attribute_mapping": {
+        "classe": "latitude_like",
+        "KM": "longitude_like",
+        "Latitude": "area_like"
+      },
+      "exceptions": ["extension_content_mismatch", "shifted_attribute_mapping", "13_invalid_geometry_warnings"]
+    },
+    {
+      "path": "02. Dados Gestão verde - Atual/Retigrafico/RA-RET-ROÇ-LIMP-2026-03-13.xlsx",
+      "bytes": 120808,
+      "sha256": "b88a8e394a291ac1cf885f4bb4a27e4e81bd7d467272608a519eaa5deaceb4aa",
+      "content_type": "xlsx",
+      "feature_summary": "480 decoded observations, document reference date 2025-03-28",
+      "status": "historical_prepared",
+      "date_interpretation": "serial_45744_reference_date; filename_is_version_label"
+    },
+    {
+      "path": "02. Dados Gestão verde - Atual/Retigrafico/RA-RET-ROÇ-LIMP-2026-03-20.xlsx",
+      "bytes": 120783,
+      "sha256": "516e64c1fc3574e33f956a6f24d7725626f01b6e9d1d83be05d469ea86a20466",
+      "content_type": "xlsx",
+      "feature_summary": "480 decoded observations, document reference date 2025-03-28",
+      "status": "historical_prepared",
+      "date_interpretation": "serial_45744_reference_date; filename_is_version_label"
+    }
+  ],
+  "release_gates": [
+    "official road axis and stationing",
+    "official left/right/median/special zone boundaries",
+    "confirmed polygon attribute mapping",
+    "authoritative survey-date relationship",
+    "licensed and adjudicated dataset before model training"
+  ]
+}

@@ -11,7 +11,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from enum import StrEnum
 
-PROTOCOL_VERSION = "gt-protocol-0.1"
+PROTOCOL_VERSION = "zenit-ground-truth-v0.1-draft"
 EXCLUSION_CONFIRMATION = (
     "No demo, prepared, estimated, simulated or inconclusive data was used as ground truth, "
     "in the pilot or in training."
@@ -19,6 +19,7 @@ EXCLUSION_CONFIRMATION = (
 
 
 class ExclusionReason(StrEnum):
+    MISSING_OBSERVATION_ID = "missing_observation_id"
     DATA_STATUS_NOT_REAL = "data_status_not_real"
     CAMPAIGN_NOT_APPROVED = "campaign_not_approved"
     PROTOCOL_NOT_APPROVED = "protocol_not_approved"
@@ -55,6 +56,8 @@ def evaluate_eligibility(
     observation: Mapping[str, object], policy: EligibilityPolicy
 ) -> Eligibility:
     reasons: list[str] = []
+    if not _present(observation.get("observation_id")):
+        reasons.append(ExclusionReason.MISSING_OBSERVATION_ID)
     if observation.get("data_status") != "real":
         reasons.append(ExclusionReason.DATA_STATUS_NOT_REAL)
     if observation.get("campaign_id") not in policy.approved_campaigns:
@@ -117,6 +120,11 @@ def summarize_eligibility(
         ),
         "included_observation_ids": [result.observation_id for result in included],
         "exclusion_confirmation": EXCLUSION_CONFIRMATION,
+        "eligible_for_model_training": False,
+        "eligible_for_official_reporting": False,
+        "eligible_for_operations": False,
+        "authorizes_field_work": False,
+        "authorizes_mowing": False,
     }
 
 

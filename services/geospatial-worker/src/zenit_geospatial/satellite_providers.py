@@ -99,7 +99,11 @@ class SentinelCatalogProvider:
     provider_name: ProviderName = "copernicus_sentinel_hub"
 
     def build_search_request(
-        self, bbox: BoundingBox, window: SearchWindow, *, limit: int = 100
+        self,
+        bbox: BoundingBox,
+        window: SearchWindow,
+        *,
+        limit: int = 100,
     ) -> Mapping[str, Any]:
         _validate_limit(limit)
         return {
@@ -137,7 +141,11 @@ class CbersStacProvider:
         self.collection = collection
 
     def build_search_request(
-        self, bbox: BoundingBox, window: SearchWindow, *, limit: int = 100
+        self,
+        bbox: BoundingBox,
+        window: SearchWindow,
+        *,
+        limit: int = 100,
     ) -> Mapping[str, Any]:
         _validate_limit(limit, maximum=10_000)
         return {
@@ -168,7 +176,12 @@ class PlanetDataProvider:
     provider_name: ProviderName = "planet"
 
     def build_search_request(
-        self, bbox: BoundingBox, window: SearchWindow, *, limit: int = 100
+        self,
+        bbox: BoundingBox,
+        window: SearchWindow,
+        *,
+        limit: int = 100,
+        require_download_permission: bool = False,
     ) -> Mapping[str, Any]:
         _validate_limit(limit, maximum=250)
         min_lon, min_lat, max_lon, max_lat = bbox.as_list()
@@ -184,25 +197,33 @@ class PlanetDataProvider:
                 ]
             ],
         }
+        filters: list[dict[str, Any]] = [
+            {
+                "type": "GeometryFilter",
+                "field_name": "geometry",
+                "config": geometry,
+            },
+            {
+                "type": "DateRangeFilter",
+                "field_name": "acquired",
+                "config": {
+                    "gte": _format_utc(window.start),
+                    "lte": _format_utc(window.end),
+                },
+            },
+        ]
+        if require_download_permission:
+            filters.append(
+                {
+                    "type": "PermissionFilter",
+                    "config": ["assets:download"],
+                }
+            )
         return {
             "item_types": [PLANET_PS_SCENE_COLLECTION],
             "filter": {
                 "type": "AndFilter",
-                "config": [
-                    {
-                        "type": "GeometryFilter",
-                        "field_name": "geometry",
-                        "config": geometry,
-                    },
-                    {
-                        "type": "DateRangeFilter",
-                        "field_name": "acquired",
-                        "config": {
-                            "gte": _format_utc(window.start),
-                            "lte": _format_utc(window.end),
-                        },
-                    },
-                ],
+                "config": filters,
             },
             "_page_size": limit,
         }

@@ -15,10 +15,12 @@ import 'domain/mowing_post_service_photo_draft.dart';
 import 'domain/prepared_mowing_plan.dart';
 import 'domain/prepared_photo_draft.dart';
 import 'domain/prepared_work_order.dart';
+import 'domain/sync_center.dart';
 
 part 'core/mobile_workflow_errors.dart';
 part 'features/inspection/application/inspection_workflow.dart';
 part 'features/mowing_rehearsal/application/mowing_rehearsal_workflow.dart';
+part 'features/sync_center/application/sync_center.dart';
 
 class ZenitAppController extends ChangeNotifier {
   ZenitAppController({
@@ -49,6 +51,7 @@ class ZenitAppController extends ChangeNotifier {
   bool initializing = true;
   bool busy = false;
   String? errorMessage;
+  String? activeSyncItemKey;
 
   bool get isAuthenticated => session != null;
 
@@ -170,11 +173,21 @@ class ZenitAppController extends ChangeNotifier {
     return (orders: downloadedOrders, mowingPlans: downloadedMowingPlans);
   }
 
-  Future<bool> _run(Future<void> Function() action) async {
+  Future<bool> _run(
+    Future<void> Function() action, {
+    String? syncItemKey,
+  }) async {
+    if (syncItemKey != null) {
+      activeSyncItemKey = syncItemKey;
+      notifyListeners();
+    }
     busy = true;
     errorMessage = null;
     notifyListeners();
     try {
+      if (syncItemKey != null) {
+        await vault.recordSyncAttempt(syncItemKey, _clock().toUtc());
+      }
       await action();
       return true;
     } catch (error) {
@@ -189,6 +202,7 @@ class ZenitAppController extends ChangeNotifier {
       return false;
     } finally {
       busy = false;
+      activeSyncItemKey = null;
       notifyListeners();
     }
   }

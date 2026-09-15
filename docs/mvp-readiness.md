@@ -22,7 +22,7 @@ field authorization.
 
 | Capability | Demonstration status | Evidence and boundary |
 | --- | --- | --- |
-| Reproducible foundation | Ready | Compose defines healthy PostgreSQL/PostGIS, MinIO, API, and dashboard services. Dashboard readiness fails closed when its server-side API dependency is unavailable. A fresh database applies migrations `0001`-`0039`. |
+| Reproducible foundation | Ready | Compose defines healthy PostgreSQL/PostGIS, MinIO, API, and dashboard services. Dashboard readiness fails closed when its server-side API dependency is unavailable. A fresh database applies migrations `0001`-`0043`. |
 | Source audit and ingestion | Ready | Immutable source catalog, checksums, lineage, idempotent imports, and deterministic parser fixtures are covered by tests and data-quality reports. |
 | Segments, zones, and map | Ready with estimated data | The dashboard exposes 100 m segments and separate zones. The candidate axis remains `estimated`, `needs_validation`, and non-operational. |
 | Satellite baseline | Ready with partial cache | Discovery, quality gates, explainable rules, provenance, and a checksum-bound NDVI preview exist. No complete source scene is approved for operations. |
@@ -63,7 +63,7 @@ python scripts/verify_release_evidence.py \
   docs/release-evidence/android-mvp-debug-apk-2026-08-14.json \
   --artifact apps/mobile/build/app/outputs/flutter-apk/app-debug.apk
 docker compose config --quiet
-fresh PostgreSQL initialization with migrations 0001-0039
+fresh PostgreSQL initialization with migrations 0001-0043
 python scripts/verify_mvp_stack.py
 ```
 

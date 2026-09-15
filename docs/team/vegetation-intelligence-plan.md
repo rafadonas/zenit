@@ -55,9 +55,11 @@ dado a revisar, não algo a esconder por média.
 
 ## Protocolo de aquisição e anotação
 
-O protocolo completo está em
+O protocolo de domínio está em
+[`../data-quality/ground-truth-protocol-proposal.md`](../data-quality/ground-truth-protocol-proposal.md),
+com a especificação calculável em
 [`../data-quality/ground-truth-protocol.md`](../data-quality/ground-truth-protocol.md)
-(`GEO-002`, status `proposed`). Ele define amostragem estratificada por rodovia,
+(`GEO-002`, status `proposed`). Eles definem amostragem estratificada por rodovia,
 zona, classe histórica e estação; instrumentos e definição única de altura;
 metadados obrigatórios de foto, escala, altura e GPS; dupla anotação,
 adjudicação e medição de concordância; aprovações de licença, consentimento,

@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { DashboardHeader } from "./dashboard-header";
 import { RealisticCorridorMap } from "./realistic-corridor-map";
 
 import {
+  findSegmentIdByDistance,
   findSegmentIdByIndex,
   formatDistance,
-  parseSegmentIndex,
+  parseCorridorSearchQuery,
   type SegmentCollection,
   type SegmentProperties,
 } from "../lib/segments";
@@ -23,6 +24,7 @@ import {
   type SatelliteObservationCollection,
 } from "../lib/satellite-observations";
 import type { VegetationMapCollection } from "../lib/vegetation-map";
+import { vegetationClassLabel, type VegetationClass } from "../lib/vegetation-map";
 
 interface CorridorDashboardProps {
   collection: SegmentCollection;
@@ -222,8 +224,30 @@ export function CorridorDashboard({
   const [segmentSearch, setSegmentSearch] = useState(
     initialSelectedId && initialSegmentIndex !== null ? String(initialSegmentIndex) : "",
   );
+  const [classFilter, setClassFilter] = useState<VegetationClass | "all">("all");
   const [searchError, setSearchError] = useState<string | null>(null);
   const [ndviVisible, setNdviVisible] = useState(false);
+  const roadCode = typeof collection.metadata.road_code === "string"
+    ? collection.metadata.road_code
+    : "SP021";
+  const filteredVegetationMap = useMemo<VegetationMapCollection>(() => {
+    if (classFilter === "all") return vegetationMap;
+    return {
+      ...vegetationMap,
+      features: vegetationMap.features.filter(
+        (feature) => feature.properties.vegetation_class === classFilter,
+      ),
+    };
+  }, [classFilter, vegetationMap]);
+  const classesBySegment = useMemo(() => {
+    const classes = new Map<number, Set<VegetationClass>>();
+    for (const feature of filteredVegetationMap.features) {
+      const segmentClasses = classes.get(feature.properties.segment_index) ?? new Set<VegetationClass>();
+      segmentClasses.add(feature.properties.vegetation_class);
+      classes.set(feature.properties.segment_index, segmentClasses);
+    }
+    return classes;
+  }, [filteredVegetationMap.features]);
   const selected = collection.features.find(
     (segment) => segment.properties.segment_id === selectedId,
   )?.properties ?? null;
@@ -249,17 +273,35 @@ export function CorridorDashboard({
 
   function selectFromSearch(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const segmentIndex = parseSegmentIndex(segmentSearch);
-    if (segmentIndex === null) {
-      setSearchError(`Informe um número inteiro entre 0 e ${maxSegmentIndex}.`);
+    const query = parseCorridorSearchQuery(segmentSearch);
+    if (query.type === "empty") {
+      setSearchError(`Informe ${roadCode}, km ou trecho entre 0 e ${maxSegmentIndex}.`);
       return;
     }
-    const segmentId = findSegmentIdByIndex(collection.features, segmentIndex);
+    if ("roadCode" in query && query.roadCode && query.roadCode !== roadCode) {
+      setSearchError(`Esta visão cobre apenas ${roadCode}.`);
+      return;
+    }
+    if (query.type === "road") {
+      const first = collection.features[0]?.properties;
+      if (!first) {
+        setSearchError("Nenhum trecho carregado para esta rodovia.");
+        return;
+      }
+      selectSegment(first.segment_id, first.segment_index, true);
+      return;
+    }
+
+    const segmentId = query.type === "distance"
+      ? findSegmentIdByDistance(collection.features, query.distanceM)
+      : findSegmentIdByIndex(collection.features, query.segmentIndex);
+    const segment = collection.features.find((feature) => feature.properties.segment_id === segmentId)
+      ?.properties;
     if (!segmentId) {
-      setSearchError(`Trecho inexistente. Informe um número entre 0 e ${maxSegmentIndex}.`);
+      setSearchError(`Trecho inexistente. Informe ${roadCode}, km ou trecho entre 0 e ${maxSegmentIndex}.`);
       return;
     }
-    selectSegment(segmentId, segmentIndex, true);
+    selectSegment(segmentId, segment?.segment_index ?? 0, true);
   }
 
   return (
@@ -267,6 +309,7 @@ export function CorridorDashboard({
       className="dashboard-shell"
       data-zenit-smoke-page="corridor"
       id="main-content"
+      tabIndex={-1}
     >
       <DashboardHeader
         active="corridor"
@@ -301,22 +344,34 @@ export function CorridorDashboard({
             <div><p className="eyebrow">Mapa de segmentos</p><h2>Corredor completo</h2></div>
             <div className="map-tools">
               <form className="segment-search" onSubmit={selectFromSearch}>
-                <label htmlFor="segment-search">Ir para trecho</label>
+                <label htmlFor="segment-search">Rodovia, km ou trecho</label>
                 <div>
                   <input
                     id="segment-search"
-                    inputMode="numeric"
-                    max={maxSegmentIndex}
-                    min={0}
+                    inputMode="search"
                     onChange={(event) => setSegmentSearch(event.target.value)}
-                    placeholder="195"
-                    type="number"
+                    placeholder="SP021 km 12,4"
+                    type="search"
                     value={segmentSearch}
                   />
                   <button type="submit">Localizar</button>
                 </div>
                 {searchError ? <span role="alert">{searchError}</span> : null}
               </form>
+              <label className="map-filter">
+                <span>Classe histórica</span>
+                <select
+                  onChange={(event) => setClassFilter(event.target.value as VegetationClass | "all")}
+                  value={classFilter}
+                >
+                  <option value="all">Todas</option>
+                  <option value="N1">N1</option>
+                  <option value="N2">N2</option>
+                  <option value="N3">N3</option>
+                  <option value="X">Não aplicável</option>
+                  <option value="unknown">Sem classe</option>
+                </select>
+              </label>
               <div className="map-meta"><span>EPSG:4326</span><span>100 m por trecho</span></div>
             </div>
           </div>
@@ -333,7 +388,7 @@ export function CorridorDashboard({
                 }}
                 selectedId={selectedId}
                 tileUrl={mapTileUrl}
-                vegetationMap={vegetationMap}
+                vegetationMap={filteredVegetationMap}
               />
               {ndviVisible ? (
                 <div className="ndvi-inset" role="img" aria-label="Ampliação dos 55 pixels do recorte NDVI cacheado">
@@ -360,13 +415,41 @@ export function CorridorDashboard({
               </div>
             </div>
           )}
+          <section className="segment-equivalent-list" aria-labelledby="segment-list-heading">
+            <div>
+              <h3 id="segment-list-heading">Lista equivalente ao mapa</h3>
+              <span>{collection.features.length} trecho(s) · {filteredVegetationMap.features.length} polígono(s) histórico(s)</span>
+            </div>
+            <ol>
+              {collection.features.map((feature) => {
+                const segment = feature.properties;
+                const classes = classesBySegment.get(segment.segment_index);
+                const classLabel = classes && classes.size > 0
+                  ? [...classes].map(vegetationClassLabel).join(", ")
+                  : "Sem classe histórica filtrada";
+                return (
+                  <li key={segment.segment_id}>
+                    <button
+                      aria-current={selectedId === segment.segment_id ? "true" : undefined}
+                      onClick={() => selectSegment(segment.segment_id, segment.segment_index, true)}
+                      type="button"
+                    >
+                      <strong>Trecho #{segment.segment_index.toString().padStart(3, "0")}</strong>
+                      <span>{formatDistance(segment.start_distance_m)} – {formatDistance(segment.end_distance_m)}</span>
+                      <small>{classLabel} · referência histórica 28/03/2025</small>
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
+          </section>
           <footer className="map-footer">
             <span>Mapa © OpenStreetMap · polígonos do KMZ fornecido</span>
             <span>Classificação histórica: 28/03/2025 · não representa condição atual</span>
           </footer>
         </article>
 
-        <aside className="side-panel">
+        <aside className="side-panel segment-drawer" aria-label="Detalhes sincronizados do trecho">
           <div className="side-heading">
             <p className="eyebrow">Inspeção</p>
             <h2 id="segment-details-heading" tabIndex={-1}>Detalhes do trecho</h2>

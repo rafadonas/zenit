@@ -8,11 +8,16 @@ de campo e relatórios auditáveis.
 > fluxos marcados como `prepared`, `estimated` ou `simulated` não representam
 > operação real, não autorizam roçada e não podem alimentar treinamento de
 > modelos nem relatórios oficiais.
+>
+> **Marca:** ZENIT é um projeto acadêmico/estudantil sem relação direta,
+> patrocínio, autorização ou licença de marca da Motiva. Menções a Motiva são
+> contexto de desafio/fonte, não afiliação ou endosso.
 
 ## Sumário
 
-- [Objetivo e regras essenciais](#objetivo-e-regras-essenciais)
 - [Trabalho em equipe](#trabalho-em-equipe)
+- [Limite acadêmico e marca](#limite-acadêmico-e-marca)
+- [Objetivo e regras essenciais](#objetivo-e-regras-essenciais)
 - [Estado atual](#estado-atual)
 - [Arquitetura do repositório](#arquitetura-do-repositório)
 - [Início rápido](#início-rápido)
@@ -55,6 +60,19 @@ Antes de editar, cada integrante também deve consultar o
 [`pacote de trabalho completo`](docs/team/work-packages.md) e o
 [`fluxo Git`](docs/team/git-collaboration-workflow.md). Arquivos compartilhados,
 migrações, contratos e lockfiles precisam ser reservados no quadro do grupo.
+
+## Limite acadêmico e marca
+
+ZENIT usa identidade própria para demonstração acadêmica. O projeto não deve
+usar logotipo, paleta oficial, assets, slogans ou linguagem que sugira
+afiliação, patrocínio, aprovação ou operação pela Motiva. A decisão de marca
+atual está registrada em
+[`ADR-0069`](docs/decisions/ADR-0069-academic-brand-boundary.md).
+
+O nome Motiva pode aparecer apenas em contexto de desafio, referência de fonte
+ou nome de arquivo fornecido. Isso não autoriza atuação operacional, relatório
+oficial, marketing, publicação como produto da Motiva ou uso de identidade
+corporativa.
 
 ## Objetivo e regras essenciais
 
@@ -386,11 +404,49 @@ cd apps/mobile
   não cria pedido, não baixa cena e sempre informa
   `operationally_eligible=false`.
 
-- **Ferramentas de ground truth (`zenit-ground-truth`)** — plano de amostragem, elegibilidade e relatório de concordância do [protocolo GEO-002](docs/data-quality/ground-truth-protocol.md#12-ferramentas):
+- **Ferramentas de ground truth (`zenit-ground-truth`)** — plano de amostragem,
+  elegibilidade e relatório de concordância da
+  [especificação GEO-002](docs/data-quality/ground-truth-protocol.md#12-ferramentas):
   ```bash
   source .venv/bin/activate
   zenit-ground-truth report --annotations tests/fixtures/ground_truth/observations_simulated.json
   ```
+
+- **Validação de permissão Planet sem pedido (`zenit-planet-capabilities`)**:
+  ```bash
+  zenit-planet-capabilities \
+    --bbox -46.80 -23.55 -46.76 -23.50 \
+    --from-date 2026-08-01 \
+    --to-date 2026-08-07
+  ```
+
+  Usa o filtro `assets:download` no catálogo para verificar acesso de cena no
+  recorte escolhido. Não cria Order, não baixa bytes e não habilita operação;
+  produto, licença, cota e checksum ainda exigem tickets próprios.
+
+- **Persistência de metadados Planet (`zenit-planet-persist`)**:
+  ```bash
+  zenit-planet-persist \
+    --bbox -46.80 -23.55 -46.76 -23.50 \
+    --from-date 2026-08-01 \
+    --to-date 2026-08-07 \
+    --persist
+  ```
+
+  O `--persist` é uma confirmação explícita para registrar somente metadados
+  normalizados e checksummed no banco local. O comando não cria pedido, não
+  baixa bytes e mantém `operationally_eligible=false`.
+
+- **Order Planet acadêmico limitado (`zenit-planet-order`)**:
+  ```bash
+  zenit-planet-order --execute
+  ```
+
+  Requer confirmação explícita. Seleciona uma cena com permissão de download
+  para o segmento preparado `SP021/195`, usa `analytic_udm2`, recorta a AOI
+  (máximo 10.000 m²), limita a 100 MiB e grava os três assets cifrados no bucket
+  local `zenit-raw`, com checksum e linhagem. Repetições reutilizam o mesmo
+  Order; o resultado continua não operacional.
 
 - **Renderizar prévia NDVI estática**:
   ```bash
@@ -435,13 +491,14 @@ Ele é restrito à geometria preparada e não operacional. Leia
 [`docs/architecture/satellite-discovery.md`](docs/architecture/satellite-discovery.md)
 antes de alterar AOI ou período.
 
-A integração Planet está inicialmente limitada à descoberta de catálogo. Tiles,
-downloads e persistência exigem tickets separados para proteger a chave, a cota
-e a proveniência. Consulte o ADR-0067 e o guia de serviços externos.
+A integração Planet mantém descoberta, Order, download e processamento como
+etapas separadas. O único Order acadêmico aprovado é explicitamente limitado e
+não autoriza operação ou relatório oficial; tiles e processamento continuam
+fora deste escopo. Consulte o ADR-0067, o ADR-0078 e o guia de serviços externos.
 
 ## Banco de dados e migrações
 
-O banco atual exige as migrações `0001` a `0039`, sempre em ordem numérica. Um
+O banco atual exige as migrações `0001` a `0043`, sempre em ordem numérica. Um
 volume novo do Compose executa todas automaticamente por
 `/docker-entrypoint-initdb.d`. Volumes existentes não são atualizados por esse
 mecanismo.
@@ -469,6 +526,12 @@ As migrações preservam uma evolução append-only:
 - `0028`–`0037`: ensaio simulado, medições, fotos, acesso, revisão, resumo,
   exportação, exceção pós-serviço e decisão humana da exceção.
 - `0038`: limitação persistente e auditada de tentativas de login local.
+- `0039`: sessões de autenticação persistentes e revogáveis.
+- `0040`: contrato acadêmico de cobertura vegetal.
+- `0041`: persistência preparada e não operacional do catálogo Planet.
+- `0042`: invariantes do contrato de cobertura vegetal que mantêm GPS real
+- `0043`: Order Planet limitado, assets cifrados, checksums e linhagem
+  bloqueado.
 
 Decisões detalhadas e invariantes de cada etapa estão em
 [`docs/decisions`](docs/decisions).
@@ -485,6 +548,7 @@ rotas abaixo usam o prefixo versionado `/v1`.
 | `GET /health` | Prontidão da API, PostgreSQL e MinIO; fila explicitamente ausente |
 | `GET /v1/roads/SP021/segments?...` | Segmentos GeoJSON por `bbox` |
 | `GET /v1/segments/{id}/satellite-observations` | Evidências persistidas do segmento |
+| `GET /v1/segments/{id}/vegetation-cover` | Cobertura vegetal versionada e não operacional |
 | `POST /v1/analysis/preview` | Prévia não persistente do baseline |
 | `GET /v1/recommendations` | Fila de recomendações |
 
@@ -517,7 +581,10 @@ de login:
 Abra diretamente uma dessas portas. A rota `/login` identifica o perfil
 configurado naquela instância e permite refazer o acesso demonstrativo sem
 pedir senha. Se o formulário de e-mail e senha aparecer, a sessão fixa não está
-configurada e a instância está no modo de login local comum.
+configurada e a instância está no modo de login local comum. Esse formulário
+identifica o ambiente antes da entrada, anuncia o carregamento do perfil e só
+retorna a uma página interna explicitamente permitida; respostas de falha não
+confirmam se uma conta existe.
 
 Os e-mails podem ser trocados por `DASHBOARD_MANAGER_EMAIL` e
 `DASHBOARD_SUPERVISOR_EMAIL`. Os nomes de cookie são diferentes entre as

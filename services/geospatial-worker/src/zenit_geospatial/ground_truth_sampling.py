@@ -123,6 +123,7 @@ def plan_campaign(
                     }
                 )
         data_status = properties.get("data_status")
+        field_use_approved = properties.get("field_use_approved") is True
         cells.append(
             {
                 "road_code": road_code,
@@ -130,7 +131,9 @@ def plan_campaign(
                 "zone": zone,
                 "threshold_cm": 10 if zone == "special" else 30,
                 "geometry_data_status": data_status,
-                "eligible_for_field_use": data_status == "real",
+                "geometry_is_real": data_status == "real",
+                "field_use_approved": field_use_approved,
+                "eligible_for_field_use": data_status == "real" and field_use_approved,
                 "strata": {
                     key: properties[key]
                     for key in ("historical_class", "surroundings")
@@ -151,6 +154,10 @@ def plan_campaign(
         "substitutes": substitutes,
         "edge_setback_m": edge_setback_m,
         "authorizes_field_work": False,
+        "authorizes_mowing": False,
+        "eligible_for_model_training": False,
+        "eligible_for_official_reporting": False,
+        "eligible_for_operations": False,
         "summary": {
             "cells": len(cells),
             "primary_points": sum(

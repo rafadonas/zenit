@@ -41,6 +41,12 @@ export interface RecommendationQueue {
   };
 }
 
+export interface RecommendationQueueFilter {
+  confidence?: RecommendationQueueItem["confidence_band"];
+  recommendation?: RecommendationQueueItem["recommendation"];
+  review?: "awaiting" | "recorded";
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -158,6 +164,27 @@ const reasonLabels: Record<string, string> = {
 
 export function explanationReasonLabel(reason: string): string {
   return reasonLabels[reason] ?? reason;
+}
+
+export function filterRecommendationQueue(
+  items: RecommendationQueueItem[],
+  filter: RecommendationQueueFilter,
+): RecommendationQueueItem[] {
+  return items.filter((item) => {
+    if (filter.confidence && item.confidence_band !== filter.confidence) return false;
+    if (filter.recommendation && item.recommendation !== filter.recommendation) return false;
+    if (filter.review === "awaiting" && item.review_state !== "awaiting_review") return false;
+    if (filter.review === "recorded" && item.review_state === "awaiting_review") return false;
+    return true;
+  });
+}
+
+export function effectiveRecommendation(
+  item: RecommendationQueueItem,
+): RecommendationQueueItem["recommendation"] | null {
+  if (item.latest_review_decision === "adjusted") return item.latest_review_adjusted_recommendation;
+  if (item.latest_review_decision === "accepted") return item.recommendation;
+  return null;
 }
 
 export function zoneLabel(zone: RecommendationQueueItem["zone_type"]): string {

@@ -1,10 +1,11 @@
-# Protocolo de ground truth de vegetação
+# GEO-002 — especificação das ferramentas de ground truth
 
 - Ticket: `GEO-002`
-- Versão do protocolo: `gt-protocol-0.1`
+- Versão do protocolo: `zenit-ground-truth-v0.1-draft`
 - Data: 2026-09-14
-- Status: `proposed` — desenho para revisão; **não autoriza coleta real**
-- Predecessor: `GEO-001` (taxonomia), ainda não aprovado
+- Status: complemento técnico `proposed`; **não autoriza coleta real**
+- Especificação de domínio: [`ground-truth-protocol-proposal.md`](ground-truth-protocol-proposal.md)
+- Predecessor: `GEO-001` com escopo acadêmico aceito e validação especializada pendente
 - Consumidores: `GEO-003`, `GEO-004`, `MOB-005`, `AI-001` a `AI-003`
 
 ## 1. Objetivo e limites
@@ -193,10 +194,10 @@ requisitos para `GEO-003` e `MOB-005` e não alteram schema neste ticket.
 
 | Alvo | Valores | Observação |
 | --- | --- | --- |
-| classe de cobertura | `unknown`, `grass_herbaceous`, `shrub`, `tree`, `mixed`, `non_vegetation`, com dominância e secundárias | taxonomia `cover-taxonomy-0.1` (`GEO-001`, `docs/data-quality/vegetation-cover-taxonomy.md`); `proposed` até parecer |
+| classe de cobertura | `unknown`, `grass_herbaceous`, `shrub`, `tree`, `mixed`, `non_vegetation`, com dominância e secundárias | taxonomia `zenit-cover-taxonomy-v0.1-draft` ([proposta GEO-001](vegetation-cover-taxonomy-proposal.md)); `proposed` até parecer especializado |
 | cobertura | faixa por classe no quadrado: `0`, `1-10`, `10-25`, `25-50`, `50-75`, `75-100` | fração da unidade, seção 4.1 da taxonomia |
 | oclusão e qualidade | `ok`, `limited`, `rejected` | com motivo |
-| motivo de `unknown` | lista fechada da seção 3.7 da taxonomia (`shadow`, `blur`, `occlusion`, `cloud`, `resolution`, `out_of_frame`, `source_conflict`, `annotator_conflict`, `understory_not_observable`, `other`) | obrigatório quando a classe for `unknown` |
+| motivo de `unknown` | lista fechada da taxonomia (`insufficient_resolution`, `shadow`, `cloud_or_haze`, `blur_or_exposure`, `canopy_occlusion`, `vehicle_or_structure_occlusion`, `mixed_without_dominance`, `source_conflict`, `out_of_zone`, `privacy_redaction`, `other`) | obrigatório quando a classe for `unknown` |
 | leitura de altura na foto | cm ou `not_readable` | **controle de qualidade** da medição de campo, não substitui `height_cm` |
 | estratos e copa | `understory_class`, `canopy_overhang`, `trunk_location` | seção 5 da taxonomia |
 
@@ -236,7 +237,8 @@ Regras:
 - conflito de altura entre foto e campo **não corrige** `height_cm` por leitura
   visual: o adjudicador mantém, marca `height_disputed` ou exclui a medição do
   alvo com motivo;
-- caso sem resolução vira classe `unknown` com motivo `conflict`.
+- caso sem resolução vira classe `unknown` com motivo controlado, normalmente
+  `source_conflict` ou `other`, e justificativa de adjudicação.
 
 ### 7.4 Medição de concordância
 
@@ -390,7 +392,7 @@ docker compose exec -T api zenit-ground-truth plan --zones - --seed 20260914 \
   --campaign-id sim-rehearsal --edge-setback-m 1 \
   < tests/fixtures/ground_truth/zones_simulated.geojson
 docker compose exec -T api zenit-ground-truth eligibility --observations - \
-  --approved-campaign <campanha> --approved-protocol gt-protocol-0.1 \
+  --approved-campaign <campanha> --approved-protocol zenit-ground-truth-v0.1-draft \
   --registered-device <dispositivo> \
   < tests/fixtures/ground_truth/observations_simulated.json
 docker compose exec -T api zenit-ground-truth report --annotations - \

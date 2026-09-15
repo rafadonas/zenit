@@ -156,6 +156,11 @@ def build_report(items: Sequence[Observation], arguments: argparse.Namespace) ->
         "observations": len(items),
         "input_data_statuses": dict(sorted(statuses.items())),
         "non_real_input": non_real,
+        "eligible_for_model_training": False,
+        "eligible_for_official_reporting": False,
+        "eligible_for_operations": False,
+        "authorizes_field_work": False,
+        "authorizes_mowing": False,
         "limitations": [
             "Governance eligibility is not checked here; run the eligibility command first.",
             "Non-real input is only a tooling exercise and never pilot evidence.",

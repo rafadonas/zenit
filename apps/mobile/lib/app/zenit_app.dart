@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../app_controller.dart';
+import '../core/presentation/field_theme.dart';
 import '../features/auth/presentation/login_page.dart';
 import '../features/work_orders/presentation/orders_page.dart';
 
@@ -13,13 +14,7 @@ class ZenitApp extends StatelessWidget {
   Widget build(BuildContext context) => MaterialApp(
     title: 'ZENIT Campo',
     debugShowCheckedModeBanner: false,
-    theme: ThemeData(
-      colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff125f4a)),
-      useMaterial3: true,
-      inputDecorationTheme: const InputDecorationTheme(
-        border: OutlineInputBorder(),
-      ),
-    ),
+    theme: FieldTheme.createTheme(),
     home: ListenableBuilder(
       listenable: controller,
       builder: (context, _) {

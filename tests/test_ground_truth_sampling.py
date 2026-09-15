@@ -15,6 +15,7 @@ def zone_feature(segment_index=0, zone="left", rings=None, **properties):
             "segment_index": segment_index,
             "zone": zone,
             "data_status": "real",
+            "field_use_approved": True,
             **properties,
         },
         "geometry": {"type": "Polygon", "coordinates": rings},
@@ -33,7 +34,13 @@ def test_plan_draws_primary_and_substitute_points_inside_zone_with_setback() -> 
     assert all(2 <= x <= 98 and 2 <= y <= 8 for x, y in points(plan))
     assert cell["shortfall"] is None
     assert cell["eligible_for_field_use"] is True
+    assert cell["geometry_is_real"] is True
+    assert cell["field_use_approved"] is True
     assert plan["authorizes_field_work"] is False
+    assert plan["authorizes_mowing"] is False
+    assert plan["eligible_for_model_training"] is False
+    assert plan["eligible_for_official_reporting"] is False
+    assert plan["eligible_for_operations"] is False
     assert plan["summary"] == {
         "cells": 1,
         "primary_points": 3,
@@ -113,6 +120,18 @@ def test_non_real_geometry_is_not_eligible_for_field_use() -> None:
     assert cell["threshold_cm"] == 10
     assert cell["strata"] == {"historical_class": "N2"}
     assert plan["summary"]["cells_not_eligible_for_field_use"] == 1
+
+
+def test_real_geometry_without_explicit_field_approval_fails_closed() -> None:
+    plan = plan_campaign(
+        [zone_feature(field_use_approved=False)], seed=1, campaign_id="c1"
+    )
+
+    cell = plan["cells"][0]
+    assert cell["geometry_is_real"] is True
+    assert cell["field_use_approved"] is False
+    assert cell["eligible_for_field_use"] is False
+    assert plan["authorizes_field_work"] is False
 
 
 @pytest.mark.parametrize(

@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 
 import { isAccessTokenContract } from "../../../../lib/auth-contracts";
 import { setDashboardSessionCookies } from "../../../../lib/dashboard-cookies";
+import { safeDashboardReturnPath } from "../../../../lib/fixed-dashboard-session";
 import {
   getDashboardSecurityConfig,
   getRequestHostOrigin,
@@ -38,6 +39,7 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
   const email = form.get("email");
   const password = form.get("password");
+  const submittedReturnTo = form.get("return_to");
   if (
     typeof email !== "string" ||
     typeof password !== "string" ||
@@ -82,7 +84,12 @@ export async function POST(request: Request): Promise<NextResponse> {
   }
 
   const response = NextResponse.redirect(
-    new URL("/recommendations?auth=signed-in", navigationOrigin),
+    new URL(
+      safeDashboardReturnPath(
+        typeof submittedReturnTo === "string" ? submittedReturnTo : null,
+      ),
+      navigationOrigin,
+    ),
     303,
   );
   setDashboardSessionCookies(

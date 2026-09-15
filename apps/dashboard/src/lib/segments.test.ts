@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   createMapProjection,
+  findSegmentIdByDistance,
   findSegmentIdByIndex,
   formatDistance,
   isSegmentCollection,
+  parseCorridorSearchQuery,
   parseSegmentIndex,
   projectSegments,
   type SegmentFeature,
@@ -44,6 +46,30 @@ describe("segment utilities", () => {
     ]);
   });
 
+  it("projects 650 segment features without dropping rows", () => {
+    const manyFeatures = Array.from({ length: 650 }, (_, index): SegmentFeature => ({
+      ...feature,
+      geometry: {
+        ...feature.geometry,
+        coordinates: [
+          [-46.8 + index * 0.00001, -23.5],
+          [-46.799 + index * 0.00001, -23.499],
+        ],
+      },
+      properties: {
+        ...feature.properties,
+        segment_id: `segment-${index}`,
+        segment_index: index,
+        start_distance_m: index * 100,
+        end_distance_m: index * 100 + 100,
+      },
+    }));
+
+    const startedAt = performance.now();
+    expect(projectSegments(manyFeatures)).toHaveLength(650);
+    expect(performance.now() - startedAt).toBeLessThan(500);
+  });
+
   it("shares the map projection with georeferenced overlays", () => {
     const project = createMapProjection([feature]);
 
@@ -66,11 +92,33 @@ describe("segment utilities", () => {
     expect(findSegmentIdByIndex([feature], 1.5)).toBeNull();
   });
 
+  it("finds a segment by candidate metric distance", () => {
+    expect(findSegmentIdByDistance([feature], 150)).toBe("segment-1");
+    expect(findSegmentIdByDistance([feature], -1)).toBeNull();
+  });
+
   it("does not interpret an empty segment search as segment zero", () => {
     expect(parseSegmentIndex("")).toBeNull();
     expect(parseSegmentIndex("   ")).toBeNull();
     expect(parseSegmentIndex("1.5")).toBeNull();
     expect(parseSegmentIndex("0")).toBe(0);
     expect(parseSegmentIndex("195")).toBe(195);
+  });
+
+  it("parses road, km, and segment corridor searches", () => {
+    expect(parseCorridorSearchQuery("SP-021 km 12,4")).toEqual({
+      type: "distance",
+      distanceM: 12400,
+      roadCode: "SP021",
+    });
+    expect(parseCorridorSearchQuery("segmento #42")).toEqual({
+      type: "segment",
+      segmentIndex: 42,
+      roadCode: undefined,
+    });
+    expect(parseCorridorSearchQuery("SP021")).toEqual({
+      type: "road",
+      roadCode: "SP021",
+    });
   });
 });

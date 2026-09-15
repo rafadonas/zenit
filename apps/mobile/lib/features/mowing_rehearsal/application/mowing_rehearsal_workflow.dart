@@ -514,7 +514,7 @@ extension MowingRehearsalWorkflowController on ZenitAppController {
             .toList(),
         result.nextSyncCursor,
       );
-    });
+    }, syncItemKey: syncWorkItemKey(SyncWorkKind.mowingBatch, plan.id));
   }
 
   bool _isCompleteMowingDemoSequence(List<MowingDemoLifecycleEvent> events) {
@@ -662,6 +662,6 @@ extension MowingRehearsalWorkflowController on ZenitAppController {
           );
         await vault.replaceMowingPostServicePhotos(plan.id, photos);
       }
-    });
+    }, syncItemKey: syncWorkItemKey(SyncWorkKind.mowingPhotoUpload, plan.id));
   }
 }

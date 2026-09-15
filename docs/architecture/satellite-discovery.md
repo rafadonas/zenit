@@ -49,10 +49,43 @@ never placed in a browser-facing tile URL.
   and UTC date window without requesting downloads.
 - Offline fixtures cover AOI/date filters, fractional cloud normalization,
   pagination host validation, and credential isolation.
-- Planet persistence is intentionally disabled until a migration extends the
-  current `satellite_scene.sensor` constraint to `planet-scope`.
-- Orders API, scene downloads, basemap discovery, tile proxy/cache, quota ledger,
-  raster checksums, and processing provenance remain future reviewed increments.
+- Planet persistence uses migration `0041` for catalog metadata and `0043` for
+  the bounded Order/download lineage.
+- Basemap discovery and tile proxy/cache remain future increments; the approved
+  Planet Order path is implemented separately with bounded polling, encrypted
+  downloads, raster checksums, and persisted lineage.
+
+`PLANET-002` adds an opt-in `assets:download` permission filter to the bounded
+catalog request and exposes it through `zenit-planet-capabilities`. This checks
+scene-level catalog permission only; it still does not select a product bundle,
+create an Order, download bytes, or consume scene-download quota.
+
+`PLANET-003` adds the reversible `0041` migration and
+`zenit-planet-persist`. It stores only normalized, checksummed catalog metadata
+with `cache_status=discovered` and idempotent provider/scene identity. The
+command requires `--persist`, never stores asset bytes, and remains
+non-operational. A bounded validation on 2026-09-15 persisted 13 scenes on the
+first run and 13 existing scenes on an immediate repeat; all 13 remain
+`cached_at=NULL`.
+
+`PLANET-004` is approved for one pilot execution. The worker selects one
+download-permitted, lowest-cloud scene for the prepared `SP021` segment 195,
+requests only the `analytic_udm2` bundle, clips to the buffered segment AOI
+(maximum 10,000 m²), caps downloads at 100 MiB, stores encrypted bytes in the
+local raw bucket, and keeps the result non-operational. The command requires
+the explicit `--execute` confirmation and is idempotent by request checksum, so
+retries reuse the same external Order rather than creating a second one.
+
+### PLANET-001 validation
+
+On 2026-09-15 the backend-only catalog flow successfully authenticated against
+the configured account for the documented development corridor AOI
+`[-46.80, -23.55, -46.76, -23.50]` and UTC window `2026-08-01` through
+`2026-08-07`. The `PSScene` search returned 13 acquisitions and no next page.
+This confirms catalog access only; it did not request an Order, download bytes,
+consume scene-download quota, or authorize an operational result. See
+[`ADR-0075`](../decisions/ADR-0075-planet-account-catalog-validation.md) and the
+[validation record](../data-quality/planet-account-catalog-validation-2026-09-15.md).
 
 ## HTTP safety
 

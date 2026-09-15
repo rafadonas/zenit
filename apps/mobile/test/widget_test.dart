@@ -70,6 +70,30 @@ void main() {
     expect(find.byType(FilledButton), findsNothing);
   });
 
+  testWidgets('opens the sync center with an actionable empty state', (
+    tester,
+  ) async {
+    final controller = ZenitAppController(
+      gateway: FakeGateway(),
+      sessionStore: MemorySessionStore()..value = validSession(),
+      vault: MemoryVault(),
+      deviceIdentityStore: MemoryDeviceIdentityStore(),
+      appVersion: 'test',
+    );
+    await controller.initialize();
+
+    await tester.pumpWidget(ZenitApp(controller: controller));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Abrir central de sincronização'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Central de sincronização'), findsOneWidget);
+    expect(
+      find.text('Nenhum evento local aguardando sincronização.'),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('captures three guarded post-service mowing heights', (
     tester,
   ) async {

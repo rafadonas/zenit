@@ -4,12 +4,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { POST } from "../app/api/auth/session/route";
 import { CSRF_COOKIE_NAME, SESSION_COOKIE_NAME } from "./session-security";
 
-function loginRequest(origin = "http://localhost:3000"): NextRequest {
+function loginRequest(
+  origin = "http://localhost:3000",
+  returnTo?: string,
+): NextRequest {
+  const body = new URLSearchParams({
+    email: "manager@example.test",
+    password: "local-test-password",
+  });
+  if (returnTo) body.set("return_to", returnTo);
   return new NextRequest("http://localhost:3000/api/auth/session", {
-    body: new URLSearchParams({
-      email: "manager@example.test",
-      password: "local-test-password",
-    }),
+    body,
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
       Origin: origin,
@@ -99,6 +104,30 @@ describe("dashboard login route", () => {
       "http://localhost:3000/recommendations?auth=signed-in",
     );
     expect(apiFetch).toHaveBeenCalledOnce();
+  });
+
+  it("returns only to a validated local dashboard path", async () => {
+    const apiFetch = vi.fn().mockImplementation(async () =>
+      new Response(
+        JSON.stringify({
+          access_token: "signed-token-value-that-is-long-enough",
+          expires_in: 1800,
+          token_type: "bearer",
+        }),
+        { headers: { "Content-Type": "application/json" }, status: 200 },
+      ),
+    );
+    vi.stubGlobal("fetch", apiFetch);
+
+    const localResponse = await POST(loginRequest(undefined, "/photo-reviews?status=pending"));
+    expect(localResponse.headers.get("location")).toBe(
+      "http://localhost:3000/photo-reviews?status=pending",
+    );
+
+    const externalResponse = await POST(loginRequest(undefined, "//attacker.test/path"));
+    expect(externalResponse.headers.get("location")).toBe(
+      "http://localhost:3000/recommendations?auth=signed-in",
+    );
   });
 
   it("preserves the API login-throttle outcome without exposing its body", async () => {

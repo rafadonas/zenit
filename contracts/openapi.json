@@ -6038,6 +6038,436 @@
         "title": "SegmentProperties",
         "type": "object"
       },
+      "VegetationCoverCollection": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/VegetationCoverObservation"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/VegetationCoverMetadata"
+          }
+        },
+        "required": [
+          "items",
+          "metadata"
+        ],
+        "title": "VegetationCoverCollection",
+        "type": "object"
+      },
+      "VegetationCoverMetadata": {
+        "properties": {
+          "limit": {
+            "maximum": 100.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "result_count": {
+            "minimum": 0.0,
+            "title": "Result Count",
+            "type": "integer"
+          },
+          "segment_id": {
+            "format": "uuid",
+            "title": "Segment Id",
+            "type": "string"
+          },
+          "total_count": {
+            "minimum": 0.0,
+            "title": "Total Count",
+            "type": "integer"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          },
+          "warning": {
+            "title": "Warning",
+            "type": "string"
+          }
+        },
+        "required": [
+          "segment_id",
+          "result_count",
+          "total_count",
+          "limit",
+          "truncated",
+          "warning"
+        ],
+        "title": "VegetationCoverMetadata",
+        "type": "object"
+      },
+      "VegetationCoverObservation": {
+        "properties": {
+          "confidence_band": {
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "title": "Confidence Band",
+            "type": "string"
+          },
+          "cover_type": {
+            "enum": [
+              "unknown",
+              "grass_herbaceous",
+              "shrub",
+              "tree",
+              "mixed",
+              "non_vegetation"
+            ],
+            "title": "Cover Type",
+            "type": "string"
+          },
+          "cover_type_method": {
+            "enum": [
+              "model_estimated",
+              "human_reviewed"
+            ],
+            "title": "Cover Type Method",
+            "type": "string"
+          },
+          "coverage_band": {
+            "anyOf": [
+              {
+                "enum": [
+                  "none",
+                  "sparse",
+                  "partial",
+                  "dominant"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Coverage Band"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "data_status": {
+            "enum": [
+              "real",
+              "estimated",
+              "simulated",
+              "prepared",
+              "inconclusive"
+            ],
+            "title": "Data Status",
+            "type": "string"
+          },
+          "dominance": {
+            "anyOf": [
+              {
+                "enum": [
+                  "dominant",
+                  "co-dominant",
+                  "not_dominant",
+                  "not_applicable"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dominance"
+          },
+          "eligible_for_official_reporting": {
+            "const": false,
+            "default": false,
+            "title": "Eligible For Official Reporting",
+            "type": "boolean"
+          },
+          "gps_accuracy_m": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gps Accuracy M"
+          },
+          "gps_status": {
+            "enum": [
+              "simulated",
+              "unavailable"
+            ],
+            "title": "Gps Status",
+            "type": "string"
+          },
+          "model_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Version"
+          },
+          "observation_id": {
+            "format": "uuid",
+            "title": "Observation Id",
+            "type": "string"
+          },
+          "provenance": {
+            "additionalProperties": true,
+            "title": "Provenance",
+            "type": "object"
+          },
+          "quality_status": {
+            "enum": [
+              "accepted",
+              "limited",
+              "rejected"
+            ],
+            "title": "Quality Status",
+            "type": "string"
+          },
+          "rationale": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rationale"
+          },
+          "review_state": {
+            "enum": [
+              "pending",
+              "accepted",
+              "corrected",
+              "rejected"
+            ],
+            "title": "Review State",
+            "type": "string"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At"
+          },
+          "reviewed_by_user_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed By User Id"
+          },
+          "segment_id": {
+            "format": "uuid",
+            "title": "Segment Id",
+            "type": "string"
+          },
+          "segment_index": {
+            "minimum": 0.0,
+            "title": "Segment Index",
+            "type": "integer"
+          },
+          "segment_zone_id": {
+            "format": "uuid",
+            "title": "Segment Zone Id",
+            "type": "string"
+          },
+          "source_acquired_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Acquired At"
+          },
+          "source_checksum_sha256": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "minLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Checksum Sha256"
+          },
+          "source_reference": {
+            "minLength": 1,
+            "title": "Source Reference",
+            "type": "string"
+          },
+          "source_type": {
+            "enum": [
+              "satellite",
+              "field_photo",
+              "manual_annotation",
+              "model_output",
+              "other"
+            ],
+            "title": "Source Type",
+            "type": "string"
+          },
+          "spatial_relation": {
+            "anyOf": [
+              {
+                "enum": [
+                  "inside_zone",
+                  "overhang",
+                  "adjacent",
+                  "uncertain"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Spatial Relation"
+          },
+          "supersedes_observation_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supersedes Observation Id"
+          },
+          "taxonomy_version": {
+            "minLength": 1,
+            "title": "Taxonomy Version",
+            "type": "string"
+          },
+          "unknown_reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "insufficient_resolution",
+                  "shadow",
+                  "cloud_or_haze",
+                  "blur_or_exposure",
+                  "canopy_occlusion",
+                  "vehicle_or_structure_occlusion",
+                  "mixed_without_dominance",
+                  "source_conflict",
+                  "out_of_zone",
+                  "privacy_redaction",
+                  "other"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unknown Reason"
+          },
+          "validity_status": {
+            "enum": [
+              "valid",
+              "limited",
+              "invalid"
+            ],
+            "title": "Validity Status",
+            "type": "string"
+          },
+          "visibility": {
+            "anyOf": [
+              {
+                "enum": [
+                  "clear",
+                  "partially_occluded",
+                  "mostly_occluded",
+                  "illegible"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Visibility"
+          },
+          "zone_type": {
+            "enum": [
+              "left",
+              "right",
+              "median",
+              "special"
+            ],
+            "title": "Zone Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "observation_id",
+          "segment_id",
+          "segment_zone_id",
+          "segment_index",
+          "zone_type",
+          "cover_type",
+          "unknown_reason",
+          "cover_type_method",
+          "source_type",
+          "source_reference",
+          "source_acquired_at",
+          "validity_status",
+          "confidence_band",
+          "quality_status",
+          "review_state",
+          "taxonomy_version",
+          "model_version",
+          "coverage_band",
+          "visibility",
+          "dominance",
+          "spatial_relation",
+          "rationale",
+          "gps_status",
+          "data_status",
+          "provenance",
+          "supersedes_observation_id",
+          "reviewed_by_user_id",
+          "reviewed_at",
+          "created_at"
+        ],
+        "title": "VegetationCoverObservation",
+        "type": "object"
+      },
       "VegetationMapFeature": {
         "properties": {
           "geometry": {
@@ -9281,6 +9711,94 @@
         "summary": "List Satellite Observations",
         "tags": [
           "satellite-observations"
+        ]
+      }
+    },
+    "/v1/segments/{segment_id}/vegetation-cover": {
+      "get": {
+        "operationId": "list_vegetation_cover_v1_segments__segment_id__vegetation_cover_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "segment_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Segment Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 100,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VegetationCoverCollection"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Request validation failed or the request cannot be processed.",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Request correlation identifier generated or accepted by the API.",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "API error response.",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Request correlation identifier generated or accepted by the API.",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "List Vegetation Cover",
+        "tags": [
+          "vegetation-cover"
         ]
       }
     },

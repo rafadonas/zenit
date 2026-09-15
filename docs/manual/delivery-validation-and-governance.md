@@ -55,6 +55,7 @@ It does not provide:
 - a validated tree/grass/shrub model or training dataset;
 - a complete current satellite scene covering the corridor; or
 - authority to act on behalf of Motiva, a regulator, concessionaire, or field team.
+  ZENIT branding is academic and project-owned under ADR-0069.
 
 See [`docs/team/current-state-and-gaps.md`](../team/current-state-and-gaps.md) for
 the detailed living inventory.
@@ -217,9 +218,18 @@ For the academic repository, Rafael can approve scope, ordering, terminology,
 demonstration parameters, and technical experiments when they do not claim external
 authority. The rationale and limitations should be versioned.
 
+### Decisions with accepted academic assumptions
+
+- ZENIT is an academic/student project brand with no direct Motiva relationship,
+  sponsorship, authorization, or brand license. The project may use ZENIT-only
+  tokens and copy for demonstration while avoiding official Motiva logos, assets,
+  colors, slogans, endorsement language, and affiliation claims. See
+  [ADR-0069](../decisions/ADR-0069-academic-brand-boundary.md).
+
 ### Decisions that still need an appropriate owner or explicit project assumption
 
-- permission to use Motiva name, logo, colors, and branded assets;
+- official permission to use Motiva logo, colors, branded assets, endorsement
+  language, or partner-facing identity;
 - which regulatory/concession instrument applies to a real corridor;
 - authoritative road axis, zone boundaries, and ambiguous KMZ attributes;
 - source licenses and permitted use of provider imagery;

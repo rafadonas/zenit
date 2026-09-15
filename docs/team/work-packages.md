@@ -36,11 +36,18 @@ regressão e problemas ligados a tickets. Não registrar dados pessoais.
 **Aceite:** todas as rotas e estados têm proprietário; rótulos preparado/simulado
 são auditados; nenhuma captura contém segredo.
 
-### GOV-002 — decisões de marca (`BLOCKED`, P0)
+### GOV-002 — decisões de marca (`READY` para escopo acadêmico, P0)
 
-**Decisão externa:** confirmar se nome, logotipo, cores e menção Motiva podem ser
-usados e em quais ambientes. Até lá, o design system é direção de produto, não
-autorização oficial de marca.
+**Decisão aceita:** registrar que ZENIT é projeto acadêmico/estudantil sem
+relação direta, patrocínio, autorização ou licença de marca da Motiva.
+
+**Escopo:** documentar limites de uso: identidade própria ZENIT, menção Motiva
+somente como contexto de desafio/fonte, sem logotipo, assets, cores oficiais,
+slogans ou linguagem de endosso.
+
+**Aceite:** ADR aceito, design system e tokens classificados como placeholders
+acadêmicos do ZENIT, documentação deixa claro que uso oficial da Motiva permanece
+bloqueado.
 
 ### GOV-003 — homologação dos dados de origem (`BLOCKED`, P1)
 
@@ -171,8 +178,9 @@ anotação, adjudicação e privacidade.
 **Aceite:** piloto de anotação mede concordância; licença/consentimento e retenção
 documentados; dados demo excluídos.
 
-**Proposta:** [`../data-quality/ground-truth-protocol.md`](../data-quality/ground-truth-protocol.md)
-(`proposed`; aprovações e piloto pendentes).
+**Proposta:** [`../data-quality/ground-truth-protocol-proposal.md`](../data-quality/ground-truth-protocol-proposal.md),
+com [`tooling reproduzível`](../data-quality/ground-truth-protocol.md)
+(`proposed`; aprovações e piloto real pendentes).
 
 ### GEO-003 — contrato de cobertura vegetal (`BLOCKED`, P1)
 
