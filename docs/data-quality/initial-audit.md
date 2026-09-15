@@ -4,6 +4,11 @@ Date: 2026-08-06
 
 Status: observed from the supplied files
 Machine-readable manifest: `data/manifests/initial-source-audit.json`
+Academic owner review: [`source-data-homologation.md`](source-data-homologation.md)
+
+The owner review accepts these sources for the prepared academic prototype
+only. It does not promote the candidate axis, zones, inferred attributes, or
+document dates to operational truth.
 
 ## Scope and method
 
