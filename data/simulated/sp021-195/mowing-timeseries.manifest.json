@@ -1,0 +1,38 @@
+{
+  "checksums": {
+    "csv_sha256": "1cf99e16f615e19917c2c2ca641c3b9af1be0b39d92bbd2585d91717a7ddd56b"
+  },
+  "data_status": "simulated",
+  "dataset_id": "zenit-simulated-mowing-timeseries",
+  "dataset_version": "v0.1-presentation-only",
+  "eligibility": {
+    "authorizes_mowing": false,
+    "eligible_for_model_training": false,
+    "eligible_for_official_reporting": false,
+    "eligible_for_operations": false
+  },
+  "limitations": [
+    "All values are algorithmically generated and are not field or satellite observations.",
+    "Mowing events are scripted scenario inputs, not recommendations or evidence of execution.",
+    "The dataset may rehearse ingestion and visualization but cannot train or validate AI-001."
+  ],
+  "purpose": "pipeline_rehearsal_and_presentation",
+  "scenario": {
+    "days": 30,
+    "end_date": "2026-08-30",
+    "record_count": 120,
+    "road_code": "SP021",
+    "seed": 20260915,
+    "segment_index": 195,
+    "segment_length_m": 100,
+    "start_date": "2026-08-01",
+    "zone_types": [
+      "left",
+      "right",
+      "median",
+      "special"
+    ]
+  },
+  "schema_version": "zenit-simulated-mowing-timeseries-v1",
+  "source_type": "algorithmically_generated_scenario"
+}
