@@ -453,6 +453,17 @@ cd apps/mobile
   python scripts/render_cached_ndvi_preview.py
   ```
 
+- **Gerar série temporal simulada de crescimento e corte**:
+  ```bash
+  python scripts/generate_simulated_mowing_timeseries.py
+  ```
+
+  O cenário reproduzível cria 180 dias para o trecho preparado `SP021/195`, com
+  as quatro zonas e ciclos de corte simulados separados. É exclusivamente
+  demonstrativo e permanece
+  inelegível para treino, relatório oficial, operação ou autorização de roçada.
+  Consulte [`DATA-DEMO-001`](docs/data-quality/simulated-mowing-timeseries.md).
+
 - **Validação de smoke test da stack ativa**:
   ```bash
   python scripts/verify_mvp_stack.py
