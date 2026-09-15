@@ -7,6 +7,9 @@ Current P0 slice:
 - initial online OAuth password login against the ZENIT API;
 - access token stored in Android secure storage (the password is never stored);
 - prepared inspection orders downloaded from `GET /v1/work-orders`;
+- guided prepared-order journey with an explicit next action, three-point
+  progress, per-point local/sync status, and a local-versus-sent summary that
+  survives closing and reopening the screen;
 - prepared mowing-planning snapshots downloaded from
   `GET /v1/prepared-mowing-orders` for encrypted offline review;
 - order snapshot and three measurement drafts stored in an AES-256 encrypted

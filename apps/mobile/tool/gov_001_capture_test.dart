@@ -65,10 +65,10 @@ void main() {
       await tester.pump();
     }
 
-    Future<void> show(Finder finder) async {
+    Future<void> show(Finder finder, {double scrollDelta = 260}) async {
       await tester.scrollUntilVisible(
         finder,
-        260,
+        scrollDelta,
         // The page-level ListView is the first Scrollable. Text fields and
         // buttons may add nested Scrollables with tiny viewports; selecting
         // the last one makes long, lazily built journeys impossible to reach.
@@ -172,8 +172,13 @@ void main() {
     await tester.tap(find.text('2. Iniciar (GPS simulado)'));
     await tester.pumpAndSettle();
     for (var index = 0; index < 3; index++) {
-      await show(find.byType(TextField).at(index));
-      await tester.enterText(find.byType(TextField).at(index), '${12 + index}');
+      final field = find.byWidgetPredicate(
+        (widget) =>
+            widget is TextField &&
+            widget.decoration?.labelText == 'Ponto ${index + 1} · altura (cm)',
+      );
+      await show(field);
+      await tester.enterText(field, '${12 + index}');
     }
     await show(find.text('Salvar 3 rascunhos no aparelho'));
     await tester.tap(find.text('Salvar 3 rascunhos no aparelho'));
@@ -189,7 +194,7 @@ void main() {
       await tester.pumpAndSettle();
     }
     await capture('07-inspection-photos', 'inspection/fixture-photo-drafts');
-    await show(find.text('3. Finalizar'));
+    await show(find.text('3. Finalizar'), scrollDelta: -260);
     await tester.tap(find.text('3. Finalizar'));
     await tester.pumpAndSettle();
     await show(find.text('Sincronizar lote preparado'));
