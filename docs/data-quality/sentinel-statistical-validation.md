@@ -47,6 +47,9 @@ height, or that the result is operationally reliable. The low mean may reflect a
 mixture of pavement, bare soil, and vegetation caused by the estimated
 centerline-derived AOI; no causal interpretation is made.
 
+This sentence is not evidence of vegetation versus pavement classification; see
+[`cover-pavement-evidence-validation-2026-09-15.md`](cover-pavement-evidence-validation-2026-09-15.md).
+
 ## Provenance and persistence
 
 - Processor version: `sentinel-ndvi-scl-v1`.
