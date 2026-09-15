@@ -1,21 +1,20 @@
 # Gate para Order e download Planet — PLANET-004
 
-O catálogo Planet e o filtro `assets:download` já foram validados para a AOI de
-desenvolvimento. Antes de criar um Order, preencher todos os campos abaixo no
-manifesto revisado:
+O catálogo Planet e o filtro `assets:download` foram validados para o segmento
+preparado `SP021/195`. O proprietário confirmou o manifesto abaixo para um único
+teste acadêmico controlado:
 
 | Campo | Pergunta que precisa de resposta |
 | --- | --- |
-| `item_ids` | Quais das 13 cenas serão usadas? Uma cena piloto ou mais? |
-| `product_bundle`/assets | Qual bundle e quais assets serão baixados (`visual`, `analytic_sr`, `analytic_udm2` ou outro disponível para a conta)? |
-| AOI recortada | O recorte continua a AOI documentada ou será um trecho menor de 100 m/1 km? |
-| orçamento | Qual limite máximo de área, bytes/custo e tentativas? |
-| licença/consentimento | O uso acadêmico, armazenamento e treinamento estão cobertos pelos termos da conta? |
-| retenção/destino | Onde guardar, por quanto tempo, com qual criptografia e checksum? |
-| aprovação | Quem confirma a criação do Order e aceita consumo de cota? |
+| `item_ids` | Uma cena com permissão de download, escolhida pela menor nuvem disponível no intervalo validado. |
+| `product_bundle`/assets | `analytic_udm2`: `ortho_analytic_4b`, XML de metadados e `ortho_udm2`. |
+| AOI recortada | Buffer de 25 m do segmento estimado de 100 m, área calculada de 6.950,55 m². |
+| orçamento | No máximo 10.000 m², 100 MiB, uma cena, um bundle e um Order; sem cobrança paga. |
+| licença/consentimento | Uso acadêmico do projeto, sem redistribuição pública; retenção aprovada por 30 dias. |
+| retenção/destino | Bucket local criptografado `zenit-raw`, prefixo do Order, SHA-256 e linhagem no Postgres. |
+| aprovação | Rafael confirmou explicitamente a criação do único Order e o download limitado. |
 
-Sem respostas, o estado é `blocked`. Não criar Order só porque a chave funciona;
-não usar links temporários como armazenamento permanente; não expor URLs,
-tokens ou bytes no dashboard/mobile. A execução futura deve ser uma operação
-única, limitada, auditável e reversível, mantendo `eligible_for_operations=false`
-até os gates do projeto.
+O worker mantém `eligible_for_operations=false` e
+`eligible_for_official_reporting=false`. Links temporários da Planet não são
+armazenados como evidência permanente; somente os bytes cifrados, seus checksums,
+metadados e eventos de Order são persistidos.
