@@ -1,0 +1,302 @@
+{
+  "type": "FeatureCollection",
+  "description": "SIMULATED tooling example for GEO-002. Not field data, not ground truth, never used in the pilot, training or official reports.",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "road_code": "SIM001",
+        "segment_index": 0,
+        "zone": "left",
+        "data_status": "simulated",
+        "historical_class": "N2"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              313000,
+              7390000
+            ],
+            [
+              313100,
+              7390000
+            ],
+            [
+              313100,
+              7390008
+            ],
+            [
+              313000,
+              7390008
+            ],
+            [
+              313000,
+              7390000
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "road_code": "SIM001",
+        "segment_index": 0,
+        "zone": "right",
+        "data_status": "simulated",
+        "historical_class": "N3"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              313000,
+              7390022
+            ],
+            [
+              313100,
+              7390022
+            ],
+            [
+              313100,
+              7390030
+            ],
+            [
+              313000,
+              7390030
+            ],
+            [
+              313000,
+              7390022
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "road_code": "SIM001",
+        "segment_index": 0,
+        "zone": "median",
+        "data_status": "simulated",
+        "historical_class": "N1"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              313000,
+              7390010
+            ],
+            [
+              313100,
+              7390010
+            ],
+            [
+              313100,
+              7390020
+            ],
+            [
+              313000,
+              7390020
+            ],
+            [
+              313000,
+              7390010
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "road_code": "SIM001",
+        "segment_index": 0,
+        "zone": "special",
+        "data_status": "simulated",
+        "historical_class": "N2"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              313000,
+              7390032
+            ],
+            [
+              313100,
+              7390032
+            ],
+            [
+              313100,
+              7390036
+            ],
+            [
+              313000,
+              7390036
+            ],
+            [
+              313000,
+              7390032
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "road_code": "SIM001",
+        "segment_index": 1,
+        "zone": "left",
+        "data_status": "simulated",
+        "historical_class": "N3"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              313100,
+              7390000
+            ],
+            [
+              313200,
+              7390000
+            ],
+            [
+              313200,
+              7390008
+            ],
+            [
+              313100,
+              7390008
+            ],
+            [
+              313100,
+              7390000
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "road_code": "SIM001",
+        "segment_index": 1,
+        "zone": "right",
+        "data_status": "simulated",
+        "historical_class": "N1"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              313100,
+              7390022
+            ],
+            [
+              313200,
+              7390022
+            ],
+            [
+              313200,
+              7390030
+            ],
+            [
+              313100,
+              7390030
+            ],
+            [
+              313100,
+              7390022
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "road_code": "SIM001",
+        "segment_index": 1,
+        "zone": "median",
+        "data_status": "simulated",
+        "historical_class": "N2"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              313100,
+              7390010
+            ],
+            [
+              313200,
+              7390010
+            ],
+            [
+              313200,
+              7390020
+            ],
+            [
+              313100,
+              7390020
+            ],
+            [
+              313100,
+              7390010
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "road_code": "SIM001",
+        "segment_index": 1,
+        "zone": "special",
+        "data_status": "simulated",
+        "historical_class": "N3"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              313100,
+              7390032
+            ],
+            [
+              313200,
+              7390032
+            ],
+            [
+              313200,
+              7390036
+            ],
+            [
+              313100,
+              7390036
+            ],
+            [
+              313100,
+              7390032
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}

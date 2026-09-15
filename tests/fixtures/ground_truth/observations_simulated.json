@@ -1,0 +1,821 @@
+{
+  "description": "SIMULATED tooling example for GEO-002. Not field data, not ground truth, never used in the pilot, training or official reports.",
+  "observations": [
+    {
+      "observation_id": "sim-obs-01",
+      "cell_id": "SIM001:0:left",
+      "road_code": "SIM001",
+      "segment_index": 0,
+      "zone": "left",
+      "season": "wet",
+      "lighting": "sun",
+      "data_status": "simulated",
+      "campaign_id": "sim-rehearsal",
+      "protocol_version": "gt-protocol-0.1",
+      "consent_record_id": null,
+      "license_record_id": null,
+      "device_id": "sim-device",
+      "height_data_status": "simulated",
+      "height_cm": 9,
+      "field_height_cm": 9,
+      "annotations": [
+        {
+          "annotator": "annotator-a",
+          "cover_class": "mixed",
+          "cover_band": "25-50",
+          "quality": "limited",
+          "photo_height_cm": 7
+        },
+        {
+          "annotator": "annotator-b",
+          "cover_class": "mixed",
+          "cover_band": "50-75",
+          "quality": "ok",
+          "photo_height_cm": null
+        }
+      ]
+    },
+    {
+      "observation_id": "sim-obs-02",
+      "cell_id": "SIM001:0:left",
+      "road_code": "SIM001",
+      "segment_index": 0,
+      "zone": "left",
+      "season": "dry",
+      "lighting": "sun",
+      "data_status": "simulated",
+      "campaign_id": "sim-rehearsal",
+      "protocol_version": "gt-protocol-0.1",
+      "consent_record_id": null,
+      "license_record_id": null,
+      "device_id": "sim-device",
+      "height_data_status": "simulated",
+      "height_cm": 22,
+      "field_height_cm": 22,
+      "annotations": [
+        {
+          "annotator": "annotator-a",
+          "cover_class": "unknown",
+          "cover_band": "50-75",
+          "quality": "ok",
+          "photo_height_cm": 20
+        },
+        {
+          "annotator": "annotator-b",
+          "cover_class": "unknown",
+          "cover_band": "25-50",
+          "quality": "ok",
+          "photo_height_cm": 20
+        }
+      ]
+    },
+    {
+      "observation_id": "sim-obs-03",
+      "cell_id": "SIM001:0:left",
+      "road_code": "SIM001",
+      "segment_index": 0,
+      "zone": "left",
+      "season": "wet",
+      "lighting": "sun",
+      "data_status": "simulated",
+      "campaign_id": "sim-rehearsal",
+      "protocol_version": "gt-protocol-0.1",
+      "consent_record_id": null,
+      "license_record_id": null,
+      "device_id": "sim-device",
+      "height_data_status": "simulated",
+      "height_cm": 39,
+      "field_height_cm": 39,
+      "annotations": [
+        {
+          "annotator": "annotator-a",
+          "cover_class": "grass_herbaceous",
+          "cover_band": "25-50",
+          "quality": "limited",
+          "photo_height_cm": 38
+        },
+        {
+          "annotator": "annotator-b",
+          "cover_class": "grass_herbaceous",
+          "cover_band": "75-100",
+          "quality": "limited",
+          "photo_height_cm": 33
+        }
+      ]
+    },
+    {
+      "observation_id": "sim-obs-04",
+      "cell_id": "SIM001:0:right",
+      "road_code": "SIM001",
+      "segment_index": 0,
+      "zone": "right",
+      "season": "dry",
+      "lighting": "overcast",
+      "data_status": "simulated",
+      "campaign_id": "sim-rehearsal",
+      "protocol_version": "gt-protocol-0.1",
+      "consent_record_id": null,
+      "license_record_id": null,
+      "device_id": "sim-device",
+      "height_data_status": "simulated",
+      "height_cm": 28,
+      "field_height_cm": 28,
+      "annotations": [
+        {
+          "annotator": "annotator-a",
+          "cover_class": "grass_herbaceous",
+          "cover_band": "50-75",
+          "quality": "ok",
+          "photo_height_cm": 27
+        },
+        {
+          "annotator": "annotator-b",
+          "cover_class": "unknown",
+          "cover_band": "50-75",
+          "quality": "ok",
+          "photo_height_cm": 26
+        }
+      ]
+    },
+    {
+      "observation_id": "sim-obs-05",
+      "cell_id": "SIM001:0:right",
+      "road_code": "SIM001",
+      "segment_index": 0,
+      "zone": "right",
+      "season": "wet",
+      "lighting": "overcast",
+      "data_status": "simulated",
+      "campaign_id": "sim-rehearsal",
+      "protocol_version": "gt-protocol-0.1",
+      "consent_record_id": null,
+      "license_record_id": null,
+      "device_id": "sim-device",
+      "height_data_status": "simulated",
+      "height_cm": 31,
+      "field_height_cm": 31,
+      "annotations": [
+        {
+          "annotator": "annotator-a",
+          "cover_class": "grass_herbaceous",
+          "cover_band": "75-100",
+          "quality": "ok",
+          "photo_height_cm": 24
+        },
+        {
+          "annotator": "annotator-b",
+          "cover_class": "grass_herbaceous",
+          "cover_band": "75-100",
+          "quality": "limited",
+          "photo_height_cm": 32
+        }
+      ]
+    },
+    {
+      "observation_id": "sim-obs-06",
+      "cell_id": "SIM001:0:right",
+      "road_code": "SIM001",
+      "segment_index": 0,
+      "zone": "right",
+      "season": "dry",
+      "lighting": "overcast",
+      "data_status": "simulated",
+      "campaign_id": "sim-rehearsal",
+      "protocol_version": "gt-protocol-0.1",
+      "consent_record_id": null,
+      "license_record_id": null,
+      "device_id": "sim-device",
+      "height_data_status": "simulated",
+      "height_cm": 27,
+      "field_height_cm": 27,
+      "annotations": [
+        {
+          "annotator": "annotator-a",
+          "cover_class": "grass_herbaceous",
+          "cover_band": "75-100",
+          "quality": "ok",
+          "photo_height_cm": 31
+        },
+        {
+          "annotator": "annotator-b",
+          "cover_class": "grass_herbaceous",
+          "cover_band": "50-75",
+          "quality": "limited",
+          "photo_height_cm": 26
+        }
+      ]
+    },
+    {
+      "observation_id": "sim-obs-07",
+      "cell_id": "SIM001:0:median",
+      "road_code": "SIM001",
+      "segment_index": 0,
+      "zone": "median",
+      "season": "wet",
+      "lighting": "sun",
+      "data_status": "simulated",
+      "campaign_id": "sim-rehearsal",
+      "protocol_version": "gt-protocol-0.1",
+      "consent_record_id": null,
+      "license_record_id": null,
+      "device_id": "sim-device",
+      "height_data_status": "simulated",
+      "height_cm": 8,
+      "field_height_cm": 8,
+      "annotations": [
+        {
+          "annotator": "annotator-a",
+          "cover_class": "tree",
+          "cover_band": "50-75",
+          "quality": "limited",
+          "photo_height_cm": 8
+        },
+        {
+          "annotator": "annotator-b",
+          "cover_class": "tree",
+          "cover_band": "25-50",
+          "quality": "ok",
+          "photo_height_cm": 4
+        }
+      ]
+    },
+    {
+      "observation_id": "sim-obs-08",
+      "cell_id": "SIM001:0:median",
+      "road_code": "SIM001",
+      "segment_index": 0,
+      "zone": "median",
+      "season": "dry",
+      "lighting": "overcast",
+      "data_status": "simulated",
+      "campaign_id": "sim-rehearsal",
+      "protocol_version": "gt-protocol-0.1",
+      "consent_record_id": null,
+      "license_record_id": null,
+      "device_id": "sim-device",
+      "height_data_status": "simulated",
+      "height_cm": 4,
+      "field_height_cm": 4,
+      "annotations": [
+        {
+          "annotator": "annotator-a",
+          "cover_class": "tree",
+          "cover_band": "50-75",
+          "quality": "ok",
+          "photo_height_cm": 1
+        },
+        {
+          "annotator": "annotator-b",
+          "cover_class": "tree",
+          "cover_band": "25-50",
+          "quality": "ok",
+          "photo_height_cm": 5
+        }
+      ]
+    },
+    {
+      "observation_id": "sim-obs-09",
+      "cell_id": "SIM001:0:median",
+      "road_code": "SIM001",
+      "segment_index": 0,
+      "zone": "median",
+      "season": "wet",
+      "lighting": "overcast",
+      "data_status": "simulated",
+      "campaign_id": "sim-rehearsal",
+      "protocol_version": "gt-protocol-0.1",
+      "consent_record_id": null,
+      "license_record_id": null,
+      "device_id": "sim-device",
+      "height_data_status": "simulated",
+      "height_cm": 20,
+      "field_height_cm": 20,
+      "annotations": [
+        {
+          "annotator": "annotator-a",
+          "cover_class": "grass_herbaceous",
+          "cover_band": "50-75",
+          "quality": "ok",
+          "photo_height_cm": null
+        },
+        {
+          "annotator": "annotator-b",
+          "cover_class": "grass_herbaceous",
+          "cover_band": "25-50",
+          "quality": "ok",
+          "photo_height_cm": null
+        }
+      ]
+    },
+    {
+      "observation_id": "sim-obs-10",
+      "cell_id": "SIM001:0:special",
+      "road_code": "SIM001",
+      "segment_index": 0,
+      "zone": "special",
+      "season": "dry",
+      "lighting": "sun",
+      "data_status": "simulated",
+      "campaign_id": "sim-rehearsal",
+      "protocol_version": "gt-protocol-0.1",
+      "consent_record_id": null,
+      "license_record_id": null,
+      "device_id": "sim-device",
+      "height_data_status": "simulated",
+      "height_cm": 17,
+      "field_height_cm": 17,
+      "annotations": [
+        {
+          "annotator": "annotator-a",
+          "cover_class": "grass_herbaceous",
+          "cover_band": "50-75",
+          "quality": "limited",
+          "photo_height_cm": 18
+        },
+        {
+          "annotator": "annotator-b",
+          "cover_class": "grass_herbaceous",
+          "cover_band": "50-75",
+          "quality": "ok",
+          "photo_height_cm": 20
+        }
+      ]
+    },
+    {
+      "observation_id": "sim-obs-11",
+      "cell_id": "SIM001:0:special",
+      "road_code": "SIM001",
+      "segment_index": 0,
+      "zone": "special",
+      "season": "wet",
+      "lighting": "sun",
+      "data_status": "simulated",
+      "campaign_id": "sim-rehearsal",
+      "protocol_version": "gt-protocol-0.1",
+      "consent_record_id": null,
+      "license_record_id": null,
+      "device_id": "sim-device",
+      "height_data_status": "simulated",
+      "height_cm": 31,
+      "field_height_cm": 31,
+      "annotations": [
+        {
+          "annotator": "annotator-a",
+          "cover_class": "unknown",
+          "cover_band": "50-75",
+          "quality": "ok",
+          "photo_height_cm": 32
+        },
+        {
+          "annotator": "annotator-b",
+          "cover_class": "unknown",
+          "cover_band": "25-50",
+          "quality": "limited",
+          "photo_height_cm": 33
+        }
+      ]
+    },
+    {
+      "observation_id": "sim-obs-12",
+      "cell_id": "SIM001:0:special",
+      "road_code": "SIM001",
+      "segment_index": 0,
+      "zone": "special",
+      "season": "dry",
+      "lighting": "sun",
+      "data_status": "simulated",
+      "campaign_id": "sim-rehearsal",
+      "protocol_version": "gt-protocol-0.1",
+      "consent_record_id": null,
+      "license_record_id": null,
+      "device_id": "sim-device",
+      "height_data_status": "simulated",
+      "height_cm": 20,
+      "field_height_cm": 20,
+      "annotations": [
+        {
+          "annotator": "annotator-a",
+          "cover_class": "grass_herbaceous",
+          "cover_band": "75-100",
+          "quality": "limited",
+          "photo_height_cm": 18
+        },
+        {
+          "annotator": "annotator-b",
+          "cover_class": "grass_herbaceous",
+          "cover_band": "25-50",
+          "quality": "ok",
+          "photo_height_cm": 17
+        }
+      ]
+    },
+    {
+      "observation_id": "sim-obs-13",
+      "cell_id": "SIM001:1:left",
+      "road_code": "SIM001",
+      "segment_index": 1,
+      "zone": "left",
+      "season": "wet",
+      "lighting": "sun",
+      "data_status": "simulated",
+      "campaign_id": "sim-rehearsal",
+      "protocol_version": "gt-protocol-0.1",
+      "consent_record_id": null,
+      "license_record_id": null,
+      "device_id": "sim-device",
+      "height_data_status": "simulated",
+      "height_cm": 39,
+      "field_height_cm": 39,
+      "annotations": [
+        {
+          "annotator": "annotator-a",
+          "cover_class": "grass_herbaceous",
+          "cover_band": "50-75",
+          "quality": "ok",
+          "photo_height_cm": 40
+        },
+        {
+          "annotator": "annotator-b",
+          "cover_class": "grass_herbaceous",
+          "cover_band": "50-75",
+          "quality": "ok",
+          "photo_height_cm": 37
+        }
+      ]
+    },
+    {
+      "observation_id": "sim-obs-14",
+      "cell_id": "SIM001:1:left",
+      "road_code": "SIM001",
+      "segment_index": 1,
+      "zone": "left",
+      "season": "dry",
+      "lighting": "sun",
+      "data_status": "simulated",
+      "campaign_id": "sim-rehearsal",
+      "protocol_version": "gt-protocol-0.1",
+      "consent_record_id": null,
+      "license_record_id": null,
+      "device_id": "sim-device",
+      "height_data_status": "simulated",
+      "height_cm": 27,
+      "field_height_cm": 27,
+      "annotations": [
+        {
+          "annotator": "annotator-a",
+          "cover_class": "mixed",
+          "cover_band": "10-25",
+          "quality": "limited",
+          "photo_height_cm": 22
+        },
+        {
+          "annotator": "annotator-b",
+          "cover_class": "tree",
+          "cover_band": "25-50",
+          "quality": "ok",
+          "photo_height_cm": 29
+        }
+      ]
+    },
+    {
+      "observation_id": "sim-obs-15",
+      "cell_id": "SIM001:1:left",
+      "road_code": "SIM001",
+      "segment_index": 1,
+      "zone": "left",
+      "season": "wet",
+      "lighting": "overcast",
+      "data_status": "simulated",
+      "campaign_id": "sim-rehearsal",
+      "protocol_version": "gt-protocol-0.1",
+      "consent_record_id": null,
+      "license_record_id": null,
+      "device_id": "sim-device",
+      "height_data_status": "simulated",
+      "height_cm": 16,
+      "field_height_cm": 16,
+      "annotations": [
+        {
+          "annotator": "annotator-a",
+          "cover_class": "grass_herbaceous",
+          "cover_band": "10-25",
+          "quality": "ok",
+          "photo_height_cm": 20
+        },
+        {
+          "annotator": "annotator-b",
+          "cover_class": "grass_herbaceous",
+          "cover_band": "10-25",
+          "quality": "ok",
+          "photo_height_cm": 18
+        }
+      ]
+    },
+    {
+      "observation_id": "sim-obs-16",
+      "cell_id": "SIM001:1:right",
+      "road_code": "SIM001",
+      "segment_index": 1,
+      "zone": "right",
+      "season": "dry",
+      "lighting": "sun",
+      "data_status": "simulated",
+      "campaign_id": "sim-rehearsal",
+      "protocol_version": "gt-protocol-0.1",
+      "consent_record_id": null,
+      "license_record_id": null,
+      "device_id": "sim-device",
+      "height_data_status": "simulated",
+      "height_cm": 36,
+      "field_height_cm": 36,
+      "annotations": [
+        {
+          "annotator": "annotator-a",
+          "cover_class": "mixed",
+          "cover_band": "50-75",
+          "quality": "limited",
+          "photo_height_cm": 36
+        },
+        {
+          "annotator": "annotator-b",
+          "cover_class": "mixed",
+          "cover_band": "25-50",
+          "quality": "ok",
+          "photo_height_cm": 33
+        }
+      ]
+    },
+    {
+      "observation_id": "sim-obs-17",
+      "cell_id": "SIM001:1:right",
+      "road_code": "SIM001",
+      "segment_index": 1,
+      "zone": "right",
+      "season": "wet",
+      "lighting": "sun",
+      "data_status": "simulated",
+      "campaign_id": "sim-rehearsal",
+      "protocol_version": "gt-protocol-0.1",
+      "consent_record_id": null,
+      "license_record_id": null,
+      "device_id": "sim-device",
+      "height_data_status": "simulated",
+      "height_cm": 34,
+      "field_height_cm": 34,
+      "annotations": [
+        {
+          "annotator": "annotator-a",
+          "cover_class": "shrub",
+          "cover_band": "50-75",
+          "quality": "ok",
+          "photo_height_cm": 28
+        },
+        {
+          "annotator": "annotator-b",
+          "cover_class": "shrub",
+          "cover_band": "50-75",
+          "quality": "ok",
+          "photo_height_cm": 41
+        }
+      ]
+    },
+    {
+      "observation_id": "sim-obs-18",
+      "cell_id": "SIM001:1:right",
+      "road_code": "SIM001",
+      "segment_index": 1,
+      "zone": "right",
+      "season": "dry",
+      "lighting": "sun",
+      "data_status": "simulated",
+      "campaign_id": "sim-rehearsal",
+      "protocol_version": "gt-protocol-0.1",
+      "consent_record_id": null,
+      "license_record_id": null,
+      "device_id": "sim-device",
+      "height_data_status": "simulated",
+      "height_cm": 11,
+      "field_height_cm": 11,
+      "annotations": [
+        {
+          "annotator": "annotator-a",
+          "cover_class": "grass_herbaceous",
+          "cover_band": "50-75",
+          "quality": "ok",
+          "photo_height_cm": null
+        },
+        {
+          "annotator": "annotator-b",
+          "cover_class": "grass_herbaceous",
+          "cover_band": "50-75",
+          "quality": "ok",
+          "photo_height_cm": 12
+        }
+      ]
+    },
+    {
+      "observation_id": "sim-obs-19",
+      "cell_id": "SIM001:1:median",
+      "road_code": "SIM001",
+      "segment_index": 1,
+      "zone": "median",
+      "season": "wet",
+      "lighting": "sun",
+      "data_status": "simulated",
+      "campaign_id": "sim-rehearsal",
+      "protocol_version": "gt-protocol-0.1",
+      "consent_record_id": null,
+      "license_record_id": null,
+      "device_id": "sim-device",
+      "height_data_status": "simulated",
+      "height_cm": 26,
+      "field_height_cm": 26,
+      "annotations": [
+        {
+          "annotator": "annotator-a",
+          "cover_class": "tree",
+          "cover_band": "50-75",
+          "quality": "limited",
+          "photo_height_cm": 26
+        },
+        {
+          "annotator": "annotator-b",
+          "cover_class": "tree",
+          "cover_band": "50-75",
+          "quality": "ok",
+          "photo_height_cm": 27
+        }
+      ]
+    },
+    {
+      "observation_id": "sim-obs-20",
+      "cell_id": "SIM001:1:median",
+      "road_code": "SIM001",
+      "segment_index": 1,
+      "zone": "median",
+      "season": "dry",
+      "lighting": "overcast",
+      "data_status": "simulated",
+      "campaign_id": "sim-rehearsal",
+      "protocol_version": "gt-protocol-0.1",
+      "consent_record_id": null,
+      "license_record_id": null,
+      "device_id": "sim-device",
+      "height_data_status": "simulated",
+      "height_cm": 31,
+      "field_height_cm": 31,
+      "annotations": [
+        {
+          "annotator": "annotator-a",
+          "cover_class": "unknown",
+          "cover_band": "50-75",
+          "quality": "ok",
+          "photo_height_cm": 31
+        },
+        {
+          "annotator": "annotator-b",
+          "cover_class": "unknown",
+          "cover_band": "50-75",
+          "quality": "ok",
+          "photo_height_cm": null
+        }
+      ]
+    },
+    {
+      "observation_id": "sim-obs-21",
+      "cell_id": "SIM001:1:median",
+      "road_code": "SIM001",
+      "segment_index": 1,
+      "zone": "median",
+      "season": "wet",
+      "lighting": "sun",
+      "data_status": "prepared",
+      "campaign_id": "sim-rehearsal",
+      "protocol_version": "gt-protocol-0.1",
+      "consent_record_id": null,
+      "license_record_id": null,
+      "device_id": "sim-device",
+      "height_data_status": "prepared",
+      "height_cm": 33,
+      "field_height_cm": 33,
+      "annotations": [
+        {
+          "annotator": "annotator-a",
+          "cover_class": "grass_herbaceous",
+          "cover_band": "25-50",
+          "quality": "ok",
+          "photo_height_cm": 30
+        },
+        {
+          "annotator": "annotator-b",
+          "cover_class": "grass_herbaceous",
+          "cover_band": "75-100",
+          "quality": "limited",
+          "photo_height_cm": 32
+        }
+      ]
+    },
+    {
+      "observation_id": "sim-obs-22",
+      "cell_id": "SIM001:1:special",
+      "road_code": "SIM001",
+      "segment_index": 1,
+      "zone": "special",
+      "season": "dry",
+      "lighting": "sun",
+      "data_status": "prepared",
+      "campaign_id": "sim-rehearsal",
+      "protocol_version": "gt-protocol-0.1",
+      "consent_record_id": null,
+      "license_record_id": null,
+      "device_id": "sim-device",
+      "height_data_status": "prepared",
+      "height_cm": 24,
+      "field_height_cm": 24,
+      "annotations": [
+        {
+          "annotator": "annotator-a",
+          "cover_class": "grass_herbaceous",
+          "cover_band": "25-50",
+          "quality": "ok",
+          "photo_height_cm": 22
+        },
+        {
+          "annotator": "annotator-b",
+          "cover_class": "grass_herbaceous",
+          "cover_band": "50-75",
+          "quality": "ok",
+          "photo_height_cm": 29
+        }
+      ]
+    },
+    {
+      "observation_id": "sim-obs-23",
+      "cell_id": "SIM001:1:special",
+      "road_code": "SIM001",
+      "segment_index": 1,
+      "zone": "special",
+      "season": "wet",
+      "lighting": "overcast",
+      "data_status": "prepared",
+      "campaign_id": "sim-rehearsal",
+      "protocol_version": "gt-protocol-0.1",
+      "consent_record_id": null,
+      "license_record_id": null,
+      "device_id": "sim-device",
+      "height_data_status": "prepared",
+      "height_cm": 43,
+      "field_height_cm": 43,
+      "annotations": [
+        {
+          "annotator": "annotator-a",
+          "cover_class": "shrub",
+          "cover_band": "10-25",
+          "quality": "ok",
+          "photo_height_cm": 47
+        },
+        {
+          "annotator": "annotator-b",
+          "cover_class": "shrub",
+          "cover_band": "25-50",
+          "quality": "ok",
+          "photo_height_cm": 42
+        }
+      ]
+    },
+    {
+      "observation_id": "sim-obs-24",
+      "cell_id": "SIM001:1:special",
+      "road_code": "SIM001",
+      "segment_index": 1,
+      "zone": "special",
+      "season": "dry",
+      "lighting": "overcast",
+      "data_status": "prepared",
+      "campaign_id": "sim-rehearsal",
+      "protocol_version": "gt-protocol-0.1",
+      "consent_record_id": null,
+      "license_record_id": null,
+      "device_id": "sim-device",
+      "height_data_status": "prepared",
+      "height_cm": 19,
+      "field_height_cm": 19,
+      "annotations": [
+        {
+          "annotator": "annotator-a",
+          "cover_class": "tree",
+          "cover_band": "50-75",
+          "quality": "ok",
+          "photo_height_cm": 17
+        },
+        {
+          "annotator": "annotator-b",
+          "cover_class": "shrub",
+          "cover_band": "25-50",
+          "quality": "ok",
+          "photo_height_cm": 19
+        }
+      ]
+    }
+  ]
+}

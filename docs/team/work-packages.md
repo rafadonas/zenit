@@ -161,6 +161,9 @@ Não adicionar serviço ou dependência sem aprovação.
 
 **Aceite:** revisão de especialista e data owner antes de virar schema oficial.
 
+**Proposta:** [`../data-quality/vegetation-cover-taxonomy.md`](../data-quality/vegetation-cover-taxonomy.md)
+(`proposed`; parecer de especialista e data owner pendente).
+
 ### GEO-002 — protocolo de ground truth (`READY` para desenho, P1)
 
 **Predecessor:** GEO-001.
@@ -170,6 +173,9 @@ anotação, adjudicação e privacidade.
 
 **Aceite:** piloto de anotação mede concordância; licença/consentimento e retenção
 documentados; dados demo excluídos.
+
+**Proposta:** [`../data-quality/ground-truth-protocol.md`](../data-quality/ground-truth-protocol.md)
+(`proposed`; aprovações e piloto pendentes).
 
 ### GEO-003 — contrato de cobertura vegetal (`BLOCKED`, P1)
 

@@ -24,20 +24,15 @@ e o que ainda precisa ser inspecionado?**
 
 ## Taxonomia candidata
 
-Precisa de validação por especialista antes de virar contrato:
+A proposta completa está em
+[`../data-quality/vegetation-cover-taxonomy.md`](../data-quality/vegetation-cover-taxonomy.md)
+(`GEO-001`, `cover-taxonomy-0.1`, status `proposed`). Ela define `unknown`,
+`grass_herbaceous`, `shrub`, `tree`, `mixed` e `non_vegetation` com exemplos de
+inclusão/exclusão, faixas de cobertura, dominância, estratos, oclusão, copa sobre a
+faixa e conflitos, e separa cobertura de altura e de decisão operacional.
 
-| Classe | Definição operacional candidata | Casos limítrofes |
-| --- | --- | --- |
-| `unknown` | evidência insuficiente/conflitante | sombra, blur, nuvem, oclusão |
-| `grass_herbaceous` | cobertura baixa sem estrutura lenhosa dominante visível | gramínea alta, forração |
-| `shrub` | vegetação lenhosa de porte arbustivo | muda, cerca viva, mistura |
-| `tree` | copa/tronco de indivíduo arbóreo ou dossel dominante | copa fora da faixa, palmeira |
-| `mixed` | mais de um tipo relevante sem dominância aceitável | árvore sobre gramínea |
-| `non_vegetation` | pavimento, solo, estrutura ou água | solo com rebrote mínimo |
-
-Além da classe, registrar cobertura percentual/faixa, visibilidade, oclusão,
-qualidade e relação espacial com left/right/median/special. Não derive N1/N2/N3 do
-tipo de cobertura.
+Precisa de parecer de especialista e data owner antes de virar contrato. Não
+derive N1/N2/N3 do tipo de cobertura.
 
 ## Fontes complementares
 
@@ -55,34 +50,15 @@ dado a revisar, não algo a esconder por média.
 
 ## Protocolo de aquisição e anotação
 
-### Amostragem
+O protocolo completo está em
+[`../data-quality/ground-truth-protocol.md`](../data-quality/ground-truth-protocol.md)
+(`GEO-002`, status `proposed`). Ele define amostragem estratificada por rodovia,
+zona, classe histórica e estação; instrumentos e definição única de altura;
+metadados obrigatórios de foto, escala, altura e GPS; dupla anotação,
+adjudicação e medição de concordância; aprovações de licença, consentimento,
+privacidade e retenção; e exclusão de dados demo/simulados.
 
-- estratificar por rodovia, zona, classe histórica, estação/clima, iluminação e
-  tipo de entorno;
-- evitar que frames vizinhos do mesmo local caiam em treino e teste;
-- reservar rodovias/trechos e períodos inteiros para holdout;
-- incluir casos difíceis e `unknown`, não apenas exemplos limpos;
-- registrar ausência de classe e motivo de descarte.
-
-### Foto de campo candidata
-
-- ponto planejado e identificador imutável;
-- data/hora e origem confiável;
-- GPS + precisão, quando autorizado;
-- direção/side/zone e enquadramento padronizados;
-- escala/régua visível sem cobrir a vegetação;
-- vista de contexto e vista de medição quando o protocolo exigir;
-- blur, exposição, oclusão e integridade avaliados antes de aceitar;
-- rostos, placas e dados pessoais tratados conforme política aprovada.
-
-### Anotação
-
-- manual ilustrado com exemplos aceitos/rejeitados;
-- dois anotadores independentes em amostra de calibração;
-- adjudicação por especialista em conflito;
-- classe, máscara/bbox conforme objetivo, cobertura, qualidade e razão de unknown;
-- versão de taxonomia e ferramenta;
-- concordância interanotador publicada com a versão do dataset.
+Nenhuma coleta real começa antes dos gates desse protocolo.
 
 ## Pipeline por maturidade
 

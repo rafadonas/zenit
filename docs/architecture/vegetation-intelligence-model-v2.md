@@ -400,6 +400,8 @@ snapshot multimodal.
 
 Classificação de `grass_herbaceous`, `shrub`, `tree`, `mixed`,
 `non_vegetation` e `unknown` depende de taxonomia aprovada e anotações próprias.
+A proposta está em
+[`../data-quality/vegetation-cover-taxonomy.md`](../data-quality/vegetation-cover-taxonomy.md).
 Não derivar tipo de cobertura de N1/N2/N3.
 
 Detecção de anomalia é um fluxo separado. Uma queda espectral pode significar
