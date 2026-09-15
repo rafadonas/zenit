@@ -122,7 +122,7 @@ The implemented migrations establish these principal groups:
 - simulated rehearsal events, post-service measurements/photos/reviews, summaries,
   exceptions, and exception reviews.
 
-Migrations are append-only and currently span `0001` through `0042`. Existing Docker
+Migrations are append-only and currently span `0001` through `0043`. Existing Docker
 volumes are not automatically migrated merely because a newer SQL file exists; apply
 only missing migrations using the documented controlled procedure.
 
@@ -195,14 +195,17 @@ is documented in [`docs/architecture/satellite-discovery.md`](../architecture/sa
 
 ### Planet
 
-Planet support is restricted to `PSScene` metadata discovery through the backend
-Data API boundary. The API key is a secret, sent only in an authorization header.
-The current CLI does not order, download, persist, tile, or analyze Planet imagery.
+Planet support is restricted to `PSScene` access through the backend Data and Orders
+API boundaries. The API key is a secret, sent only in authorization headers. The
+worker can execute one explicitly confirmed, bounded academic Order for the
+prepared pilot segment, clip it to the AOI, encrypt downloaded assets in local
+object storage, and retain checksums and lineage. It does not tile or analyze Planet
+imagery automatically, and the result remains non-operational.
 
-Future work must be split into account/catalog validation, persistence with an
-approved migration, quota accounting, Orders/downloads, checksums and lineage,
-controlled tile proxy/cache, and a small offline pilot. Catalog discovery alone does
-not consume authorization for later stages.
+The approved pilot uses one scene, the `analytic_udm2` bundle, an AOI of at most
+10,000 m², a 100 MiB byte cap, and a single Order. Catalog discovery, Order state,
+download receipts, checksums, and lineage remain separate evidence; none of them
+authorizes mowing or an official report.
 
 ## Security model
 

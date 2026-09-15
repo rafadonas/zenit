@@ -429,6 +429,17 @@ cd apps/mobile
   normalizados e checksummed no banco local. O comando não cria pedido, não
   baixa bytes e mantém `operationally_eligible=false`.
 
+- **Order Planet acadêmico limitado (`zenit-planet-order`)**:
+  ```bash
+  zenit-planet-order --execute
+  ```
+
+  Requer confirmação explícita. Seleciona uma cena com permissão de download
+  para o segmento preparado `SP021/195`, usa `analytic_udm2`, recorta a AOI
+  (máximo 10.000 m²), limita a 100 MiB e grava os três assets cifrados no bucket
+  local `zenit-raw`, com checksum e linhagem. Repetições reutilizam o mesmo
+  Order; o resultado continua não operacional.
+
 - **Renderizar prévia NDVI estática**:
   ```bash
   python scripts/render_cached_ndvi_preview.py
@@ -472,13 +483,14 @@ Ele é restrito à geometria preparada e não operacional. Leia
 [`docs/architecture/satellite-discovery.md`](docs/architecture/satellite-discovery.md)
 antes de alterar AOI ou período.
 
-A integração Planet está inicialmente limitada à descoberta de catálogo. Tiles,
-downloads e persistência exigem tickets separados para proteger a chave, a cota
-e a proveniência. Consulte o ADR-0067 e o guia de serviços externos.
+A integração Planet mantém descoberta, Order, download e processamento como
+etapas separadas. O único Order acadêmico aprovado é explicitamente limitado e
+não autoriza operação ou relatório oficial; tiles e processamento continuam
+fora deste escopo. Consulte o ADR-0067, o ADR-0078 e o guia de serviços externos.
 
 ## Banco de dados e migrações
 
-O banco atual exige as migrações `0001` a `0042`, sempre em ordem numérica. Um
+O banco atual exige as migrações `0001` a `0043`, sempre em ordem numérica. Um
 volume novo do Compose executa todas automaticamente por
 `/docker-entrypoint-initdb.d`. Volumes existentes não são atualizados por esse
 mecanismo.
@@ -510,6 +522,7 @@ As migrações preservam uma evolução append-only:
 - `0040`: contrato acadêmico de cobertura vegetal.
 - `0041`: persistência preparada e não operacional do catálogo Planet.
 - `0042`: invariantes do contrato de cobertura vegetal que mantêm GPS real
+- `0043`: Order Planet limitado, assets cifrados, checksums e linhagem
   bloqueado.
 
 Decisões detalhadas e invariantes de cada etapa estão em

@@ -67,6 +67,12 @@ class Settings(BaseSettings):
         max_length=63,
         pattern=r"^[a-z0-9][a-z0-9.-]*[a-z0-9]$",
     )
+    object_storage_bucket_raw: str = Field(
+        default="zenit-raw",
+        min_length=3,
+        max_length=63,
+        pattern=r"^[a-z0-9][a-z0-9.-]*[a-z0-9]$",
+    )
     object_storage_media_encryption_key: SecretStr = SecretStr(
         "ZGV2ZWxvcG1lbnQtb25seS0zMi1ieXRlLWtleSEhISE="
     )

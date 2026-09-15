@@ -1,6 +1,6 @@
 # ADR-0078: Planet Order and download gate
 
-- Status: proposed and blocked on project-owner inputs
+- Status: accepted for one bounded academic pilot
 - Date: 2026-09-15
 - Ticket: PLANET-004
 - Predecessors: ADR-0067, ADR-0075, ADR-0076, ADR-0077
@@ -13,29 +13,41 @@ Planet Orders still have product-bundle, delivery, area quota, licensing, and
 cost semantics that are not established by a catalog search. Creating an Order
 is an external write and may consume the shared account quota.
 
-## Gate before implementation
+## Approved pilot gate
 
-The project owner must record, in the ticket and a reviewed manifest:
+The project owner confirmed the following reviewed manifest for this pilot:
 
-1. the exact catalog scene(s) and product bundle/assets to request;
-2. the clipped AOI and maximum area/byte or cost budget;
-3. the academic license/consent and retention scope for downloaded bytes;
-4. the destination bucket/prefix, encryption, checksum and lineage policy; and
-5. explicit approval to create the Order in the shared Planet account.
+1. one download-permitted scene selected from the prepared `SP021` segment 195
+   search, with the lowest available cloud cover;
+2. `analytic_udm2`, yielding `ortho_analytic_4b`, its XML metadata, and
+   `ortho_udm2`;
+3. the buffered 100 m segment AOI, capped at 10,000 m² and 100 MiB;
+4. academic-only use, 30-day retention, and encrypted local `zenit-raw`
+   storage with SHA-256 checksums and order lineage; and
+5. explicit approval to create exactly one external Order, with no paid
+   acquisition permitted.
 
-Until these values exist, the worker may only build a dry-run payload and report
-that no Order/download was requested. It must not guess a bundle, fetch a
-download token, or mark any result operational.
+The worker refuses a missing `--execute` confirmation, a larger AOI or byte cap,
+an unprepared/operational segment, a second request checksum, or any result that
+does not contain the complete bundle. It never prints signed links or stores
+provider credentials.
 
 ## Planned safe workflow
 
-After the gate is recorded, a separate implementation should validate the
-selected item IDs and permission filter, create one bounded Order, poll its
-status with a timeout, download only the approved asset, stream it to the
-encrypted object store, verify a SHA-256 checksum, and persist an immutable
-manifest with provider, item, bundle, AOI, license, quota, timestamps and
-lineage. A failed/partial Order must remain visible and retryable without
-duplicating the request.
+The implementation validates the selected item and permission filter, creates
+one bounded Order, polls its status with a timeout, downloads only the approved
+assets, encrypts them in the local object store, verifies SHA-256 checksums, and
+persists an immutable event trail with provider, item, bundle, AOI, license,
+quota limits, timestamps, and lineage. A failed/partial Order remains visible
+and retryable without duplicating the request.
+
+The pilot completed on 2026-09-15 with Order
+`f830d7d4-b4fd-4b58-a0a8-d54898096d35` and scene
+`20260805_135356_12_253c`. It stored three encrypted assets (27,266 bytes in
+total) and marked the scene cache complete while keeping both operational and
+official-reporting eligibility false. The provider response included additional
+order metadata/manifest outputs; those were intentionally not persisted as
+satellite assets because they were outside the approved three-asset bundle.
 
 Even a successful download remains `real` provider evidence requiring quality
 checks; it does not measure height, create a vegetation label, authorize mowing,

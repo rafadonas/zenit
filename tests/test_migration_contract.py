@@ -92,6 +92,9 @@ VEGETATION_COVER_CONTRACT_MIGRATION = Path(
 PLANET_SCENE_PERSISTENCE_MIGRATION = Path(
     "infra/migrations/0041_planet_scene_persistence.sql"
 )
+PLANET_ORDER_DOWNLOAD_MIGRATION = Path(
+    "infra/migrations/0043_planet_order_download.sql"
+)
 VEGETATION_COVER_INVARIANTS_MIGRATION = Path(
     "infra/migrations/0042_vegetation_cover_contract_invariants.sql"
 )
@@ -200,12 +203,24 @@ class MigrationContractTests(unittest.TestCase):
         mounts = [
             line.strip() for line in compose.splitlines() if "/docker-entrypoint-initdb.d/" in line
         ]
-        self.assertEqual(len(mounts), 42)
+        self.assertEqual(len(mounts), 43)
         for version, mount in enumerate(mounts, start=1):
             prefix = f"{version:04d}"
             self.assertIn(f"infra/migrations/{prefix}_", mount)
             self.assertIn(f"/docker-entrypoint-initdb.d/{prefix}.sql:ro", mount)
             self.assertNotIn(".down.sql", mount)
+
+    def test_planet_order_download_is_bounded_and_lineage_is_append_only(self) -> None:
+        sql = PLANET_ORDER_DOWNLOAD_MIGRATION.read_text(encoding="utf-8")
+
+        self.assertIn("CREATE TABLE planet_order", sql)
+        self.assertIn("CREATE TABLE planet_order_event", sql)
+        self.assertIn("product_bundle text NOT NULL CHECK (product_bundle = 'analytic_udm2')", sql)
+        self.assertIn("aoi_area_m2 <= 10000.00", sql)
+        self.assertIn("max_bytes <= 104857600", sql)
+        self.assertIn("license_scope = 'academic-only'", sql)
+        self.assertIn("ADD COLUMN source_order_id uuid REFERENCES planet_order(id)", sql)
+        self.assertIn("planet_order_event_immutable", sql)
 
     def test_mowing_demo_lifecycle_is_simulated_sequenced_and_non_operational(self) -> None:
         sql = PREPARED_MOWING_DEMO_LIFECYCLE_MIGRATION.read_text(encoding="utf-8")
