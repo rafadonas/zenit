@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Annotated, Any, Literal, Protocol
+from typing import Annotated, Any, Literal, Protocol, Self
 from uuid import UUID
 
 import psycopg
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from zenit_api.auth import AuthenticatedUser, get_current_user
 from zenit_api.config import get_settings
@@ -45,7 +45,7 @@ ConfidenceBand = Literal["low", "medium", "high"]
 QualityStatus = Literal["accepted", "limited", "rejected"]
 ReviewState = Literal["pending", "accepted", "corrected", "rejected"]
 DataStatus = Literal["real", "estimated", "simulated", "prepared", "inconclusive"]
-GpsStatus = Literal["real", "simulated", "unavailable"]
+GpsStatus = Literal["simulated", "unavailable"]
 
 
 class VegetationCoverObservation(BaseModel):
@@ -81,6 +81,20 @@ class VegetationCoverObservation(BaseModel):
     reviewed_at: datetime | None
     created_at: datetime
     eligible_for_official_reporting: Literal[False] = False
+
+    @model_validator(mode="after")
+    def validate_draft_contract_invariants(self) -> Self:
+        if self.cover_type == "unknown" and self.unknown_reason is None:
+            raise ValueError("unknown cover type requires an unknown reason")
+        if self.cover_type not in {"unknown", "mixed"} and self.unknown_reason is not None:
+            raise ValueError("unknown reason is only valid for unknown or mixed cover")
+        if self.cover_type in {"unknown", "mixed"} and not (self.rationale or "").strip():
+            raise ValueError("unknown or mixed cover requires a rationale")
+        if self.cover_type_method == "model_estimated" and not (self.model_version or "").strip():
+            raise ValueError("model-estimated cover requires a model version")
+        if self.gps_accuracy_m is not None:
+            raise ValueError("GPS accuracy is unavailable in the draft GPS scope")
+        return self
 
 
 class VegetationCoverMetadata(BaseModel):

@@ -122,7 +122,7 @@ The implemented migrations establish these principal groups:
 - simulated rehearsal events, post-service measurements/photos/reviews, summaries,
   exceptions, and exception reviews.
 
-Migrations are append-only and currently span `0001` through `0041`. Existing Docker
+Migrations are append-only and currently span `0001` through `0043`. Existing Docker
 volumes are not automatically migrated merely because a newer SQL file exists; apply
 only missing migrations using the documented controlled procedure.
 

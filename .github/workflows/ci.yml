@@ -127,7 +127,8 @@ jobs:
                 AND to_regclass('public.prepared_mowing_post_service_exception') IS NOT NULL
                 AND to_regclass('public.prepared_mowing_post_service_exception_review') IS NOT NULL
                 AND to_regclass('public.authentication_login_throttle') IS NOT NULL
-                AND to_regclass('public.authentication_login_attempt') IS NOT NULL;" \
+                AND to_regclass('public.authentication_login_attempt') IS NOT NULL
+                AND to_regclass('public.vegetation_cover_observation') IS NOT NULL;" \
             | grep -qx t
           docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit -Atc \
             "SELECT postgis_typmod_type(a.atttypmod)
@@ -135,6 +136,11 @@ jobs:
                JOIN pg_class c ON c.oid = a.attrelid
               WHERE c.relname = 'satellite_scene' AND a.attname = 'footprint';" \
             | grep -qx MultiPolygon
+      - name: Verify vegetation-cover database invariants
+        run: |
+          docker compose exec -T postgres \
+            psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
+            < tests/sql/verify_vegetation_cover_contract.sql
       - name: Verify service contracts
         run: python scripts/verify_mvp_stack.py --expect-empty
       - name: Show service logs on failure

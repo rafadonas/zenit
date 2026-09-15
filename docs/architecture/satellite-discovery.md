@@ -49,7 +49,7 @@ never placed in a browser-facing tile URL.
   and UTC date window without requesting downloads.
 - Offline fixtures cover AOI/date filters, fractional cloud normalization,
   pagination host validation, and credential isolation.
-- Planet persistence uses migration `0041` for catalog metadata and `0042` for
+- Planet persistence uses migration `0041` for catalog metadata and `0043` for
   the bounded Order/download lineage.
 - Basemap discovery and tile proxy/cache remain future increments; the approved
   Planet Order path is implemented separately with bounded polling, encrypted

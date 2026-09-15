@@ -6202,7 +6202,6 @@
           },
           "gps_status": {
             "enum": [
-              "real",
               "simulated",
               "unavailable"
             ],

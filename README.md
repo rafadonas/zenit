@@ -490,7 +490,7 @@ fora deste escopo. Consulte o ADR-0067, o ADR-0078 e o guia de serviços externo
 
 ## Banco de dados e migrações
 
-O banco atual exige as migrações `0001` a `0042`, sempre em ordem numérica. Um
+O banco atual exige as migrações `0001` a `0043`, sempre em ordem numérica. Um
 volume novo do Compose executa todas automaticamente por
 `/docker-entrypoint-initdb.d`. Volumes existentes não são atualizados por esse
 mecanismo.
@@ -518,6 +518,12 @@ As migrações preservam uma evolução append-only:
 - `0028`–`0037`: ensaio simulado, medições, fotos, acesso, revisão, resumo,
   exportação, exceção pós-serviço e decisão humana da exceção.
 - `0038`: limitação persistente e auditada de tentativas de login local.
+- `0039`: sessões de autenticação persistentes e revogáveis.
+- `0040`: contrato acadêmico de cobertura vegetal.
+- `0041`: persistência preparada e não operacional do catálogo Planet.
+- `0042`: invariantes do contrato de cobertura vegetal que mantêm GPS real
+- `0043`: Order Planet limitado, assets cifrados, checksums e linhagem
+  bloqueado.
 
 Decisões detalhadas e invariantes de cada etapa estão em
 [`docs/decisions`](docs/decisions).
@@ -534,6 +540,7 @@ rotas abaixo usam o prefixo versionado `/v1`.
 | `GET /health` | Prontidão da API, PostgreSQL e MinIO; fila explicitamente ausente |
 | `GET /v1/roads/SP021/segments?...` | Segmentos GeoJSON por `bbox` |
 | `GET /v1/segments/{id}/satellite-observations` | Evidências persistidas do segmento |
+| `GET /v1/segments/{id}/vegetation-cover` | Cobertura vegetal versionada e não operacional |
 | `POST /v1/analysis/preview` | Prévia não persistente do baseline |
 | `GET /v1/recommendations` | Fila de recomendações |
 
