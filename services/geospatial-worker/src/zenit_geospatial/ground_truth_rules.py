@@ -133,10 +133,11 @@ class AdjudicationTrigger(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class AdjudicationPolicy:
-    # Academic assumptions from protocol section 7.3; cover bands await the annotation guide.
+    # Academic assumptions: tolerance from protocol section 7.3, cover bands from the
+    # GEO-001 cover taxonomy section 4.1 (share of the annotated unit).
     height_tolerance_cm: float = 5.0
     thresholds_cm: tuple[float, ...] = (10.0, 30.0)
-    cover_bands: tuple[str, ...] = ("0-25", "25-50", "50-75", "75-100")
+    cover_bands: tuple[str, ...] = ("0", "1-10", "10-25", "25-50", "50-75", "75-100")
 
 
 def _crosses(first: float, second: float, thresholds: tuple[float, ...]) -> bool:

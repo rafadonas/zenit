@@ -464,7 +464,7 @@
         {
           "annotator": "annotator-a",
           "cover_class": "mixed",
-          "cover_band": "0-25",
+          "cover_band": "10-25",
           "quality": "limited",
           "photo_height_cm": 22
         },
@@ -498,14 +498,14 @@
         {
           "annotator": "annotator-a",
           "cover_class": "grass_herbaceous",
-          "cover_band": "0-25",
+          "cover_band": "10-25",
           "quality": "ok",
           "photo_height_cm": 20
         },
         {
           "annotator": "annotator-b",
           "cover_class": "grass_herbaceous",
-          "cover_band": "0-25",
+          "cover_band": "10-25",
           "quality": "ok",
           "photo_height_cm": 18
         }
@@ -770,7 +770,7 @@
         {
           "annotator": "annotator-a",
           "cover_class": "shrub",
-          "cover_band": "0-25",
+          "cover_band": "10-25",
           "quality": "ok",
           "photo_height_cm": 47
         },

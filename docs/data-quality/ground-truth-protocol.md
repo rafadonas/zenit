@@ -193,12 +193,12 @@ requisitos para `GEO-003` e `MOB-005` e não alteram schema neste ticket.
 
 | Alvo | Valores | Observação |
 | --- | --- | --- |
-| classe de cobertura | taxonomia `GEO-001` (candidata: `unknown`, `grass_herbaceous`, `shrub`, `tree`, `mixed`, `non_vegetation`) | até aprovação, versão `taxonomy-candidate-0` |
-| cobertura | faixa percentual por classe no quadrado | faixas fixadas no guia de anotação |
+| classe de cobertura | `unknown`, `grass_herbaceous`, `shrub`, `tree`, `mixed`, `non_vegetation`, com dominância e secundárias | taxonomia `cover-taxonomy-0.1` (`GEO-001`, `docs/data-quality/vegetation-cover-taxonomy.md`); `proposed` até parecer |
+| cobertura | faixa por classe no quadrado: `0`, `1-10`, `10-25`, `25-50`, `50-75`, `75-100` | fração da unidade, seção 4.1 da taxonomia |
 | oclusão e qualidade | `ok`, `limited`, `rejected` | com motivo |
-| motivo de `unknown` | lista fechada (sombra, blur, oclusão, conflito, fora de escala) | obrigatório quando a classe for `unknown` |
+| motivo de `unknown` | lista fechada da seção 3.7 da taxonomia (`shadow`, `blur`, `occlusion`, `cloud`, `resolution`, `out_of_frame`, `source_conflict`, `annotator_conflict`, `understory_not_observable`, `other`) | obrigatório quando a classe for `unknown` |
 | leitura de altura na foto | cm ou `not_readable` | **controle de qualidade** da medição de campo, não substitui `height_cm` |
-| relação espacial | dentro da zona, copa sobre a zona, fora da zona | conforme regras de oclusão do `GEO-001` |
+| estratos e copa | `understory_class`, `canopy_overhang`, `trunk_location` | seção 5 da taxonomia |
 
 `unknown` é um rótulo de anotação válido e deve aparecer no dataset. Ele não se
 confunde com `data_status = inconclusive`, que torna a observação inelegível.
@@ -363,7 +363,7 @@ Cada manifesto de campanha e de dataset registra:
 - homologação da AOI, eixo e zonas (`GOV-003`);
 - taxonomia de cobertura e regras de oclusão (`GEO-001`);
 - definição e ilustração finais de altura;
-- faixas de cobertura e ferramenta de anotação;
+- ferramenta de anotação e parecer sobre as faixas e limiares da taxonomia;
 - número de pontos por célula após a dispersão observada no piloto;
 - limite de precisão GNSS, tolerância de 5 cm e gate de κ;
 - prazos de retenção, legal hold e responsáveis de privacidade, dados e segurança;

@@ -137,7 +137,7 @@ def test_matching_annotations_within_tolerance_need_no_adjudication() -> None:
     ("second", "field", "expected"),
     [
         ({"cover_class": "shrub"}, None, (AdjudicationTrigger.CLASS_MISMATCH,)),
-        ({"cover_band": "0-25"}, None, (AdjudicationTrigger.COVER_BAND_NOT_ADJACENT,)),
+        ({"cover_band": "10-25"}, None, (AdjudicationTrigger.COVER_BAND_NOT_ADJACENT,)),
         ({"quality": "rejected"}, None, (AdjudicationTrigger.QUALITY_REJECTED,)),
         (
             {"photo_height_cm": None},
