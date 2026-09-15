@@ -341,6 +341,9 @@ def _safe_state(response: Mapping[str, Any], *, default: str) -> str:
 
 def _result_count(response: Mapping[str, Any]) -> int:
     results = response.get("results")
+    if results is None:
+        links = response.get("_links")
+        results = links.get("results") if isinstance(links, Mapping) else None
     return len(results) if isinstance(results, list) else 0
 
 

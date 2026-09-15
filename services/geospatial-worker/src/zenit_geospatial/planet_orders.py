@@ -132,6 +132,9 @@ def order_state(response: Mapping[str, Any]) -> str:
 
 def order_results(response: Mapping[str, Any]) -> tuple[OrderResult, ...]:
     raw_results = response.get("results")
+    if raw_results is None:
+        links = response.get("_links")
+        raw_results = links.get("results") if isinstance(links, Mapping) else None
     if not isinstance(raw_results, list):
         raise PlanetOrderError("Planet Order response has no results array")
     results: list[OrderResult] = []
@@ -156,11 +159,11 @@ def asset_role(name: str) -> str:
     """Map Planet's result path to the stable role used in satellite_asset."""
 
     normalized = name.casefold()
-    if "ortho_analytic_4b_xml" in normalized:
+    if "ortho_analytic_4b_xml" in normalized or "analyticms_metadata" in normalized:
         return "ortho_analytic_4b_xml"
-    if "ortho_analytic_4b" in normalized:
+    if "ortho_analytic_4b" in normalized or "analyticms" in normalized:
         return "ortho_analytic_4b"
-    if "ortho_udm2" in normalized:
+    if "ortho_udm2" in normalized or "_udm2" in normalized:
         return "ortho_udm2"
     return "planet_order_result"
 

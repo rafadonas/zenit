@@ -85,15 +85,15 @@ class PlanetOrderTests(unittest.TestCase):
     def test_result_roles_and_bundle_media_types_are_stable(self) -> None:
         results = order_results(
             {
-                "results": [
+                "_links": {"results": [
                     {
                         "delivery": "success",
-                        "name": "scene_ortho_analytic_4b.tif",
+                        "name": "scene_3B_AnalyticMS_clip.tif",
                         "location": "https://api.planet.com/compute/ops/download/?token=x",
                     },
                     {
                         "delivery": "success",
-                        "name": "scene_ortho_analytic_4b_xml.xml",
+                        "name": "scene_3B_AnalyticMS_metadata_clip.xml",
                         "location": "https://api.planet.com/compute/ops/download/?token=y",
                     },
                     {
@@ -101,12 +101,12 @@ class PlanetOrderTests(unittest.TestCase):
                         "name": "scene_ortho_udm2.tif",
                         "location": "https://api.planet.com/compute/ops/download/?token=z",
                     },
-                ]
+                ]}
             }
         )
 
         self.assertEqual({item.asset_role for item in results}, EXPECTED_ANALYTIC_UDM2_ASSETS)
-        self.assertEqual(asset_role("scene_ortho_udm2.tif"), "ortho_udm2")
+        self.assertEqual(asset_role("scene_3B_udm2_clip.tif"), "ortho_udm2")
         self.assertEqual(media_type("application/octet-stream", "x.xml"), "application/xml")
 
     def test_result_rejects_untrusted_download_location(self) -> None:
@@ -122,4 +122,3 @@ class PlanetOrderTests(unittest.TestCase):
                     ]
                 }
             )
-

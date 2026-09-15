@@ -41,6 +41,14 @@ persists an immutable event trail with provider, item, bundle, AOI, license,
 quota limits, timestamps, and lineage. A failed/partial Order remains visible
 and retryable without duplicating the request.
 
+The pilot completed on 2026-09-15 with Order
+`f830d7d4-b4fd-4b58-a0a8-d54898096d35` and scene
+`20260805_135356_12_253c`. It stored three encrypted assets (27,266 bytes in
+total) and marked the scene cache complete while keeping both operational and
+official-reporting eligibility false. The provider response included additional
+order metadata/manifest outputs; those were intentionally not persisted as
+satellite assets because they were outside the approved three-asset bundle.
+
 Even a successful download remains `real` provider evidence requiring quality
 checks; it does not measure height, create a vegetation label, authorize mowing,
 or make the estimated road axis operational.
