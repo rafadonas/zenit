@@ -416,6 +416,19 @@ cd apps/mobile
   recorte escolhido. Não cria Order, não baixa bytes e não habilita operação;
   produto, licença, cota e checksum ainda exigem tickets próprios.
 
+- **Persistência de metadados Planet (`zenit-planet-persist`)**:
+  ```bash
+  zenit-planet-persist \
+    --bbox -46.80 -23.55 -46.76 -23.50 \
+    --from-date 2026-08-01 \
+    --to-date 2026-08-07 \
+    --persist
+  ```
+
+  O `--persist` é uma confirmação explícita para registrar somente metadados
+  normalizados e checksummed no banco local. O comando não cria pedido, não
+  baixa bytes e mantém `operationally_eligible=false`.
+
 - **Renderizar prévia NDVI estática**:
   ```bash
   python scripts/render_cached_ndvi_preview.py
@@ -465,7 +478,7 @@ e a proveniência. Consulte o ADR-0067 e o guia de serviços externos.
 
 ## Banco de dados e migrações
 
-O banco atual exige as migrações `0001` a `0039`, sempre em ordem numérica. Um
+O banco atual exige as migrações `0001` a `0041`, sempre em ordem numérica. Um
 volume novo do Compose executa todas automaticamente por
 `/docker-entrypoint-initdb.d`. Volumes existentes não são atualizados por esse
 mecanismo.
