@@ -67,6 +67,11 @@ non-operational. A bounded validation on 2026-09-15 persisted 13 scenes on the
 first run and 13 existing scenes on an immediate repeat; all 13 remain
 `cached_at=NULL`.
 
+`PLANET-004` remains blocked until the owner records the exact scene IDs,
+product bundle/assets, clipped AOI, area/byte or cost budget, academic license,
+retention/destination, and explicit approval to create an external Order. A
+catalog key and `assets:download` result do not satisfy those gates.
+
 ### PLANET-001 validation
 
 On 2026-09-15 the backend-only catalog flow successfully authenticated against
