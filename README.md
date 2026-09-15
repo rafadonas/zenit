@@ -404,6 +404,14 @@ cd apps/mobile
   não cria pedido, não baixa cena e sempre informa
   `operationally_eligible=false`.
 
+- **Ferramentas de ground truth (`zenit-ground-truth`)** — plano de amostragem,
+  elegibilidade e relatório de concordância da
+  [especificação GEO-002](docs/data-quality/ground-truth-protocol.md#12-ferramentas):
+  ```bash
+  source .venv/bin/activate
+  zenit-ground-truth report --annotations tests/fixtures/ground_truth/observations_simulated.json
+  ```
+
 - **Validação de permissão Planet sem pedido (`zenit-planet-capabilities`)**:
   ```bash
   zenit-planet-capabilities \
