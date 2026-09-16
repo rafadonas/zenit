@@ -1,4 +1,11 @@
 import { CorridorDashboard } from "../components/corridor-dashboard";
+import {
+  CORRIDOR_DEMO_HREF,
+  CORRIDOR_DEMO_QUERY,
+  corridorDemoEnabled,
+  demoSegments,
+  demoVegetation,
+} from "../lib/corridor-demo";
 import { isSegmentCollection, type SegmentCollection } from "../lib/segments";
 import {
   isVegetationMapCollection,
@@ -53,7 +60,7 @@ async function loadVegetationMap(): Promise<VegetationMapCollection> {
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ segment?: string | string[] }>;
+  searchParams: Promise<{ segment?: string | string[]; demo?: string | string[] }>;
 }) {
   const params = await searchParams;
   const rawSegment = Array.isArray(params.segment) ? params.segment[0] : params.segment;
@@ -62,10 +69,15 @@ export default async function Home({
     parsedSegment !== null && Number.isInteger(parsedSegment) && parsedSegment >= 0
       ? parsedSegment
       : null;
-  const [segments, vegetationMap] = await Promise.all([loadSegments(), loadVegetationMap()]);
+  const demoAvailable = corridorDemoEnabled(process.env);
+  const useDemo = demoAvailable && params.demo === CORRIDOR_DEMO_QUERY;
+  const [segments, vegetationMap] = useDemo
+    ? [demoSegments, demoVegetation]
+    : await Promise.all([loadSegments(), loadVegetationMap()]);
   return (
     <CorridorDashboard
       collection={segments}
+      demoHref={demoAvailable ? CORRIDOR_DEMO_HREF : undefined}
       initialSegmentIndex={initialSegmentIndex}
       mapTileUrl={process.env.MAP_TILE_URL ?? "https://tile.openstreetmap.org/{z}/{x}/{y}.png"}
       vegetationMap={vegetationMap}

@@ -167,6 +167,13 @@ vigente exigir.
 É suficiente para CI, healthchecks, autenticação negativa e renderização básica.
 Não precisa dos documentos brutos nem de provedor satelital.
 
+Para testar o mapa sem os arquivos originais, abra
+`http://localhost:3000/corridor?demo=gov-001` ou use o link de demonstração
+na tela de mapa vazio. Os oito trechos e quatro polígonos são **simulados**,
+recuperados do inventário visual GOV-001, com distâncias fictícias. Esse modo
+local não grava no banco nem substitui erros da API automaticamente. Consulte a
+[proveniência e os limites](../data-quality/recovered-gov-001-corridor.md).
+
 ### B. Desenvolvimento com fontes locais
 
 Coloque os arquivos fornecidos sob `data/raw/` sem renomear/substituir e nunca os

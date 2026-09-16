@@ -9,6 +9,7 @@ import {
   NavigationControl,
   Popup,
   ScaleControl,
+  setWorkerUrl,
   type GeoJSONSource,
   type MapLayerMouseEvent,
   type StyleSpecification,
@@ -111,6 +112,7 @@ export function RealisticCorridorMap({
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
 
+    setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
     const map = new MapLibreMap({
       attributionControl: false,
       center: [-46.78, -23.52],
@@ -144,9 +146,11 @@ export function RealisticCorridorMap({
       const title = document.createElement("strong");
       title.textContent = vegetationClassLabel(vegetationClass);
       const detail = document.createElement("span");
-      detail.textContent = `Trecho #${properties?.segment_index} · referência 28/03/2025`;
+      detail.textContent = `Trecho #${properties?.segment_index} · ${collection.metadata.is_simulated === true ? "simulação visual" : "referência 28/03/2025"}`;
       const warning = document.createElement("small");
-      warning.textContent = "Associação histórica inferida · não representa condição atual";
+      warning.textContent = collection.metadata.is_simulated === true
+        ? "Classe e geometria fictícias · não representa condição atual"
+        : "Associação histórica inferida · não representa condição atual";
       content.append(title, detail, warning);
       new Popup({ closeButton: true, closeOnClick: true, offset: 8 })
         .setLngLat(event.lngLat)
@@ -291,7 +295,7 @@ export function RealisticCorridorMap({
           <strong>{mapStatus === "loading" ? "Carregando mapa" : "Mapa-base indisponível"}</strong>
           <small>
             {mapStatus === "loading"
-              ? "Preparando ruas, segmentos e áreas históricas de vegetação."
+              ? (collection.metadata.is_simulated === true ? "Preparando mapa demonstrativo com dados simulados." : "Preparando ruas, segmentos e áreas históricas de vegetação.")
               : "A lista equivalente, filtros e detalhes continuam disponíveis sem os tiles."}
           </small>
         </div>

@@ -24,6 +24,7 @@ node_modules/
 .next/
 *.tsbuildinfo
 coverage/
+apps/dashboard/public/maplibre/
 
 # Local source documents
 ZENIT_Manual_Mestre_para_Codex.pdf

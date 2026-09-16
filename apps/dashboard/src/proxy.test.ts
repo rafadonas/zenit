@@ -1,13 +1,21 @@
 import { NextRequest } from "next/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { proxy } from "./proxy";
+import { config, proxy } from "./proxy";
 
 afterEach(() => {
   vi.unstubAllEnvs();
 });
 
 describe("fixed dashboard proxy", () => {
+  it("serves map worker assets without redirecting them while retaining page authentication", () => {
+    const matcher = new RegExp(`^${config.matcher[0]}$`);
+    expect(matcher.test("/maplibre/maplibre-gl-worker.mjs")).toBe(false);
+    expect(matcher.test("/maplibre/maplibre-gl-shared.mjs")).toBe(false);
+    expect(matcher.test("/corridor")).toBe(true);
+    expect(matcher.test("/recommendations")).toBe(true);
+  });
+
   it("sends the root of a manager dashboard to the simplified overview", () => {
     vi.stubEnv("DASHBOARD_APP_ENV", "test");
     vi.stubEnv("DASHBOARD_FIXED_USER_EMAIL", "manager@example.com");

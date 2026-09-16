@@ -25,6 +25,7 @@ ENV NODE_ENV=production \
 RUN addgroup --system zenit && adduser --system --ingroup zenit zenit
 COPY --from=builder --chown=zenit:zenit /app/apps/dashboard/.next/standalone ./
 COPY --from=builder --chown=zenit:zenit /app/apps/dashboard/.next/static ./apps/dashboard/.next/static
+COPY --from=builder --chown=zenit:zenit /app/apps/dashboard/public ./apps/dashboard/public
 
 USER zenit
 EXPOSE 3000

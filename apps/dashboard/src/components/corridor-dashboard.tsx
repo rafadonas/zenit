@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { DashboardHeader } from "./dashboard-header";
@@ -28,12 +29,13 @@ import { vegetationClassLabel, type VegetationClass } from "../lib/vegetation-ma
 
 interface CorridorDashboardProps {
   collection: SegmentCollection;
+  demoHref?: string;
   initialSegmentIndex?: number | null;
   mapTileUrl: string;
   vegetationMap: VegetationMapCollection;
 }
 
-function SegmentDetails({ segment }: { segment: SegmentProperties | null }) {
+function SegmentDetails({ segment, isDemo }: { segment: SegmentProperties | null; isDemo: boolean }) {
   if (!segment) {
     return (
       <div className="empty-selection">
@@ -49,18 +51,18 @@ function SegmentDetails({ segment }: { segment: SegmentProperties | null }) {
         <dd>#{segment.segment_index.toString().padStart(3, "0")}</dd>
       </div>
       <div>
-        <dt>Extensão geométrica</dt>
+        <dt>{isDemo ? "Extensão fictícia" : "Extensão geométrica"}</dt>
         <dd>{formatDistance(segment.end_distance_m - segment.start_distance_m)}</dd>
       </div>
       <div>
-        <dt>Posição no eixo estimado</dt>
+        <dt>{isDemo ? "Posição fictícia" : "Posição no eixo estimado"}</dt>
         <dd>
           {formatDistance(segment.start_distance_m)} – {formatDistance(segment.end_distance_m)}
         </dd>
       </div>
       <div>
         <dt>Origem</dt>
-        <dd><span className="status-pill estimated">Estimado</span></dd>
+        <dd><span className="status-pill estimated">{isDemo ? "Simulado" : "Estimado"}</span></dd>
       </div>
       <div>
         <dt>Validação</dt>
@@ -212,10 +214,12 @@ function SatelliteEvidence({
 
 export function CorridorDashboard({
   collection,
+  demoHref,
   initialSegmentIndex = null,
   mapTileUrl,
   vegetationMap,
 }: CorridorDashboardProps) {
+  const isDemo = collection.metadata.is_simulated === true;
   const initialSelectedId =
     initialSegmentIndex === null
       ? null
@@ -265,7 +269,9 @@ export function CorridorDashboard({
     setSegmentSearch(String(segmentIndex));
     setSearchError(null);
     setNdviVisible(false);
-    window.history.replaceState(null, "", `/corridor?segment=${segmentIndex}`);
+    const search = new URLSearchParams({ segment: String(segmentIndex) });
+    if (isDemo) search.set("demo", "gov-001");
+    window.history.replaceState(null, "", `/corridor?${search}`);
     if (focus) {
       requestAnimationFrame(() => document.getElementById("segment-details-heading")?.focus());
     }
@@ -313,29 +319,30 @@ export function CorridorDashboard({
     >
       <DashboardHeader
         active="corridor"
-        context={{ label: "Geometria", value: "candidata v1" }}
+        context={{ label: "Geometria", value: isDemo ? "Simulada · GOV-001" : "candidata v1" }}
       />
 
       <section className="hero-row">
         <div>
           <p className="eyebrow">Visão do corredor</p>
-          <h1>Rodoanel Oeste</h1>
-          <p className="subtitle">Segmentação geométrica para validação técnica</p>
+          <h1>{isDemo ? "Mapa demonstrativo · SP021" : "Rodoanel Oeste"}</h1>
+          <p className="subtitle">{isDemo ? "Dados simulados do inventário visual de 14/09/2026" : "Segmentação geométrica para validação técnica"}</p>
         </div>
         <div className="warning-banner" role="status">
           <span className="warning-icon" aria-hidden="true">!</span>
           <div>
-            <strong>Eixo estimado — uso operacional bloqueado</strong>
-            <span>Marcos KM apresentam inversões e lacunas. Não usar para ordens ou geofence.</span>
+            <strong>{isDemo ? "Simulação · uso operacional bloqueado" : "Eixo estimado — uso operacional bloqueado"}</strong>
+            <span>{isDemo ? "Geometria, distâncias e classes fictícias. Sem uso em campo, treinamento ou relatório oficial." : "Marcos KM apresentam inversões e lacunas. Não usar para ordens ou geofence."}</span>
+            {isDemo ? <Link href="/corridor">Voltar aos dados da API</Link> : null}
           </div>
         </div>
       </section>
 
       <section className="kpi-grid" aria-label="Indicadores do corredor">
         <article><span>Segmentos</span><strong>{collection.features.length}</strong><small>unidades geométricas</small></article>
-        <article><span>Extensão candidata</span><strong>{formatDistance(totalDistance)}</strong><small>não é KM oficial</small></article>
+        <article><span>{isDemo ? "Extensão fictícia" : "Extensão candidata"}</span><strong>{formatDistance(totalDistance)}</strong><small>não é KM oficial</small></article>
         <article><span>Trechos operacionais</span><strong>0</strong><small>validação necessária</small></article>
-        <article><span>CRS métrico</span><strong>31983</strong><small>SIRGAS 2000 / UTM 23S</small></article>
+        <article><span>{isDemo ? "CRS da geometria" : "CRS métrico"}</span><strong>{isDemo ? "4326" : "31983"}</strong><small>{isDemo ? "WGS 84 · coordenadas fictícias" : "SIRGAS 2000 / UTM 23S"}</small></article>
       </section>
 
       <section className="workspace-grid">
@@ -350,7 +357,7 @@ export function CorridorDashboard({
                     id="segment-search"
                     inputMode="search"
                     onChange={(event) => setSegmentSearch(event.target.value)}
-                    placeholder="SP021 km 12,4"
+                    placeholder={isDemo ? "SP021 trecho 3" : "SP021 km 12,4"}
                     type="search"
                     value={segmentSearch}
                   />
@@ -359,7 +366,7 @@ export function CorridorDashboard({
                 {searchError ? <span role="alert">{searchError}</span> : null}
               </form>
               <label className="map-filter">
-                <span>Classe histórica</span>
+                <span>{isDemo ? "Classe simulada" : "Classe histórica"}</span>
                 <select
                   onChange={(event) => setClassFilter(event.target.value as VegetationClass | "all")}
                   value={classFilter}
@@ -372,12 +379,17 @@ export function CorridorDashboard({
                   <option value="unknown">Sem classe</option>
                 </select>
               </label>
-              <div className="map-meta"><span>EPSG:4326</span><span>100 m por trecho</span></div>
+              <div className="map-meta"><span>EPSG:4326</span><span>{isDemo ? "100 m fictícios por trecho" : "100 m por trecho"}</span></div>
             </div>
           </div>
 
           {collection.features.length === 0 ? (
-            <div className="map-empty"><p>Nenhum segmento encontrado nesta área.</p></div>
+            <div className="map-empty">
+              <div>
+                <p>Nenhum segmento encontrado nesta área.</p>
+                {demoHref ? <Link href={demoHref}>Abrir mapa demonstrativo (dados simulados)</Link> : null}
+              </div>
+            </div>
           ) : (
             <div className="map-frame">
               <RealisticCorridorMap
@@ -406,19 +418,19 @@ export function CorridorDashboard({
                 </div>
               ) : null}
               <div className="vegetation-map-legend" aria-label="Legenda da vegetação">
-                <strong>Vegetação · histórico</strong>
+                <strong>{isDemo ? "Vegetação · simulada" : "Vegetação · histórico"}</strong>
                 <span><i className="vegetation-swatch n1" /> N1 · abaixo de 10 cm</span>
                 <span><i className="vegetation-swatch n2" /> N2 · 10 a 30 cm</span>
                 <span><i className="vegetation-swatch n3" /> N3 · acima de 30 cm</span>
                 <span><i className="vegetation-swatch unknown" /> Sem classe / não aplicável</span>
-                <small>Referência 28/03/2025 · associação espacial inferida</small>
+                <small>{isDemo ? "Classes fictícias · não são medições" : "Referência 28/03/2025 · associação espacial inferida"}</small>
               </div>
             </div>
           )}
           <section className="segment-equivalent-list" aria-labelledby="segment-list-heading">
             <div>
               <h3 id="segment-list-heading">Lista equivalente ao mapa</h3>
-              <span>{collection.features.length} trecho(s) · {filteredVegetationMap.features.length} polígono(s) histórico(s)</span>
+              <span>{collection.features.length} trecho(s) · {filteredVegetationMap.features.length} polígono(s) {isDemo ? "simulado(s)" : "histórico(s)"}</span>
             </div>
             <ol>
               {collection.features.map((feature) => {
@@ -426,7 +438,7 @@ export function CorridorDashboard({
                 const classes = classesBySegment.get(segment.segment_index);
                 const classLabel = classes && classes.size > 0
                   ? [...classes].map(vegetationClassLabel).join(", ")
-                  : "Sem classe histórica filtrada";
+                  : isDemo ? "Sem classe simulada filtrada" : "Sem classe histórica filtrada";
                 return (
                   <li key={segment.segment_id}>
                     <button
@@ -436,7 +448,7 @@ export function CorridorDashboard({
                     >
                       <strong>Trecho #{segment.segment_index.toString().padStart(3, "0")}</strong>
                       <span>{formatDistance(segment.start_distance_m)} – {formatDistance(segment.end_distance_m)}</span>
-                      <small>{classLabel} · referência histórica 28/03/2025</small>
+                      <small>{classLabel} · {isDemo ? "simulação visual" : "referência histórica 28/03/2025"}</small>
                     </button>
                   </li>
                 );
@@ -444,8 +456,8 @@ export function CorridorDashboard({
             </ol>
           </section>
           <footer className="map-footer">
-            <span>Mapa © OpenStreetMap · polígonos do KMZ fornecido</span>
-            <span>Classificação histórica: 28/03/2025 · não representa condição atual</span>
+            <span>{isDemo ? "Mapa © OpenStreetMap · polígonos fictícios GOV-001" : "Mapa © OpenStreetMap · polígonos do KMZ fornecido"}</span>
+            <span>{isDemo ? "Classificação simulada · não representa condição atual" : "Classificação histórica: 28/03/2025 · não representa condição atual"}</span>
           </footer>
         </article>
 
@@ -454,15 +466,15 @@ export function CorridorDashboard({
             <p className="eyebrow">Inspeção</p>
             <h2 id="segment-details-heading" tabIndex={-1}>Detalhes do trecho</h2>
           </div>
-          <SegmentDetails segment={selected} />
-          <SatelliteEvidence
+          <SegmentDetails isDemo={isDemo} segment={selected} />
+          {!isDemo ? <SatelliteEvidence
             ndviVisible={ndviVisible}
             onNdviVisibilityChange={setNdviVisible}
             segmentId={selectedId}
-          />
+          /> : null}
           <div className="quality-note">
             <span aria-hidden="true">i</span>
-            <div><strong>Sobre esta camada</strong><p>Distâncias seguem a linha candidata de 30,85 km. A fonte não contém eixo rodoviário oficial.</p></div>
+            <div><strong>Sobre esta camada</strong><p>{isDemo ? "Oito trechos e quatro polígonos recuperados do teste visual GOV-001. Coordenadas e distâncias são fictícias e não seguem o traçado real da rodovia." : "Distâncias seguem a linha candidata de 30,85 km. A fonte não contém eixo rodoviário oficial."}</p></div>
           </div>
         </aside>
       </section>

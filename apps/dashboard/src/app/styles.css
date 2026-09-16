@@ -409,7 +409,7 @@ h1 { margin-bottom: 8px; font: 600 clamp(2.1rem, 4vw, 3.2rem)/1 Georgia, serif; 
   .kpi-grid article:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
   .map-frame { min-height: 520px; height: 62vh; }
   .card-heading { align-items: stretch; flex-direction: column; }
-  .map-tools { justify-content: space-between; }
+  .map-tools { justify-content: space-between; flex-wrap: wrap; }
   .map-meta, .map-footer span:last-child { display: none; }
   .vegetation-map-legend { top: 10px; bottom: auto; left: 10px; min-width: 190px; padding: 10px 11px; }
   .vegetation-map-legend span { font-size: .61rem; }
