@@ -350,7 +350,9 @@ no Order; faltam os valores aprovados do orçamento e a revisão da migração.
 
 ### PLANET-006 — proxy e cache controlado de tiles (`BLOCKED`, P2)
 
-**Predecessor:** PLANET-005; licença de tiles e decisão de privacidade.
+**Predecessor:** PLANET-005; linhas L3 e L6 do
+[registro de licenças](../governance/licence-register.md) e decisão D6 da
+[base de privacidade](../governance/privacy-baseline.md).
 
 **Escopo:** rota autenticada no backend, cache com TTL e limite por usuário,
 atribuição e desligamento por padrão. OSM permanece direto, sem proxy.

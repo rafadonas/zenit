@@ -980,6 +980,8 @@ Use `--expect-empty` apenas em um banco recém-inicializado, como o da CI.
 - [Índice e rastreabilidade das fontes PDF](docs/reference/README.md)
 - [Prontidão do MVP demonstrativo](docs/mvp-readiness.md)
 - [Contrato OpenAPI](contracts/openapi.json)
+- [Registro de licenças e usos permitidos](docs/governance/licence-register.md)
+- [Base de política de privacidade](docs/governance/privacy-baseline.md)
 - [Baseline de acessibilidade](docs/accessibility/dashboard-baseline.md)
 - [Baseline de headers HTTP](docs/security/dashboard-http-headers.md)
 - [Baseline de limitação do login local](docs/security/local-login-throttle.md)
