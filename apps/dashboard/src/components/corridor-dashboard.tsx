@@ -376,35 +376,42 @@ export function CorridorDashboard({
             </div>
           </div>
 
-          {collection.features.length === 0 ? (
-            <div className="map-empty"><p>Nenhum segmento encontrado nesta área.</p></div>
-          ) : (
-            <div className="map-frame">
-              <RealisticCorridorMap
-                collection={collection}
-                ndviVisible={ndviVisible}
-                onSelectSegment={(segmentId, segmentIndex) => {
-                  selectSegment(segmentId, segmentIndex, false);
-                }}
-                selectedId={selectedId}
-                tileUrl={mapTileUrl}
-                vegetationMap={filteredVegetationMap}
-              />
-              {ndviVisible ? (
-                <div className="ndvi-inset" role="img" aria-label="Ampliação dos 55 pixels do recorte NDVI cacheado">
-                  <div><strong>NDVI · ampliação</strong><span>Sentinel-2 · 29/07/2026</span></div>
-                  <div className="ndvi-inset-grid" aria-hidden="true">
-                    {cachedNdviCells().map((cell) => (
-                      <i
-                        key={`inset-${cell.row}-${cell.column}`}
-                        style={{ backgroundColor: ndviCellColor(cell.value) }}
-                        title={cell.value === null ? "NoData" : cell.value.toFixed(3)}
-                      />
-                    ))}
-                  </div>
-                  <small>AOI estimada · não operacional · NDVI não é altura</small>
+          <div className="map-frame">
+            <RealisticCorridorMap
+              collection={collection}
+              ndviVisible={ndviVisible}
+              onSelectSegment={(segmentId, segmentIndex) => {
+                selectSegment(segmentId, segmentIndex, false);
+              }}
+              selectedId={selectedId}
+              tileUrl={mapTileUrl}
+              vegetationMap={filteredVegetationMap}
+            />
+            {collection.features.length === 0 ? (
+              <div className="map-empty-notice" role="status">
+                <strong>Mapa-base carregado sem segmentos</strong>
+                <span>
+                  Importe as fontes locais e gere o eixo candidato para exibir os trechos e
+                  polígonos históricos. Nenhum dado foi presumido.
+                </span>
+              </div>
+            ) : null}
+            {ndviVisible ? (
+              <div className="ndvi-inset" role="img" aria-label="Ampliação dos 55 pixels do recorte NDVI cacheado">
+                <div><strong>NDVI · ampliação</strong><span>Sentinel-2 · 29/07/2026</span></div>
+                <div className="ndvi-inset-grid" aria-hidden="true">
+                  {cachedNdviCells().map((cell) => (
+                    <i
+                      key={`inset-${cell.row}-${cell.column}`}
+                      style={{ backgroundColor: ndviCellColor(cell.value) }}
+                      title={cell.value === null ? "NoData" : cell.value.toFixed(3)}
+                    />
+                  ))}
                 </div>
-              ) : null}
+                <small>AOI estimada · não operacional · NDVI não é altura</small>
+              </div>
+            ) : null}
+            {filteredVegetationMap.features.length > 0 ? (
               <div className="vegetation-map-legend" aria-label="Legenda da vegetação">
                 <strong>Vegetação · histórico</strong>
                 <span><i className="vegetation-swatch n1" /> N1 · abaixo de 10 cm</span>
@@ -413,8 +420,8 @@ export function CorridorDashboard({
                 <span><i className="vegetation-swatch unknown" /> Sem classe / não aplicável</span>
                 <small>Referência 28/03/2025 · associação espacial inferida</small>
               </div>
-            </div>
-          )}
+            ) : null}
+          </div>
           <section className="segment-equivalent-list" aria-labelledby="segment-list-heading">
             <div>
               <h3 id="segment-list-heading">Lista equivalente ao mapa</h3>
