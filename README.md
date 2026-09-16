@@ -430,12 +430,19 @@ cd apps/mobile
     --bbox -46.80 -23.55 -46.76 -23.50 \
     --from-date 2026-08-01 \
     --to-date 2026-08-07 \
+    --database-url postgresql://zenit:<senha>@localhost:5432/zenit \
     --persist
   ```
 
   O `--persist` é uma confirmação explícita para registrar somente metadados
   normalizados e checksummed no banco local. O comando não cria pedido, não
   baixa bytes e mantém `operationally_eligible=false`.
+
+  O destino é explícito: o host configurado nunca é reescrito. Rodando fora do
+  Compose com `DATABASE_URL` apontando para o host `postgres`, o comando falha e
+  pede `--database-url`, para não gravar em outro banco que responda na mesma
+  porta local. A busca é limitada por `--limit` e não segue paginação; confira
+  `has_next_page` na saída.
 
 - **Order Planet acadêmico limitado (`zenit-planet-order`)**:
   ```bash

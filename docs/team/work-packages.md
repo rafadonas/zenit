@@ -321,6 +321,66 @@ proveniência, prompt/tooling de IA e supply chain.
 **Aceite:** ativos, atores, fronteiras, ameaças, controles e riscos aceitos; testes
 negativos ligados aos itens de maior risco.
 
+## F. Planet e imagens
+
+Incrementos da trilha geoespacial, sempre em tickets separados. Descoberta de
+catálogo não autoriza download, e nenhum item desta seção torna resultado
+operacional ou oficial.
+
+### PLANET-003 — persistir cenas com migração aprovada (`DONE`, gate pendente, P1)
+
+**Escopo:** metadados de cena PlanetScope em AOI e janela limitadas, com migração
+reversível e gravação idempotente.
+
+**Aceite:** [`../data-quality/planet-catalog-metadata-persistence.md`](../data-quality/planet-catalog-metadata-persistence.md).
+Implementado em `0d36d57`; faltam revisão da migração por outra pessoa, destino
+de banco explícito, testes de persistência e decisão de retenção.
+
+### PLANET-005 — controle de cota (`READY`, P1)
+
+**Predecessor:** PLANET-003 e PLANET-004.
+
+**Escopo:** orçamento versionado de área, bytes e chamadas; consumo derivado de
+`planet_order`; checagem antes de cada Order; extrato; repasse da chave aos
+serviços que precisam dela.
+
+**Aceite:** falha fechada sem orçamento aprovado; recusa antes da chamada externa
+com saldo informado; nenhuma contagem paralela de consumo; testes de saldo
+suficiente, insuficiente e ausente.
+
+### PLANET-006 — proxy e cache controlado de tiles (`BLOCKED`, P2)
+
+**Predecessor:** PLANET-005; licença de tiles e decisão de privacidade.
+
+**Escopo:** rota autenticada no backend, cache com TTL e limite por usuário,
+atribuição e desligamento por padrão. OSM permanece direto, sem proxy.
+
+**Aceite:** chave nunca no navegador; limite por usuário; cache verificável;
+mapa continua usável com o proxy desligado; registro de acesso compatível com
+`MAP-01` do threat model.
+
+### PLANET-007 — checksums e linhagem dos ativos (`READY`, P1)
+
+**Predecessor:** PLANET-003 e PLANET-004.
+
+**Escopo:** cadeia cena → Order → ativo → artefato derivado, com auditoria que
+recalcula checksums e exporta manifesto determinístico.
+
+**Aceite:** linhagem registrada ou ausência justificada; divergência marca o
+ativo como não utilizável sem correção automática; auditoria não altera dados.
+
+### PLANET-008 — processar offline o trecho piloto de 1 km (`BLOCKED`, P2)
+
+**Predecessor:** PLANET-005, PLANET-007, AOI homologada e licença de
+processamento.
+
+**Escopo:** processar apenas ativos cacheados e verificados, sem rede, com
+máscara UDM2 e resultado por segmento e zona.
+
+**Aceite:** execução idempotente e reproduzível; proporção de pixels válidos por
+zona; conclusão permanece `inconclusive`; nenhuma conversão em altura, N1/N2/N3
+ou autorização.
+
 ## Ordem recomendada para começar agora
 
 1. GOV-001;
