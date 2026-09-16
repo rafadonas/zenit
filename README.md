@@ -444,6 +444,18 @@ cd apps/mobile
   porta local. A busca é limitada por `--limit` e não segue paginação; confira
   `has_next_page` na saída.
 
+- **Processamento offline do trecho piloto (`zenit-planet-process`)**:
+  ```bash
+  zenit-planet-process --scene-id <cena> --from-segment 195 --segments 10 \
+    --database-url postgresql://zenit:<senha>@localhost:5432/zenit
+  ```
+
+  Calcula NDVI por zona a partir dos ativos já cacheados, com máscara UDM2 de
+  nuvem e sombra, sem nenhuma chamada ao provedor e sem consumir cota. Exige
+  auditoria `verified` nos ativos, é idempotente e grava resultado sempre
+  `inconclusive`, sujeito a revisão humana. Ver
+  [processamento do piloto](docs/data-quality/planet-pilot-offline-processing.md).
+
 - **Auditoria de checksums e linhagem (`zenit-asset-lineage`)**:
   ```bash
   zenit-asset-lineage --verify --database-url postgresql://zenit:<senha>@localhost:5432/zenit

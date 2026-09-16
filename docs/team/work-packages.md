@@ -370,7 +370,7 @@ recalcula checksums e exporta manifesto determinístico.
 Implementado com a migração `0045` e `zenit-asset-lineage`; faltam a política de
 divergência e a revisão da migração.
 
-### PLANET-008 — processar offline o trecho piloto de 1 km (`BLOCKED`, P2)
+### PLANET-008 — processar offline o trecho piloto de 1 km (`DONE`, AOI e licença pendentes, P2)
 
 **Predecessor:** PLANET-005, PLANET-007, AOI homologada e licença de
 processamento.
@@ -378,9 +378,9 @@ processamento.
 **Escopo:** processar apenas ativos cacheados e verificados, sem rede, com
 máscara UDM2 e resultado por segmento e zona.
 
-**Aceite:** execução idempotente e reproduzível; proporção de pixels válidos por
-zona; conclusão permanece `inconclusive`; nenhuma conversão em altura, N1/N2/N3
-ou autorização.
+**Aceite:** [`../data-quality/planet-pilot-offline-processing.md`](../data-quality/planet-pilot-offline-processing.md).
+Implementado com `zenit-planet-process`, sem migração nova; faltam a AOI
+homologada, a licença de processamento e a revisão do processador.
 
 ## Ordem recomendada para começar agora
 
