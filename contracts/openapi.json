@@ -9876,6 +9876,114 @@
         ]
       }
     },
+    "/v1/tiles/{provider}/{z}/{x}/{y}.png": {
+      "get": {
+        "operationId": "proxy_tile_v1_tiles__provider___z___x___y__png_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider",
+            "required": true,
+            "schema": {
+              "maxLength": 32,
+              "title": "Provider",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "z",
+            "required": true,
+            "schema": {
+              "title": "Z",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "x",
+            "required": true,
+            "schema": {
+              "title": "X",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "y",
+            "required": true,
+            "schema": {
+              "title": "Y",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/png": {}
+            },
+            "description": "Cached or proxied tile"
+          },
+          "404": {
+            "description": "Tile proxying is disabled or the provider is unknown"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "Request validation failed or the request cannot be processed.",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Request correlation identifier generated or accepted by the API.",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The authenticated user exceeded the tile rate limit"
+          },
+          "503": {
+            "description": "The provider could not serve the tile"
+          },
+          "default": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorResponse"
+                }
+              }
+            },
+            "description": "API error response.",
+            "headers": {
+              "X-Correlation-ID": {
+                "description": "Request correlation identifier generated or accepted by the API.",
+                "schema": {
+                  "format": "uuid",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "summary": "Proxy Tile",
+        "tags": [
+          "tiles"
+        ]
+      }
+    },
     "/v1/work-orders": {
       "get": {
         "operationId": "list_prepared_inspection_orders_v1_work_orders_get",
