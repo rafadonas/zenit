@@ -20,7 +20,7 @@ export const DEMO_GUIDE_STEPS: readonly DemoGuideStep[] = [
   },
   {
     title: "Abra o mapa da rodovia",
-    body: "No menu superior, clique em Mapa. A tela mostra a rodovia dividida em segmentos sobre o mapa-base.",
+    body: "No menu de navegação, clique em Mapa. A tela mostra a rodovia dividida em segmentos sobre o mapa-base.",
     action: { label: "Abrir o mapa", href: "/corridor" },
   },
   {
