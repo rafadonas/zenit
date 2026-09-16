@@ -92,7 +92,10 @@ def test_quota_cli_requires_an_offset_aware_instant() -> None:
         run(arguments, quota_status=status())
 
 
-def test_order_command_refuses_a_compose_only_destination_before_any_call() -> None:
+def test_order_command_refuses_a_compose_only_destination_before_any_call(monkeypatch) -> None:
+    import zenit_geospatial.database_target as target
+
+    monkeypatch.setattr(target, "_resolves", lambda host: False)
     from zenit_api.config import Settings
     from zenit_geospatial.planet_order_cli import build_parser as order_parser
     from zenit_geospatial.planet_order_cli import run as order_run
@@ -123,3 +126,22 @@ def test_blank_planet_key_still_reports_missing_configuration() -> None:
 
     with pytest.raises(RuntimeError, match="Planet API key is not configured"):
         persist_run(arguments, Settings(_env_file=None, PL_API_KEY=""))
+
+
+def test_compose_host_is_accepted_when_it_resolves() -> None:
+    from zenit_geospatial.database_target import resolve_database_url
+
+    # Inside the Compose network the host resolves and is the right destination.
+    assert resolve_database_url(
+        None,
+        "postgresql+psycopg://zenit:pw@postgres:5432/zenit",
+        host_resolves=lambda host: True,
+    ) == "postgresql://zenit:pw@postgres:5432/zenit"
+
+    # On a developer machine it does not resolve, so the command asks for a target.
+    with pytest.raises(RuntimeError, match="only reachable inside Compose"):
+        resolve_database_url(
+            None,
+            "postgresql+psycopg://zenit:pw@postgres:5432/zenit",
+            host_resolves=lambda host: False,
+        )

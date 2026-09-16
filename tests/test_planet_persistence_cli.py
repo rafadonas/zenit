@@ -125,7 +125,10 @@ def test_empty_catalog_page_touches_no_database() -> None:
     assert catalog.registered == []
 
 
-def test_compose_only_host_requires_explicit_destination() -> None:
+def test_compose_only_host_requires_explicit_destination(monkeypatch) -> None:
+    import zenit_geospatial.database_target as target
+
+    monkeypatch.setattr(target, "_resolves", lambda host: False)
     with pytest.raises(RuntimeError, match="only reachable inside Compose"):
         run(
             _arguments("--persist"),
