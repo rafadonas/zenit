@@ -444,6 +444,17 @@ cd apps/mobile
   porta local. A busca é limitada por `--limit` e não segue paginação; confira
   `has_next_page` na saída.
 
+- **Auditoria de checksums e linhagem (`zenit-asset-lineage`)**:
+  ```bash
+  zenit-asset-lineage --verify --database-url postgresql://zenit:<senha>@localhost:5432/zenit
+  zenit-asset-lineage --export --database-url ... > lineage.json
+  ```
+
+  `--verify` relê cada ativo do armazenamento, decifra, recalcula o SHA-256 e
+  registra a evidência sem alterar o ativo; sai com erro se algum estiver
+  divergente, ausente ou ilegível. `--export` só imprime o manifesto. Ver
+  [checksums e linhagem](docs/data-quality/asset-checksums-and-lineage.md).
+
 - **Extrato de cota Planet (`zenit-planet-quota`)**:
   ```bash
   zenit-planet-quota --database-url postgresql://zenit:<senha>@localhost:5432/zenit

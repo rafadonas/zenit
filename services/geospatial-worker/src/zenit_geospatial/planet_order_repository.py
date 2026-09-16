@@ -202,19 +202,30 @@ class PostgresPlanetOrderRepository:
         storage_uri: str,
         checksum_sha256: str,
         media_type: str,
+        storage_version_id: str | None = None,
+        size_bytes: int | None = None,
     ) -> None:
         query = """
             INSERT INTO satellite_asset (
                 satellite_scene_id, asset_role, storage_uri, checksum_sha256,
-                media_type, source_order_id
+                media_type, source_order_id, storage_version_id, size_bytes
             )
-            VALUES (%s, %s, %s, %s, %s, %s)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             ON CONFLICT (satellite_scene_id, asset_role, checksum_sha256) DO NOTHING
         """
         with psycopg.connect(self._database_url) as connection, connection.cursor() as cursor:
             cursor.execute(
                 query,
-                (scene_id, asset_role, storage_uri, checksum_sha256, media_type, order_id),
+                (
+                    scene_id,
+                    asset_role,
+                    storage_uri,
+                    checksum_sha256,
+                    media_type,
+                    order_id,
+                    storage_version_id,
+                    size_bytes,
+                ),
             )
 
     def mark_scene_cached(self, *, scene_id: UUID, cached_at: datetime) -> None:

@@ -224,6 +224,8 @@ def run(
             storage_uri=stored.storage_uri,
             checksum_sha256=checksum,
             media_type=media_type(binary.content_type, result.name),
+            storage_version_id=stored.version_id,
+            size_bytes=len(binary.body),
         )
         repository.record_event(
             order_id=lineage_id,

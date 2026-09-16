@@ -97,6 +97,9 @@ PLANET_ORDER_DOWNLOAD_MIGRATION = Path(
 )
 PLANET_QUOTA_BUDGET_MIGRATION = Path("infra/migrations/0044_planet_quota_budget.sql")
 PLANET_QUOTA_BUDGET_DOWN_MIGRATION = Path("infra/migrations/0044_planet_quota_budget.down.sql")
+ASSET_VERIFICATION_MIGRATION = Path(
+    "infra/migrations/0045_satellite_asset_lineage_verification.sql"
+)
 VEGETATION_COVER_INVARIANTS_MIGRATION = Path(
     "infra/migrations/0042_vegetation_cover_contract_invariants.sql"
 )
@@ -205,12 +208,25 @@ class MigrationContractTests(unittest.TestCase):
         mounts = [
             line.strip() for line in compose.splitlines() if "/docker-entrypoint-initdb.d/" in line
         ]
-        self.assertEqual(len(mounts), 44)
+        self.assertEqual(len(mounts), 45)
         for version, mount in enumerate(mounts, start=1):
             prefix = f"{version:04d}"
             self.assertIn(f"infra/migrations/{prefix}_", mount)
             self.assertIn(f"/docker-entrypoint-initdb.d/{prefix}.sql:ro", mount)
             self.assertNotIn(".down.sql", mount)
+
+    def test_satellite_asset_verification_is_append_only_audit(self) -> None:
+        sql = ASSET_VERIFICATION_MIGRATION.read_text(encoding="utf-8")
+
+        self.assertIn("CREATE TABLE satellite_asset_verification", sql)
+        self.assertIn("ADD COLUMN storage_version_id text", sql)
+        self.assertIn("status text NOT NULL CHECK (status IN (", sql)
+        self.assertIn("'verified', 'mismatch', 'missing', 'unreadable'", sql)
+        self.assertIn("satellite asset verifications are append-only", sql)
+        self.assertIn(
+            "CHECK ((status = 'verified') = (observed_checksum_sha256 = expected_checksum_sha256))",
+            sql,
+        )
 
     def test_planet_quota_budget_is_approved_bounded_and_append_only(self) -> None:
         sql = PLANET_QUOTA_BUDGET_MIGRATION.read_text(encoding="utf-8")

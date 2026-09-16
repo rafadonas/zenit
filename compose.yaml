@@ -55,6 +55,7 @@ services:
       - ./infra/migrations/0042_vegetation_cover_contract_invariants.sql:/docker-entrypoint-initdb.d/0042.sql:ro
       - ./infra/migrations/0043_planet_order_download.sql:/docker-entrypoint-initdb.d/0043.sql:ro
       - ./infra/migrations/0044_planet_quota_budget.sql:/docker-entrypoint-initdb.d/0044.sql:ro
+      - ./infra/migrations/0045_satellite_asset_lineage_verification.sql:/docker-entrypoint-initdb.d/0045.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s

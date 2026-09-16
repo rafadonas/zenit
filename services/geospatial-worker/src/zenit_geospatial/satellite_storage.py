@@ -14,6 +14,7 @@ from minio.error import S3Error
 from minio.versioningconfig import ENABLED, VersioningConfig
 
 from zenit_api.config import Settings
+from zenit_geospatial.asset_lineage import AssetUnavailableError, AssetUnreadableError
 
 
 class SatelliteContentMismatchError(RuntimeError):
@@ -119,6 +120,37 @@ class EncryptedSatelliteStore:
             version_id=result.version_id,
             storage_uri=f"s3://{self._bucket}/{object_name}",
         )
+
+    def read_plaintext(self, storage_uri: str, version_id: str | None = None) -> bytes:
+        """Fetch and decrypt an asset so its checksum can be recomputed (PLANET-007)."""
+        prefix = f"s3://{self._bucket}/"
+        if not storage_uri.startswith(prefix):
+            raise ValueError(f"storage_uri does not belong to bucket {self._bucket!r}")
+        object_name = storage_uri[len(prefix) :]
+        try:
+            response = self._client.get_object(self._bucket, object_name, version_id=version_id)
+        except S3Error as error:
+            if error.code in {"NoSuchKey", "NoSuchVersion"}:
+                raise AssetUnavailableError(
+                    f"stored object {object_name!r} was not found"
+                ) from None
+            raise
+        try:
+            encrypted = response.read()
+        finally:
+            response.close()
+            response.release_conn()
+        if len(encrypted) < 28:
+            raise AssetUnreadableError("stored object is shorter than the AES-GCM envelope")
+        nonce, tag, ciphertext = encrypted[:16], encrypted[16:32], encrypted[32:]
+        try:
+            return AES.new(self._encryption_key, AES.MODE_GCM, nonce=nonce).decrypt_and_verify(
+                ciphertext, tag
+            )
+        except ValueError as error:
+            raise AssetUnreadableError(
+                f"stored object failed AES-GCM verification: {error}"
+            ) from None
 
     def _ensure_bucket(self) -> None:
         if not self._client.bucket_exists(self._bucket):
