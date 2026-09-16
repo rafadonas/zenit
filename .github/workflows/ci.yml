@@ -148,6 +148,11 @@ jobs:
           docker compose exec -T postgres \
             psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
             < tests/sql/verify_planet_scene_persistence.sql
+      - name: Verify Planet quota budget constraints
+        run: |
+          docker compose exec -T postgres \
+            psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
+            < tests/sql/verify_planet_quota_budget.sql
       - name: Verify Planet migration reverse guard
         run: |
           docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit -c \

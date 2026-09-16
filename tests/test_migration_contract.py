@@ -95,6 +95,8 @@ PLANET_SCENE_PERSISTENCE_MIGRATION = Path(
 PLANET_ORDER_DOWNLOAD_MIGRATION = Path(
     "infra/migrations/0043_planet_order_download.sql"
 )
+PLANET_QUOTA_BUDGET_MIGRATION = Path("infra/migrations/0044_planet_quota_budget.sql")
+PLANET_QUOTA_BUDGET_DOWN_MIGRATION = Path("infra/migrations/0044_planet_quota_budget.down.sql")
 VEGETATION_COVER_INVARIANTS_MIGRATION = Path(
     "infra/migrations/0042_vegetation_cover_contract_invariants.sql"
 )
@@ -203,12 +205,28 @@ class MigrationContractTests(unittest.TestCase):
         mounts = [
             line.strip() for line in compose.splitlines() if "/docker-entrypoint-initdb.d/" in line
         ]
-        self.assertEqual(len(mounts), 43)
+        self.assertEqual(len(mounts), 44)
         for version, mount in enumerate(mounts, start=1):
             prefix = f"{version:04d}"
             self.assertIn(f"infra/migrations/{prefix}_", mount)
             self.assertIn(f"/docker-entrypoint-initdb.d/{prefix}.sql:ro", mount)
             self.assertNotIn(".down.sql", mount)
+
+    def test_planet_quota_budget_is_approved_bounded_and_append_only(self) -> None:
+        sql = PLANET_QUOTA_BUDGET_MIGRATION.read_text(encoding="utf-8")
+
+        self.assertIn("CREATE TABLE planet_quota_budget", sql)
+        self.assertIn("EXCLUDE USING gist (tstzrange(period_start, period_end) WITH &&)", sql)
+        self.assertIn("CHECK (period_end > period_start)", sql)
+        self.assertIn("max_area_m2 numeric(14, 2) NOT NULL CHECK (max_area_m2 > 0)", sql)
+        self.assertIn("approval_reference text NOT NULL", sql)
+        self.assertIn("Planet quota budgets are append-only", sql)
+
+    def test_planet_quota_budget_reverse_keeps_approved_budgets(self) -> None:
+        sql = PLANET_QUOTA_BUDGET_DOWN_MIGRATION.read_text(encoding="utf-8")
+
+        self.assertIn("cannot drop Planet quota budgets while approved budgets exist", sql)
+        self.assertIn("DROP TABLE planet_quota_budget", sql)
 
     def test_planet_order_download_is_bounded_and_lineage_is_append_only(self) -> None:
         sql = PLANET_ORDER_DOWNLOAD_MIGRATION.read_text(encoding="utf-8")

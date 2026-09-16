@@ -336,7 +336,7 @@ reversível e gravação idempotente.
 Implementado em `0d36d57`; faltam revisão da migração por outra pessoa, destino
 de banco explícito, testes de persistência e decisão de retenção.
 
-### PLANET-005 — controle de cota (`READY`, P1)
+### PLANET-005 — controle de cota (`DONE`, aprovação do orçamento pendente, P1)
 
 **Predecessor:** PLANET-003 e PLANET-004.
 
@@ -344,9 +344,9 @@ de banco explícito, testes de persistência e decisão de retenção.
 `planet_order`; checagem antes de cada Order; extrato; repasse da chave aos
 serviços que precisam dela.
 
-**Aceite:** falha fechada sem orçamento aprovado; recusa antes da chamada externa
-com saldo informado; nenhuma contagem paralela de consumo; testes de saldo
-suficiente, insuficiente e ausente.
+**Aceite:** [`../data-quality/planet-quota-control.md`](../data-quality/planet-quota-control.md).
+Implementado com a migração `0044`, `zenit-planet-quota` e verificação embutida
+no Order; faltam os valores aprovados do orçamento e a revisão da migração.
 
 ### PLANET-006 — proxy e cache controlado de tiles (`BLOCKED`, P2)
 

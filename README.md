@@ -444,6 +444,16 @@ cd apps/mobile
   porta local. A busca é limitada por `--limit` e não segue paginação; confira
   `has_next_page` na saída.
 
+- **Extrato de cota Planet (`zenit-planet-quota`)**:
+  ```bash
+  zenit-planet-quota --database-url postgresql://zenit:<senha>@localhost:5432/zenit
+  ```
+
+  Mostra o orçamento aprovado do período, o consumo já registrado e o saldo
+  restante. Só faz leitura. Sem orçamento aprovado para o instante atual,
+  `zenit-planet-order` falha fechado e nenhum pedido é criado. Ver
+  [controle de cota](docs/data-quality/planet-quota-control.md).
+
 - **Order Planet acadêmico limitado (`zenit-planet-order`)**:
   ```bash
   zenit-planet-order --execute
