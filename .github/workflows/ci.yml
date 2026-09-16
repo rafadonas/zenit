@@ -143,6 +143,32 @@ jobs:
           docker compose exec -T postgres \
             psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
             < tests/sql/verify_vegetation_cover_contract.sql
+      - name: Verify Planet scene persistence constraints
+        run: |
+          docker compose exec -T postgres \
+            psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
+            < tests/sql/verify_planet_scene_persistence.sql
+      - name: Verify Planet migration reverse guard
+        run: |
+          docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit -c \
+            "INSERT INTO satellite_scene (
+               provider, external_scene_id, collection, sensor, acquired_at, discovered_at,
+               cached_at, cache_status, data_status, catalog_checksum_sha256
+             ) VALUES (
+               'planet', 'planet-reverse-guard-test', 'PSScene', 'planet-scope', now(), now(),
+               NULL, 'discovered', 'real', repeat('f', 64)
+             );"
+          if docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
+               < infra/migrations/0041_planet_scene_persistence.down.sql; then
+            echo "reverse migration did not block while Planet scenes exist"
+            exit 1
+          fi
+          docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit -c \
+            "DELETE FROM satellite_scene WHERE sensor = 'planet-scope';"
+          docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
+            < infra/migrations/0041_planet_scene_persistence.down.sql
+          docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit \
+            < infra/migrations/0041_planet_scene_persistence.sql
       - name: Verify service contracts
         run: python scripts/verify_mvp_stack.py --expect-empty
       - name: Show service logs on failure

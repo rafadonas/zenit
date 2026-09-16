@@ -22,12 +22,12 @@
 | A1 | Migração aplica e reverte; o reverso falha enquanto houver cenas Planet | atendido | `0041_planet_scene_persistence.sql` e `.down.sql` |
 | A2 | Gravar exige a confirmação `--persist` | atendido | `test_persistence_refuses_writes_without_confirmation` |
 | A3 | A chave é exigida antes de qualquer chamada de rede | atendido | `test_persistence_checks_key_before_network_after_confirmation` |
-| A4 | Idempotência por `(provider, external_scene_id)`, preservando o checksum do primeiro snapshot | parcial | execução manual de 2026-09-15; sem teste automatizado |
+| A4 | Idempotência por `(provider, external_scene_id)`, preservando o checksum do primeiro snapshot | atendido | `test_repeating_the_same_search_creates_no_duplicate` e `tests/sql/verify_planet_scene_persistence.sql` |
 | A5 | Nenhum byte, Order ou elegibilidade operacional; `cache_status=discovered` | atendido | ADR-0077 e saída do comando |
 | A6 | Saída sem chave, URL de asset, corpo bruto ou ID de Order | atendido | `planet_persistence_cli.run` devolve apenas contagens e flags |
-| A7 | Banco de destino explícito, sem reescrita implícita de host | **não atendido** | o comando troca `@postgres:` por `@localhost:`; ver Riscos |
-| A8 | Testes automatizados de persistência e do reverso da migração | **não atendido** | os testes atuais cobrem argumentos e pré-condições |
-| A9 | Snapshot parcial declarado quando houver paginação | **não atendido** | `--limit` padrão 25 e `has_next_page` não seguido |
+| A7 | Banco de destino explícito, sem reescrita implícita de host | atendido | `--database-url` e `resolve_database_url`; host de Compose exige destino explícito |
+| A8 | Testes automatizados de persistência e do reverso da migração | atendido | 8 testes do comando; smoke SQL no CI; passo de CI aplica o reverso real com e sem cenas Planet |
+| A9 | Snapshot parcial declarado quando houver paginação | atendido | seção "Snapshot parcial" abaixo; `has_next_page` sempre na saída |
 
 ## Dependências
 
@@ -52,14 +52,20 @@ concluído.
 
 ## Riscos conhecidos
 
-- **Destino do banco (A7):** a reescrita de `@postgres:` para `@localhost:`
-  assume Postgres do ZENIT na porta padrão do host. Em uma estação onde a 5432
-  pertence a outro projeto, o comando aponta para o banco errado. Correção
-  proposta em `PLANET-003-fix`.
-- **Snapshot parcial (A9):** com `--limit` e sem seguir páginas, o conjunto
-  persistido é um recorte, não o catálogo completo da janela.
 - **Aplicação da migração:** os arquivos montados no Compose só rodam em volume
   novo; bancos existentes seguem o procedimento manual do README.
+- **Destino do banco:** resolvido. O comando não reescreve mais o host. Quando a
+  configuração aponta para o host `postgres`, alcançável apenas dentro do
+  Compose, ele falha e pede `--database-url`, em vez de gravar num banco vizinho
+  que responda em `localhost`.
+
+## Snapshot parcial
+
+A busca é limitada por `--limit`, padrão 25, e **não segue paginação**. O
+conjunto persistido é um recorte da janela, não o catálogo completo. A saída
+sempre informa `has_next_page`; quando ela for `true`, existem cenas elegíveis
+fora do snapshot. Ampliar a cobertura exige nova execução com janela ou limite
+diferentes, e o consumo correspondente entra no controle de cota (`PLANET-005`).
 
 ## Comportamento implementado
 
