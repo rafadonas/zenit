@@ -260,3 +260,17 @@ def test_enabled_proxy_without_upstream_is_unavailable_not_broken() -> None:
         app.dependency_overrides.clear()
 
     assert response.status_code == 503
+
+
+def test_blank_environment_values_are_treated_as_absent() -> None:
+    # Compose passes empty strings for unset variables; they must not look configured.
+    blank = Settings(
+        _env_file=None,
+        PL_API_KEY="",
+        TILE_PROXY_UPSTREAM_TEMPLATE="",
+        TILE_PROXY_ATTRIBUTION="   ",
+    )
+
+    assert blank.planet_api_key is None
+    assert blank.tile_proxy_upstream_template is None
+    assert blank.tile_proxy_attribution is None

@@ -106,3 +106,20 @@ def test_order_command_refuses_a_compose_only_destination_before_any_call() -> N
 
     with pytest.raises(RuntimeError, match="only reachable inside Compose"):
         order_run(arguments, settings, quota_status=status())
+
+
+def test_blank_planet_key_still_reports_missing_configuration() -> None:
+    from zenit_api.config import Settings
+    from zenit_geospatial.planet_persistence_cli import build_parser as persist_parser
+    from zenit_geospatial.planet_persistence_cli import run as persist_run
+
+    arguments = persist_parser().parse_args(
+        [
+            "--bbox", "-46.80", "-23.55", "-46.76", "-23.50",
+            "--from-date", "2026-08-01", "--to-date", "2026-08-07",
+            "--persist",
+        ]
+    )
+
+    with pytest.raises(RuntimeError, match="Planet API key is not configured"):
+        persist_run(arguments, Settings(_env_file=None, PL_API_KEY=""))

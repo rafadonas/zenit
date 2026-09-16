@@ -43,11 +43,11 @@ artefatos derivados declarados em data/manifests/*.json
 | A5 | Divergência marca o ativo como não utilizável, sem correção automática | atendido | `summarize` lista `unusable_asset_ids`; comando sai com erro |
 | A6 | Estados distintos para ausente, ilegível e divergente | atendido | `missing`, `unreadable`, `mismatch` |
 | A7 | Registro de auditoria imutável | atendido | gatilho append-only; smoke recusa `UPDATE` e `DELETE` |
-| A11 | Divergência só de tamanho é gravável como evidência | atendido | restrição aceita `mismatch` com checksum igual; verificado em banco real |
-| A12 | Reverso possível, porém deliberado | atendido | exige `SET zenit.confirm_destructive` na mesma sessão |
 | A8 | Exportação determinística | atendido | ordenação estável por cena e papel; testada com entrada invertida |
 | A9 | Artefatos derivados aparecem como filhos da origem | atendido | manifesto liga prévia e camada ao checksum do raster |
 | A10 | Nenhum resultado torna o ativo oficial | atendido | `eligible_for_official_reporting: false` no manifesto |
+| A11 | Divergência só de tamanho é gravável como evidência | atendido | restrição aceita `mismatch` com checksum igual; verificado em banco real |
+| A12 | Reverso possível, porém deliberado | atendido | exige `SET zenit.confirm_destructive` na mesma sessão |
 
 ## Dependências e aprovações
 

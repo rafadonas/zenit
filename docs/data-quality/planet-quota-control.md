@@ -22,7 +22,6 @@
 | A1 | Orçamento versionado, com responsável e referência de aprovação | atendido | `planet_quota_budget`, colunas `approval_reference`, `approved_by`, `approved_at` |
 | A2 | Um único orçamento vigente por instante | atendido | restrição de exclusão GiST; smoke recusa período sobreposto |
 | A3 | Orçamento aprovado é imutável | atendido | gatilho append-only; smoke recusa `UPDATE` e `DELETE` |
-| A11 | Reverso possível, porém deliberado | atendido | exige `SET zenit.confirm_destructive = 'planet_quota_budget'` na mesma sessão |
 | A4 | Consumo derivado de `planet_order`, sem contador paralelo | atendido | `PostgresPlanetQuota.status` soma área e bytes dos pedidos do período |
 | A5 | Pedido cancelado não consome orçamento | atendido | `CONSUMING_ORDER_STATES`; verificado em banco real |
 | A6 | Falha fechada sem orçamento aprovado | atendido | `QuotaError` quando nenhum período cobre o instante |
@@ -30,6 +29,7 @@
 | A8 | Extrato sem escrever no banco | atendido | `zenit-planet-quota` executa apenas consultas |
 | A9 | Destino de banco explícito nos comandos Planet | atendido | `--database-url` e `resolve_database_url` compartilhado |
 | A10 | Chave Planet disponível para os comandos no Compose | atendido | `PL_API_KEY` repassado ao serviço `api` |
+| A11 | Reverso possível, porém deliberado | atendido | exige `SET zenit.confirm_destructive = 'planet_quota_budget'` na mesma sessão |
 
 ## Dependências
 
