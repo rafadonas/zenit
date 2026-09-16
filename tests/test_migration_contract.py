@@ -100,6 +100,9 @@ PLANET_QUOTA_BUDGET_DOWN_MIGRATION = Path("infra/migrations/0044_planet_quota_bu
 ASSET_VERIFICATION_MIGRATION = Path(
     "infra/migrations/0045_satellite_asset_lineage_verification.sql"
 )
+ASSET_VERIFICATION_DOWN_MIGRATION = Path(
+    "infra/migrations/0045_satellite_asset_lineage_verification.down.sql"
+)
 VEGETATION_COVER_INVARIANTS_MIGRATION = Path(
     "infra/migrations/0042_vegetation_cover_contract_invariants.sql"
 )
@@ -224,9 +227,10 @@ class MigrationContractTests(unittest.TestCase):
         self.assertIn("'verified', 'mismatch', 'missing', 'unreadable'", sql)
         self.assertIn("satellite asset verifications are append-only", sql)
         self.assertIn(
-            "CHECK ((status = 'verified') = (observed_checksum_sha256 = expected_checksum_sha256))",
+            "CHECK (status <> 'verified' OR observed_checksum_sha256 = expected_checksum_sha256)",
             sql,
         )
+        self.assertIn("CHECK (status <> 'mismatch' OR observed_checksum_sha256 IS NOT NULL)", sql)
 
     def test_planet_quota_budget_is_approved_bounded_and_append_only(self) -> None:
         sql = PLANET_QUOTA_BUDGET_MIGRATION.read_text(encoding="utf-8")
@@ -238,11 +242,19 @@ class MigrationContractTests(unittest.TestCase):
         self.assertIn("approval_reference text NOT NULL", sql)
         self.assertIn("Planet quota budgets are append-only", sql)
 
-    def test_planet_quota_budget_reverse_keeps_approved_budgets(self) -> None:
+    def test_planet_quota_budget_reverse_requires_explicit_confirmation(self) -> None:
         sql = PLANET_QUOTA_BUDGET_DOWN_MIGRATION.read_text(encoding="utf-8")
 
         self.assertIn("cannot drop Planet quota budgets while approved budgets exist", sql)
+        self.assertIn("zenit.confirm_destructive", sql)
         self.assertIn("DROP TABLE planet_quota_budget", sql)
+
+    def test_asset_verification_reverse_requires_explicit_confirmation(self) -> None:
+        sql = ASSET_VERIFICATION_DOWN_MIGRATION.read_text(encoding="utf-8")
+
+        self.assertIn("cannot drop satellite asset verifications while audit records exist", sql)
+        self.assertIn("zenit.confirm_destructive", sql)
+        self.assertIn("DROP COLUMN storage_version_id", sql)
 
     def test_planet_order_download_is_bounded_and_lineage_is_append_only(self) -> None:
         sql = PLANET_ORDER_DOWNLOAD_MIGRATION.read_text(encoding="utf-8")

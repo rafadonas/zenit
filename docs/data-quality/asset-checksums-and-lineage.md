@@ -43,6 +43,8 @@ artefatos derivados declarados em data/manifests/*.json
 | A5 | Divergência marca o ativo como não utilizável, sem correção automática | atendido | `summarize` lista `unusable_asset_ids`; comando sai com erro |
 | A6 | Estados distintos para ausente, ilegível e divergente | atendido | `missing`, `unreadable`, `mismatch` |
 | A7 | Registro de auditoria imutável | atendido | gatilho append-only; smoke recusa `UPDATE` e `DELETE` |
+| A11 | Divergência só de tamanho é gravável como evidência | atendido | restrição aceita `mismatch` com checksum igual; verificado em banco real |
+| A12 | Reverso possível, porém deliberado | atendido | exige `SET zenit.confirm_destructive` na mesma sessão |
 | A8 | Exportação determinística | atendido | ordenação estável por cena e papel; testada com entrada invertida |
 | A9 | Artefatos derivados aparecem como filhos da origem | atendido | manifesto liga prévia e camada ao checksum do raster |
 | A10 | Nenhum resultado torna o ativo oficial | atendido | `eligible_for_official_reporting: false` no manifesto |
@@ -55,6 +57,18 @@ artefatos derivados declarados em data/manifests/*.json
 | Migrações `0001`–`0045` aplicadas no destino | responsabilidade de quem executa |
 | Política de divergência: reter, rebaixar ou apagar | **pendente**, data owner |
 | Revisão da migração `0045` | **pendente**, revisor diferente do autor |
+
+## Reverter a migração
+
+O gatilho append-only impede `UPDATE` e `DELETE`, então o reverso não pode
+simplesmente apagar as linhas. Ele exige confirmação explícita na mesma sessão:
+
+```bash
+psql -c "SET zenit.confirm_destructive = 'satellite_asset_verification'" \
+     -f infra/migrations/0045_satellite_asset_lineage_verification.down.sql
+```
+
+Sem essa confirmação, o reverso falha e a evidência permanece.
 
 ## Uso
 
@@ -78,7 +92,8 @@ pipeline não siga usando bytes divergentes.
 | --- | --- |
 | Migrações `0001`–`0045` em Postgres/PostGIS descartável | aplicadas |
 | `tests/sql/verify_satellite_asset_verification.sql` | PASS: `verified` com checksum divergente, `missing` com checksum observado, `UPDATE` e `DELETE` recusados |
-| Reverso da `0045` com auditoria registrada | bloqueado, como esperado |
+| Reverso da `0045` sem confirmação | bloqueado |
+| Reverso da `0045` com `SET zenit.confirm_destructive` e reaplicação | aplicado |
 | Ida e volta real no MinIO: gravar, decifrar e recalcular | `verified` |
 | Mesma leitura com checksum registrado errado | `mismatch` |
 | Objeto inexistente | `missing` |
