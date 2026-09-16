@@ -22,4 +22,10 @@ describe("corridor dashboard map v2 contract", () => {
     expect(dashboardSource).toContain("não representa condição atual");
     expect(mapSource).toContain("A lista equivalente, filtros e detalhes continuam disponíveis sem os tiles.");
   });
+
+  it("keeps the raster base visible when the local database has no imported segments", () => {
+    expect(dashboardSource).toContain("Mapa-base carregado sem segmentos");
+    expect(dashboardSource).toContain("Nenhum dado foi presumido.");
+    expect(dashboardSource).not.toContain('className="map-empty"');
+  });
 });
