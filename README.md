@@ -464,6 +464,18 @@ cd apps/mobile
   inelegível para treino, relatório oficial, operação ou autorização de roçada.
   Consulte [`DATA-DEMO-001`](docs/data-quality/simulated-mowing-timeseries.md).
 
+- **Gerar feature snapshots simulados**:
+
+  ```bash
+  python scripts/build_simulated_feature_snapshots.py
+  ```
+
+  A transformação verifica o checksum da série de seis meses, usa somente
+  janelas passadas e produz partições cronológicas para ensaio. Nenhum modelo é
+  treinado e todos os snapshots continuam inelegíveis para treino, operação e
+  relatório oficial. Consulte
+  [`DATA-DEMO-002`](docs/data-quality/simulated-feature-snapshot-rehearsal.md).
+
 - **Validação de smoke test da stack ativa**:
   ```bash
   python scripts/verify_mvp_stack.py
