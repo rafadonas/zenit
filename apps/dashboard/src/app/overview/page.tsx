@@ -4,6 +4,12 @@ import { DashboardHeader } from "../../components/dashboard-header";
 import { Alert, DataStatus, EmptyState, ErrorState } from "../../components/ui";
 import { loadDashboardSession } from "../../lib/dashboard-session";
 import {
+  DEMO_GUIDE_CONTEXT,
+  DEMO_GUIDE_HUMAN_DECISION,
+  DEMO_GUIDE_STEPS,
+  DEMO_GUIDE_SUMMARY,
+} from "../../lib/demo-guide";
+import {
   buildOverviewMetrics,
   latestOverviewReference,
   nextDecisionItem,
@@ -175,6 +181,36 @@ export default async function OverviewPage() {
               <span>5</span><div><strong>Concluir</strong><small>Histórico e resultado</small></div>
             </li>
           </ol>
+        </section>
+
+        <section className="workflow-panel demo-guide" aria-labelledby="demo-guide-title">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Demonstração do produto</p>
+              <h2 id="demo-guide-title">Como usar o ZENIT, passo a passo</h2>
+            </div>
+            <span className="flow-caption">Siga na ordem da apresentação</span>
+          </div>
+          <div className="demo-guide-context">
+            {DEMO_GUIDE_CONTEXT.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+            <p className="demo-guide-human"><strong>{DEMO_GUIDE_HUMAN_DECISION}</strong></p>
+          </div>
+          <ol className="demo-guide-steps">
+            {DEMO_GUIDE_STEPS.map((step, index) => (
+              <li key={step.title}>
+                <span aria-hidden="true">{index + 1}</span>
+                <div>
+                  <h3>{step.title}</h3>
+                  <p>{step.body}</p>
+                  {step.note ? <small>{step.note}</small> : null}
+                  {step.action ? (
+                    <Link className="secondary-button" href={step.action.href}>{step.action.label}</Link>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ol>
+          <p className="demo-guide-summary">{DEMO_GUIDE_SUMMARY}</p>
         </section>
 
         <section className="overview-grid">
