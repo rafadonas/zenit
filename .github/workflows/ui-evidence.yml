@@ -51,20 +51,34 @@ jobs:
       COMPOSE_PROJECT_NAME: zenit-evidence
     steps:
       - uses: actions/checkout@v4
-      - name: Pick an available MinIO image
-        run: |
-          # quay.io/minio stopped serving the pinned image; try known mirrors of the same release.
-          for image in quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z minio/minio:RELEASE.2025-04-22T22-12-26Z minio/minio:RELEASE.2025-09-07T16-13-09Z minio/minio:latest; do
-            if docker pull "$image"; then echo "MINIO_IMAGE=$image" >> "$GITHUB_ENV"; break; fi
-          done
-          test -n "$(grep MINIO_IMAGE "$GITHUB_ENV" || true)"
       - name: Start the full stack
         run: |
           cp .env.example .env
-          printf 'services:\n  minio:\n    image: %s\n' "$MINIO_IMAGE" > compose.evidence.yaml
+          # MinIO images are no longer publicly downloadable. These captures use an
+          # empty database and never touch object storage, so a stub that only
+          # answers the API health probe stands in for MinIO here (evidence only).
+          cat > compose.evidence.yaml <<'YAML'
+          services:
+            minio:
+              image: python:3.12-alpine
+              command:
+                - python
+                - -c
+                - |
+                  from http.server import BaseHTTPRequestHandler, HTTPServer
+                  class H(BaseHTTPRequestHandler):
+                      def do_GET(self):
+                          self.send_response(200); self.end_headers()
+                      do_HEAD = do_GET
+                  HTTPServer(("0.0.0.0", 9000), H).serve_forever()
+              healthcheck:
+                test: ["CMD", "wget", "-q", "-O-", "http://127.0.0.1:9000/minio/health/ready"]
+                interval: 5s
+                timeout: 5s
+                retries: 10
+          YAML
+          echo "COMPOSE_FILE=compose.yaml:compose.evidence.yaml" >> "$GITHUB_ENV"
           export COMPOSE_FILE=compose.yaml:compose.evidence.yaml
-          echo "COMPOSE_FILE=$COMPOSE_FILE" >> "$GITHUB_ENV"
-          docker compose pull --ignore-pull-failures postgres minio
           docker compose build
           docker compose up --no-build --wait --wait-timeout 300
       - name: Create the demo road and local fixture identities
