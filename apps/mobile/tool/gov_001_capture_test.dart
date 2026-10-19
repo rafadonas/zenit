@@ -44,7 +44,7 @@ void main() {
     await tester.runAsync(() async {
       await output.create(recursive: true);
       final font = await File(fontPath).readAsBytes();
-      for (final family in ['Roboto', 'Ahem']) {
+      for (final family in ['Roboto', 'Ahem', 'FlutterTest']) {
         final loader = FontLoader(family)
           ..addFont(Future.value(ByteData.sublistView(font)));
         await loader.load();
