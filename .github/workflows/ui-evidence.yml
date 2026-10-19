@@ -51,10 +51,25 @@ jobs:
       COMPOSE_PROJECT_NAME: zenit-evidence
     steps:
       - uses: actions/checkout@v4
+      - name: Pick an available MinIO image
+        run: |
+          # quay.io/minio stopped serving the pinned image; try known mirrors of the same release.
+          for image in quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z minio/minio:RELEASE.2025-04-22T22-12-26Z minio/minio:RELEASE.2025-09-07T16-13-09Z minio/minio:latest; do
+            if docker pull "$image"; then echo "MINIO_IMAGE=$image" >> "$GITHUB_ENV"; break; fi
+          done
+          test -n "$(grep MINIO_IMAGE "$GITHUB_ENV" || true)"
       - name: Start the full stack
         run: |
           cp .env.example .env
-          docker compose up --build --wait --wait-timeout 300
+          printf 'services:
+  minio:
+    image: %s
+' "$MINIO_IMAGE" > compose.evidence.yaml
+          export COMPOSE_FILE=compose.yaml:compose.evidence.yaml
+          echo "COMPOSE_FILE=$COMPOSE_FILE" >> "$GITHUB_ENV"
+          docker compose pull --ignore-pull-failures postgres minio
+          docker compose build
+          docker compose up --no-build --wait --wait-timeout 300
       - name: Create the demo road and local fixture identities
         run: |
           docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit -c \
