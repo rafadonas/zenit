@@ -166,10 +166,10 @@ export default async function MowingPostServiceSummariesPage({ searchParams }: P
             {summaries.truncated ? <small>Lista limitada a {summaries.limit} itens.</small> : null}
           </section>
 
-          <p className="quality-note">
-            <span>i</span>
-            <span><strong>Escopo seguro</strong> {summaries.warning}</span>
-          </p>
+          <div className="quality-note scope-note" role="note">
+            <span aria-hidden="true">i</span>
+            <div><strong>Escopo seguro</strong><p>{summaries.warning}</p></div>
+          </div>
 
           <section aria-label="Resumos pós-serviço simulados" className="prepared-summary-grid">
             {summaries.items.length === 0 ? (

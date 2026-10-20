@@ -24,6 +24,12 @@ describe("shared dashboard header", () => {
     expect(source.match(/shortLabel: "/g)).toHaveLength(5);
   });
 
+  it("keeps compact labels short enough for the tablet rail", () => {
+    const shortLabels = [...source.matchAll(/shortLabel: "([^"]+)"/g)].map(([, label]) => label);
+    expect(shortLabels).toHaveLength(5);
+    for (const label of shortLabels) expect(label.length, label).toBeLessThanOrEqual(7);
+  });
+
   it("keeps logout protected by the server-provided CSRF token", () => {
     expect(source).toContain('action="/api/auth/logout"');
     expect(source).toContain('name="csrf_token"');
