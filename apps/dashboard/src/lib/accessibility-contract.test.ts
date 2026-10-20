@@ -90,6 +90,34 @@ describe("dashboard accessibility baseline", () => {
     expect(cssVariable("green").toLowerCase()).toBe("#5a26ff");
   });
 
+  it("keeps tablet rail labels horizontal and inside the 72 px rail", () => {
+    const tabletRules = [...styles.matchAll(/@media \(min-width: 721px\) and \(max-width: 980px\) \{([\s\S]*?)\r?\n\}/g)]
+      .map(([, body]) => body)
+      .join("\n");
+    expect(tabletRules).toContain("width: 72px;");
+    expect(tabletRules).toContain("content: attr(data-compact-label)");
+    expect(tabletRules).toContain("white-space: nowrap;");
+    expect(tabletRules).toContain("min-width: 0;");
+    expect(tabletRules).not.toContain("writing-mode");
+  });
+
+  it("renders every quality note as an icon plus a block body", () => {
+    const notes = sourceFiles(sourceRoot)
+      .flatMap((path) => [...readFileSync(path, "utf8").matchAll(/<(\w+) className="quality-note[^"]*"[^>]*>\s*(<span[^>]*>)i<\/span>\s*<(\w+)/g)]
+        .map(([, wrapper, icon, body]) => ({ body, icon, path, wrapper })));
+    const usages = sourceFiles(sourceRoot)
+      .reduce((count, path) => count + (readFileSync(path, "utf8").match(/className="quality-note/g)?.length ?? 0), 0);
+
+    expect(usages).toBeGreaterThanOrEqual(3);
+    expect(notes).toHaveLength(usages);
+    for (const { body, icon, path, wrapper } of notes) {
+      expect(wrapper, path).toBe("div");
+      expect(icon, path).toContain('aria-hidden="true"');
+      expect(body, path).toBe("div");
+    }
+    expect(styles).toContain(".scope-note { margin: 16px auto 0; }");
+  });
+
   it("keeps normal muted text at WCAG AA contrast on primary surfaces", () => {
     const muted = cssVariable("muted");
     expect(contrastRatio(muted, cssVariable("paper"))).toBeGreaterThanOrEqual(4.5);

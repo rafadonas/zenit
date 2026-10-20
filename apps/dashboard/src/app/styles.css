@@ -300,6 +300,7 @@ h1 { margin-bottom: 8px; font: 600 clamp(2.1rem, 4vw, 3.2rem)/1 Georgia, serif; 
 .latest-photo-review { display: grid; gap: 4px; padding: 12px; border-radius: 8px; color: #496058; background: #edf3ee; font-size: .68rem; }
 .latest-photo-review p { margin: 4px 0 0; }
 .prepared-summary-grid { width: min(1120px, 92vw); margin: 16px auto 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+.scope-note { margin: 16px auto 0; }
 .prepared-summary-card { padding: 20px; border: 1px solid #d7c79d; border-radius: 14px; background: #fffdf7; box-shadow: var(--shadow); }
 .prepared-summary-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .prepared-summary-heading h2 { margin-top: 3px; font-size: 1.15rem; }
@@ -468,7 +469,7 @@ h1 { margin-bottom: 8px; font: 600 clamp(2.1rem, 4vw, 3.2rem)/1 Georgia, serif; 
 
 .dashboard-shell, .recommendations-shell { background: var(--color-bg); }
 .hero-row, .kpi-grid, .workspace-grid, .queue-heading, .queue-summary, .recommendation-list,
-.reviewer-session, .operation-message, .photo-review-grid, .prepared-summary-grid { width: min(1440px, calc(100vw - 64px)); }
+.reviewer-session, .operation-message, .photo-review-grid, .prepared-summary-grid, .scope-note { width: min(1440px, calc(100vw - 64px)); }
 .hero-row, .queue-heading { padding-top: 40px; padding-bottom: 28px; }
 .eyebrow { color: var(--color-brand); font-size: .68rem; letter-spacing: .12em; }
 h1, h2, p { letter-spacing: normal; }
@@ -647,7 +648,7 @@ h2, .card-heading h2, .side-heading h2, .recommendation-title h2, .prepared-summ
 @media (max-width: 980px) {
   .topbar { padding-inline: 24px; }
   .hero-row, .kpi-grid, .workspace-grid, .queue-heading, .queue-summary, .recommendation-list,
-  .reviewer-session, .operation-message, .photo-review-grid, .prepared-summary-grid { width: min(100% - 48px, 900px); }
+  .reviewer-session, .operation-message, .photo-review-grid, .prepared-summary-grid, .scope-note { width: min(100% - 48px, 900px); }
   .login-card { grid-template-columns: 1fr; max-width: 560px; }
   .login-brand-panel { min-height: 280px; }
   .login-form-panel { padding: 40px; }
@@ -672,7 +673,7 @@ h2, .card-heading h2, .side-heading h2, .recommendation-title h2, .prepared-summ
   .topnav a { min-height: 44px; padding: 9px 3px; font-size: 0; text-align: center; white-space: nowrap; }
   .topnav a::after { content: attr(data-compact-label); font-size: .65rem; }
   .hero-row, .kpi-grid, .workspace-grid, .queue-heading, .queue-summary, .recommendation-list,
-  .reviewer-session, .operation-message, .photo-review-grid, .prepared-summary-grid { width: calc(100% - 32px); }
+  .reviewer-session, .operation-message, .photo-review-grid, .prepared-summary-grid, .scope-note { width: calc(100% - 32px); }
   .hero-row, .queue-heading { padding-top: 28px; }
   .dashboard-shell, .recommendations-shell, .overview-shell { padding-bottom: 92px; }
   .login-shell { padding: 16px; }
@@ -724,15 +725,26 @@ h2, .card-heading h2, .side-heading h2, .recommendation-title h2, .prepared-summ
   }
   .brand-block { justify-content: center; margin-bottom: 34px; }
   .brand-block > div, .brand-block > span:last-child, .route-context, .update-context, .session-context span, .session-context button { display: none; }
-  .topnav { flex-direction: column; align-items: stretch; gap: 6px; }
-  .topnav a { min-height: 44px; padding: 12px; overflow: hidden; font-size: 0; text-align: center; }
-  .topnav a::after { content: attr(data-compact-label); font-size: .7rem; writing-mode: vertical-rl; }
+  .topnav { width: 100%; flex-direction: column; flex-wrap: nowrap; align-items: stretch; gap: 6px; }
+  .topnav a {
+    display: block;
+    min-width: 0;
+    min-height: 44px;
+    padding: 14px 2px;
+    overflow: hidden;
+    font-size: 0;
+    line-height: 16px;
+    text-align: center;
+    text-overflow: clip;
+    white-space: nowrap;
+  }
+  .topnav a::after { content: attr(data-compact-label); font-size: .62rem; }
   .dashboard-shell, .recommendations-shell { padding-left: 72px; }
 }
 
 @media (min-width: 981px) {
   .hero-row, .kpi-grid, .workspace-grid, .queue-heading, .queue-summary, .recommendation-list,
-  .reviewer-session, .operation-message, .photo-review-grid, .prepared-summary-grid {
+  .reviewer-session, .operation-message, .photo-review-grid, .prepared-summary-grid, .scope-note {
     width: min(1440px, calc(100vw - 304px));
   }
 }
