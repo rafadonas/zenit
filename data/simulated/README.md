@@ -10,3 +10,5 @@ dataset manifest.
 
 The `sp021-195` scenario is documented in
 [`docs/data-quality/simulated-mowing-timeseries.md`](../../docs/data-quality/simulated-mowing-timeseries.md).
+Its derived, training-ineligible feature rehearsal is documented in
+[`docs/data-quality/simulated-feature-snapshot-rehearsal.md`](../../docs/data-quality/simulated-feature-snapshot-rehearsal.md).

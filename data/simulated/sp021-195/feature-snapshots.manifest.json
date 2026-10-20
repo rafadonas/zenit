@@ -1,0 +1,38 @@
+{
+  "checksums": {
+    "csv_sha256": "51110dd0847063019b82945b77b9f338d0418929ee49cf9ca7b1f9978b352f87"
+  },
+  "data_status": "simulated",
+  "dataset_id": "zenit-simulated-feature-snapshots",
+  "dataset_version": "v0.1-presentation-only",
+  "eligibility": {
+    "authorizes_mowing": false,
+    "eligible_for_model_training": false,
+    "eligible_for_official_reporting": false,
+    "eligible_for_operations": false,
+    "model_fitted": false
+  },
+  "end_as_of": "2027-01-27",
+  "feature_definition_version": "zenit-simulated-feature-snapshot-v1",
+  "limitations": [
+    "All features derive only from algorithmically generated simulated values.",
+    "Split labels rehearse chronology and are not approved training partitions.",
+    "A single simulated segment cannot provide a spatial holdout.",
+    "No model was fitted, validated, calibrated, or promoted from this artifact."
+  ],
+  "purpose": "feature_pipeline_and_temporal_split_rehearsal",
+  "rehearsal_split_counts": {
+    "development_rehearsal": 464,
+    "holdout_rehearsal": 100,
+    "validation_rehearsal": 100
+  },
+  "schema_version": "zenit-simulated-feature-snapshot-manifest-v1",
+  "snapshot_count": 664,
+  "source_dataset": {
+    "csv_sha256": "8fa4ce5b6de213ad03db6a22032cf3caf4da9a03768b043b598671489c92a1ed",
+    "dataset_id": "zenit-simulated-mowing-timeseries",
+    "dataset_version": "v0.1-presentation-only"
+  },
+  "start_as_of": "2026-08-15",
+  "warmup_days": 14
+}
