@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import argparse
 from datetime import UTC, date, datetime, timedelta
-from urllib.parse import urlsplit
 
 from zenit_api.config import Settings
+from zenit_geospatial.database_target import resolve_database_url
 from zenit_geospatial.satellite_catalog import PostgresSatelliteCatalog
 from zenit_geospatial.satellite_http import PlanetCatalogClient, UrllibJsonTransport
 from zenit_geospatial.satellite_providers import BoundingBox, PlanetDataProvider, SearchWindow
@@ -31,22 +31,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="confirm writing normalized metadata to the configured local database",
     )
     return parser
-
-
-COMPOSE_ONLY_HOSTS = ("postgres",)
-
-
-def resolve_database_url(requested: str | None, configured: str) -> str:
-    """Never rewrite the host implicitly: a wrong guess writes to another database."""
-
-    url = (requested or configured).replace("postgresql+psycopg://", "postgresql://", 1)
-    host = urlsplit(url).hostname
-    if requested is None and host in COMPOSE_ONLY_HOSTS:
-        raise RuntimeError(
-            f"configured database host {host!r} is only reachable inside Compose; "
-            "pass --database-url with the ZENIT database reachable from here"
-        )
-    return url
 
 
 def run(

@@ -11,6 +11,7 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from zenit_api.config import Settings
+from zenit_geospatial.database_target import resolve_database_url
 from zenit_geospatial.planet_order_repository import PostgresPlanetOrderRepository
 from zenit_geospatial.planet_orders import (
     EXPECTED_ANALYTIC_UDM2_ASSETS,
@@ -22,6 +23,7 @@ from zenit_geospatial.planet_orders import (
     order_results,
     order_state,
 )
+from zenit_geospatial.planet_quota import PostgresPlanetQuota, QuotaStatus
 from zenit_geospatial.satellite_catalog import PostgresSatelliteCatalog
 from zenit_geospatial.satellite_http import PlanetCatalogClient, UrllibJsonTransport
 from zenit_geospatial.satellite_providers import BoundingBox, PlanetDataProvider, SearchWindow
@@ -51,6 +53,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--poll-seconds", type=float, default=DEFAULT_POLL_SECONDS)
     parser.add_argument("--wait-seconds", type=float, default=DEFAULT_WAIT_SECONDS)
     parser.add_argument(
+        "--database-url",
+        help="explicit destination database; required when the configured host is Compose-only",
+    )
+    parser.add_argument(
         "--execute",
         action="store_true",
         help="confirm the single external Order and bounded download",
@@ -64,6 +70,7 @@ def run(
     *,
     sleep: Callable[[float], None] = time.sleep,
     monotonic: Callable[[], float] = time.monotonic,
+    quota_status: QuotaStatus | None = None,
 ) -> dict[str, object]:
     if not arguments.execute:
         raise RuntimeError("Planet Order/download requires the --execute confirmation")
@@ -76,7 +83,7 @@ def run(
     if start >= end:
         raise ValueError("from-date must not be after to-date")
 
-    database_url = _local_database_url(active.database_url)
+    database_url = resolve_database_url(arguments.database_url, active.database_url)
     repository = PostgresPlanetOrderRepository(database_url)
     aoi = repository.prepared_segment_aoi(
         road_code=arguments.road_code,
@@ -87,6 +94,9 @@ def run(
         raise PlanetOrderError("Order AOI must remain estimated and non-operational")
     if aoi.area_m2 > arguments.max_area_m2:
         raise PlanetOrderError("Order AOI exceeds the approved area limit")
+    # PLANET-005: refuse before the external Order when the approved budget cannot cover it.
+    status = quota_status or PostgresPlanetQuota(database_url).status(datetime.now(UTC))
+    status.ensure_capacity(area_m2=aoi.area_m2, requested_bytes=arguments.max_bytes)
     bbox = BoundingBox(*_bbox(aoi.geometry))
     provider = PlanetDataProvider()
     search_payload = provider.build_search_request(
@@ -354,12 +364,6 @@ def _safe_response_metadata(response: Mapping[str, Any]) -> dict[str, object]:
         "has_error_hints": bool(response.get("error_hints")),
         "has_last_message": bool(response.get("last_message")),
     }
-
-
-def _local_database_url(database_url: str) -> str:
-    return database_url.replace("@postgres:", "@localhost:").replace(
-        "postgresql+psycopg://", "postgresql://"
-    )
 
 
 def _local_object_storage_endpoint(endpoint: str) -> str:
