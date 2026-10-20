@@ -320,7 +320,7 @@ infra exigem consumidores e smoke, não apenas unitários.
 | login fixo falha | usuários existem com os mesmos e-mails do `.env`; API e secrets de sessão coincidem |
 | `road SP021 does not exist` | importação + eixo candidato demonstrativo ainda não foram executados |
 | API local não conecta ao DB | URL do host deve usar `localhost`, não hostname `postgres` |
-| mapa vazio | verificar API GeoJSON, bbox, dados importados e só depois tiles |
+| mapa-base sem segmentos | é o estado esperado do banco vazio; verificar API GeoJSON, bbox, importação das fontes e geração do eixo candidato |
 | mapa sem base | rede/`MAP_TILE_URL`/atribuição; lista deve continuar útil |
 | migração nova não apareceu | volume existente não reaplica init scripts |
 | mobile não alcança API | emulador usa `10.0.2.2`; device precisa de host alcançável |
