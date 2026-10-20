@@ -1,4 +1,4 @@
-# ADR-0081: Pinned object-storage image and pydantic bound for CI
+# ADR-0086: Pinned object-storage image and pydantic bound for CI
 
 - Status: accepted
 - Date: 2026-10-20
