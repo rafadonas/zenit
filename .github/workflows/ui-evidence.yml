@@ -1,0 +1,123 @@
+name: UI evidence (Sprint 4)
+
+# Captures real application screens for the Sprint 4 Trello evidence.
+# Data is an empty demo database plus local fixture identities; the original
+# challenge source files are not in Git, so no segment, map or queue data is
+# imported. Screens are evidence of the UI, not of operational data.
+
+on:
+  push:
+    branches: [docs/sprint4-ui-evidence]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mobile:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.44.9"
+          channel: stable
+          cache: true
+      - name: Install locked mobile dependencies
+        run: flutter pub get --enforce-lockfile
+      - name: Expose the SDK fonts where the harness expects them
+        run: |
+          mkdir -p ../../.tools
+          ln -sfn "$FLUTTER_ROOT" ../../.tools/flutter
+          target="../../.tools/flutter/engine/src/flutter/txt/third_party/fonts"
+          if [ ! -f "$target/Roboto-Regular.ttf" ]; then
+            mkdir -p "$target"
+            cp "$(find "$FLUTTER_ROOT" -name 'Roboto-Regular.ttf' | head -n 1)" "$target/"
+          fi
+      - name: Capture mobile screens
+        run: flutter test tool/gov_001_capture_test.dart
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mobile-screens
+          path: data/processed/gov-001/mobile
+
+  dashboard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      COMPOSE_PROJECT_NAME: zenit-evidence
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start the full stack
+        run: |
+          cp .env.example .env
+          # MinIO images are no longer publicly downloadable. These captures use an
+          # empty database and never touch object storage, so a stub that only
+          # answers the API health probe stands in for MinIO here (evidence only).
+          cat > compose.evidence.yaml <<'YAML'
+          services:
+            minio:
+              image: python:3.12-alpine
+              command:
+                - python
+                - -c
+                - |
+                  from http.server import BaseHTTPRequestHandler, HTTPServer
+                  class H(BaseHTTPRequestHandler):
+                      def do_GET(self):
+                          self.send_response(200); self.end_headers()
+                      do_HEAD = do_GET
+                  HTTPServer(("0.0.0.0", 9000), H).serve_forever()
+              healthcheck:
+                test: ["CMD", "wget", "-q", "-O-", "http://127.0.0.1:9000/minio/health/ready"]
+                interval: 5s
+                timeout: 5s
+                retries: 10
+          YAML
+          echo "COMPOSE_FILE=compose.yaml:compose.evidence.yaml" >> "$GITHUB_ENV"
+          export COMPOSE_FILE=compose.yaml:compose.evidence.yaml
+          docker compose build
+          docker compose up --no-build --wait --wait-timeout 300
+      - name: Create the demo road and local fixture identities
+        run: |
+          docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U zenit -d zenit -c \
+            "INSERT INTO road (code, name) VALUES ('SP021', 'Rodoanel (demo, sem dados importados)') ON CONFLICT (code) DO NOTHING;"
+          password="$(openssl rand -hex 16)"
+          for spec in "manager@example.com|Gestor local do MVP|manager" "supervisor@example.com|Supervisor local do MVP|supervisor"; do
+            IFS='|' read -r email name role <<< "$spec"
+            printf '%s\n%s\n' "$password" "$password" | docker compose exec -T api \
+              zenit-user --email "$email" --display-name "$name" --road-code SP021 --role "$role"
+          done
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Capture dashboard screens (manager)
+        env:
+          CHROME_BINARY: /usr/bin/google-chrome
+          GOV_001_UNAUTHENTICATED_BASE_URL: http://127.0.0.1:3000
+          GOV_001_AUTHENTICATED_BOOTSTRAP_BASE_URL: http://127.0.0.1:3000
+          GOV_001_AUTHENTICATED_CAPTURE_BASE_URL: http://127.0.0.1:3000
+          GOV_001_OUTPUT_DIRECTORY: data/processed/ui-evidence/web-manager
+        run: node apps/dashboard/scripts/capture-gov-001.mjs
+      - name: Capture dashboard screens (supervisor)
+        env:
+          CHROME_BINARY: /usr/bin/google-chrome
+          GOV_001_UNAUTHENTICATED_BASE_URL: http://127.0.0.1:3002
+          GOV_001_AUTHENTICATED_BOOTSTRAP_BASE_URL: http://127.0.0.1:3002
+          GOV_001_AUTHENTICATED_CAPTURE_BASE_URL: http://127.0.0.1:3002
+          GOV_001_OUTPUT_DIRECTORY: data/processed/ui-evidence/web-supervisor
+        run: node apps/dashboard/scripts/capture-gov-001.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dashboard-screens
+          path: data/processed/ui-evidence
+      - name: Show service logs on failure
+        if: failure()
+        run: docker compose logs --no-color | tail -n 300
+      - name: Remove the stack
+        if: always()
+        run: docker compose down --volumes --remove-orphans
