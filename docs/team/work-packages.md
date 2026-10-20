@@ -359,15 +359,16 @@ atribuição e desligamento por padrão. OSM permanece direto, sem proxy.
 mapa continua usável com o proxy desligado; registro de acesso compatível com
 `MAP-01` do threat model.
 
-### PLANET-007 — checksums e linhagem dos ativos (`READY`, P1)
+### PLANET-007 — checksums e linhagem dos ativos (`DONE`, política pendente, P1)
 
 **Predecessor:** PLANET-003 e PLANET-004.
 
 **Escopo:** cadeia cena → Order → ativo → artefato derivado, com auditoria que
 recalcula checksums e exporta manifesto determinístico.
 
-**Aceite:** linhagem registrada ou ausência justificada; divergência marca o
-ativo como não utilizável sem correção automática; auditoria não altera dados.
+**Aceite:** [`../data-quality/asset-checksums-and-lineage.md`](../data-quality/asset-checksums-and-lineage.md).
+Implementado com a migração `0045` e `zenit-asset-lineage`; faltam a política de
+divergência e a revisão da migração.
 
 ### PLANET-008 — processar offline o trecho piloto de 1 km (`BLOCKED`, P2)
 
