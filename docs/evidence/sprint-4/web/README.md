@@ -15,5 +15,13 @@ and captured with `apps/dashboard/scripts/capture-gov-001.mjs` (headless Chrome)
 - **Defects found and kept visible:** `web-defeito-tablet-768.png` (compact
   sidebar labels break at 768 px) and `web-resultados-com-defeito-alerta.png`
   ("Escopo seguro" notice renders unstyled on the post-service pages).
+- **Defects fixed (PR #47) and recaptured:** the same workflow ran again on
+  `main` after the merge, in run
+  [39412425630](https://github.com/rafadonas/zenit/actions/runs/39412425630):
+  `web-corrigido-tablet-768.png` (rail labels fit at 768 px),
+  `web-corrigido-resultados-alerta.png` and
+  `web-corrigido-fotos-pos-servico-alerta.png` (styled "Escopo seguro" notice
+  aligned with the content column). The defect captures stay as before/after
+  evidence.
 - Not field data; not eligible for training, official reporting or field
   authorization.
