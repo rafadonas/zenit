@@ -29,6 +29,7 @@
 | A8 | Extrato sem escrever no banco | atendido | `zenit-planet-quota` executa apenas consultas |
 | A9 | Destino de banco explícito nos comandos Planet | atendido | `--database-url` e `resolve_database_url` compartilhado |
 | A10 | Chave Planet disponível para os comandos no Compose | atendido | `PL_API_KEY` repassado ao serviço `api` |
+| A11 | Reverso possível, porém deliberado | atendido | exige `SET zenit.confirm_destructive = 'planet_quota_budget'` na mesma sessão |
 
 ## Dependências
 

@@ -48,3 +48,6 @@ rewritten.
 - The budget is not a licence, a cost approval or an operational authorization,
   and no value here makes a result official.
 - Tile consumption is out of scope and belongs to PLANET-006.
+- Reverting the migration is possible but deliberate: it requires
+  `SET zenit.confirm_destructive = 'planet_quota_budget'` in the same session,
+  because the append-only trigger otherwise makes the table impossible to empty.

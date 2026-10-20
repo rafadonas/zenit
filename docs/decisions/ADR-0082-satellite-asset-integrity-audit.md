@@ -48,3 +48,9 @@ repository manifests, and reads nothing from object storage.
 - Re-downloading, retention enforcement and deletion of corrupted assets remain
   out of scope and depend on the approved retention policy.
 - No verification result makes an asset operational or officially reportable.
+- Reverting the migration is possible but deliberate: it requires
+  `SET zenit.confirm_destructive = 'satellite_asset_verification'` in the same
+  session, because the append-only trigger otherwise makes the table impossible
+  to empty.
+- A divergence in the registered size alone is still a mismatch, and the
+  constraints accept it with an observed checksum equal to the expected one.

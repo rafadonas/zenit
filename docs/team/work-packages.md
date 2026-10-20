@@ -348,7 +348,7 @@ serviços que precisam dela.
 Implementado com a migração `0044`, `zenit-planet-quota` e verificação embutida
 no Order; faltam os valores aprovados do orçamento e a revisão da migração.
 
-### PLANET-006 — proxy e cache controlado de tiles (`BLOCKED`, P2)
+### PLANET-006 — proxy e cache controlado de tiles (`DONE`, desligado até aprovação, P2)
 
 **Predecessor:** PLANET-005; linhas L3 e L6 do
 [registro de licenças](../governance/licence-register.md) e decisão D6 da
@@ -357,9 +357,9 @@ no Order; faltam os valores aprovados do orçamento e a revisão da migração.
 **Escopo:** rota autenticada no backend, cache com TTL e limite por usuário,
 atribuição e desligamento por padrão. OSM permanece direto, sem proxy.
 
-**Aceite:** chave nunca no navegador; limite por usuário; cache verificável;
-mapa continua usável com o proxy desligado; registro de acesso compatível com
-`MAP-01` do threat model.
+**Aceite:** [`../data-quality/planet-tile-proxy.md`](../data-quality/planet-tile-proxy.md).
+Implementado atrás de `TILE_PROXY_ENABLED=false`; ligar depende da licença de
+tiles e da decisão sobre endereço do visitante.
 
 ### PLANET-007 — checksums e linhagem dos ativos (`DONE`, política pendente, P1)
 

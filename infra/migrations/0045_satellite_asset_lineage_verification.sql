@@ -17,7 +17,10 @@ CREATE TABLE satellite_asset_verification (
     status text NOT NULL CHECK (status IN ('verified', 'mismatch', 'missing', 'unreadable')),
     detail text,
     verifier_version text NOT NULL,
-    CHECK ((status = 'verified') = (observed_checksum_sha256 = expected_checksum_sha256)),
+    -- A verified record must carry the matching checksum, but a divergence may be
+    -- in the size alone, so mismatch stays compatible with an equal checksum.
+    CHECK (status <> 'verified' OR observed_checksum_sha256 = expected_checksum_sha256),
+    CHECK (status <> 'mismatch' OR observed_checksum_sha256 IS NOT NULL),
     CHECK (status <> 'missing' OR observed_checksum_sha256 IS NULL)
 );
 

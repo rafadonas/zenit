@@ -41,6 +41,27 @@ BEGIN
         WHEN check_violation THEN NULL;
     END;
 
+    -- Bytes may be intact while the registered size diverges: that is a mismatch
+    -- whose observed checksum equals the expected one, and it must be storable.
+    INSERT INTO satellite_asset_verification (
+        satellite_asset_id, expected_checksum_sha256, observed_checksum_sha256,
+        observed_bytes, status, detail, verifier_version
+    ) VALUES (
+        asset_id, repeat('b', 64), repeat('b', 64), 2048, 'mismatch',
+        'stored size does not match the registered size', 'zenit-asset-verifier-v1'
+    );
+
+    -- A mismatch always carries what was observed.
+    BEGIN
+        INSERT INTO satellite_asset_verification (
+            satellite_asset_id, expected_checksum_sha256, observed_checksum_sha256,
+            observed_bytes, status, verifier_version
+        ) VALUES (asset_id, repeat('b', 64), NULL, NULL, 'mismatch', 'v1');
+        RAISE EXCEPTION 'a mismatch was accepted without an observed checksum';
+    EXCEPTION
+        WHEN check_violation THEN NULL;
+    END;
+
     -- A missing object cannot report observed bytes content.
     BEGIN
         INSERT INTO satellite_asset_verification (

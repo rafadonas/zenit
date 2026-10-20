@@ -54,10 +54,10 @@ concluído.
 
 - **Aplicação da migração:** os arquivos montados no Compose só rodam em volume
   novo; bancos existentes seguem o procedimento manual do README.
-- **Destino do banco:** resolvido. O comando não reescreve mais o host. Quando a
-  configuração aponta para o host `postgres`, alcançável apenas dentro do
-  Compose, ele falha e pede `--database-url`, em vez de gravar num banco vizinho
-  que responda em `localhost`.
+- **Destino do banco:** resolvido. O comando não reescreve mais o host. Dentro do
+  Compose, onde `postgres` resolve, ele é usado normalmente. Fora do Compose, onde
+  o nome não resolve, o comando falha e pede `--database-url`, em vez de gravar
+  num banco vizinho que responda em `localhost`.
 
 ## Snapshot parcial
 

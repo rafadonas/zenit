@@ -3,7 +3,7 @@ import binascii
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, SecretStr, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -80,6 +80,29 @@ class Settings(BaseSettings):
     copernicus_client_secret: str | None = None
     bdc_access_token: str | None = None
     planet_api_key: SecretStr | None = Field(default=None, validation_alias="PL_API_KEY")
+    # PLANET-006: the tile proxy stays closed until the licence rows L3/L6 and the
+    # viewer-IP decision D6 of the privacy baseline are approved.
+    tile_proxy_enabled: bool = False
+    tile_proxy_upstream_template: str | None = None
+    tile_proxy_attribution: str | None = None
+    tile_proxy_cache_ttl_seconds: int = Field(default=86_400, ge=60, le=2_592_000)
+    tile_proxy_rate_limit_per_minute: int = Field(default=60, ge=1, le=1_000)
+
+    @field_validator(
+        "copernicus_client_id",
+        "copernicus_client_secret",
+        "bdc_access_token",
+        "planet_api_key",
+        "tile_proxy_upstream_template",
+        "tile_proxy_attribution",
+        mode="before",
+    )
+    @classmethod
+    def blank_optional_is_absent(cls, value: object) -> object:
+        """Compose passes empty strings for unset variables; treat them as absent."""
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
     @model_validator(mode="after")
     def validate_security_settings(self) -> "Settings":

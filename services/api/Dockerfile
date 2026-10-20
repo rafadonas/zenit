@@ -6,6 +6,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# rasterio wheels link against the system expat library (PLANET-008).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libexpat1 \
+    && rm -rf /var/lib/apt/lists/*
+
 RUN addgroup --system zenit && adduser --system --ingroup zenit zenit
 
 COPY pyproject.toml README.md ./
