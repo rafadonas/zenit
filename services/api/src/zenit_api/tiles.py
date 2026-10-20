@@ -168,7 +168,7 @@ router = APIRouter(prefix="/v1/tiles", tags=["tiles"])
         503: {"description": "The provider could not serve the tile"},
     },
 )
-async def proxy_tile(
+def proxy_tile(
     user: Annotated[AuthenticatedUser, Depends(get_current_user)],
     settings: Annotated[Settings, Depends(get_settings)],
     cache: Annotated[TileCache, Depends(get_tile_cache)],
@@ -179,6 +179,8 @@ async def proxy_tile(
     x: int,
     y: int,
 ) -> Response:
+    # Deliberately synchronous: FastAPI runs it in a worker thread, so the blocking
+    # provider fetch never stalls the event loop that serves every other request.
     if not settings.tile_proxy_enabled:
         raise _tile_disabled()
     if provider not in ALLOWED_PROVIDERS:
